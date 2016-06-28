@@ -1,9 +1,12 @@
 # -*- coding: utf-8  -*-
+import datetime
 import pywikibot
 import re
 
 from pywikibot import pagegenerators
 from pywikibot import textlib
+
+start = datetime.datetime.now()
 
 cswiki = pywikibot.Site('cs', 'wikipedia')
 commons = pywikibot.Site('commons', 'commons')
@@ -32,20 +35,20 @@ for page in pagegenerators.WikibaseItemFilterPageGenerator(gen_combined):
     for template, fielddict in textlib.extract_templates_and_params(page.get()):
         if template.lower() == 'commonscat':
             has_param = False
-            cat_name = page.title()
+            cat_name = page.title(withNamespace=False)
             if '1' in fielddict.keys():
                 for pairs in fielddict.items():
                     if pairs[0] == '1':
                         cat_name = pairs[1].strip()
                         if cat_name != '':
                             has_param = True
-                            break
                         else:
-                            cat_name = page.title()
+                            cat_name = page.title(withNamespace=False)
+                        break
 
             commons_cat = pywikibot.Category(commons, cat_name)
             if not commons_cat.exists():
-                regex = r'(?:[\n\r]?|^)(?:\* *)?\{\{ *[Cc]ommonscat *'
+                regex = r'(?:[\n\r]?|^)(?:\* *)?\{\{ *[Cc]ommons(?:cat|[_ ]?category) *'
                 if has_param is True:
                     regex += r'\| *' + re.escape(cat_name).replace('\ ', '[_ ]')
                 regex += r'[^\}]*\}\}'
@@ -60,7 +63,6 @@ for page in pagegenerators.WikibaseItemFilterPageGenerator(gen_combined):
                     callback = None
                     if len(deferred_touch) > 0:
                         def_page = deferred_touch.pop(0)
-                        pywikibot.output("Deferring touching %s" % def_page.title())
                         callback = lambda _, __: def_touch(def_page)
                     page.save(summary=u"odstranění odkazu na neexistující kategorii na Commons",
                               async=True, callback=callback)
@@ -75,6 +77,10 @@ for page in pagegenerators.WikibaseItemFilterPageGenerator(gen_combined):
                 deferred_touch.append(page)
             break
 
-pywikibot.output("Touching remaining pages (%s item%s)" % (len(cache), 's' if len(cache) > 1 else ''))
+pywikibot.output("Touching remaining pages (%s item%s)" % (len(deferred_touch), 's' if len(deferred_touch) != 1 else ''))
 for def_page in deferred_touch:
-    def_page.touch(botflag=True)
+    def_touch(def_page)
+
+end = datetime.datetime.now()
+
+pywikibot.output("Complete! Took %s seconds" % (end - start).total_seconds())
