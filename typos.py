@@ -19,17 +19,19 @@ exceptions = ['category', 'comment', 'gallery', 'header', 'hyperlink', 'interwik
               'invoke', 'pre', 'property', 'source', 'startspace', 'template']
 # tags
 exceptions += ['ce', 'code', 'graph', 'imagemap', 'math', 'nowiki', 'timeline']
-# regexes ('target-part' of a wikilink)
-exceptions += [re.compile('\[\[[^\[\]\|]+[]\|]')]
+# regexes ('target-part' of a wikilink; quotation marks; italics)
+exceptions += [re.compile(r'\[\[[^\[\]\|]+[\|\]]'), re.compile(ur'„[^“]+“'),
+               re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1).)\1", re.M | re.U)]
 
 pywikibot.output(u'Loading typos')
 WPCTypos = pywikibot.Page(site, u'Wikipedie:WPCleaner/Typo')
 content = WPCTypos.get()
 
+false_positives = pywikibot.Page(site, u'Wikipedie:WPCleaner/Typo/False')
+false_positives.get()
+
 for template, fielddict in textlib.extract_templates_and_params(content):
     if template.lower() == 'typo':
-        if 'hledat' not in fielddict.keys():
-            continue
         if 'auto' not in fielddict.keys():
             continue
         if '3' in fielddict.keys():
@@ -49,7 +51,8 @@ for template, fielddict in textlib.extract_templates_and_params(content):
                 replace = re.sub(r'\$([1-9])', r'\\\1', pairs[1])
                 replace = re.sub(r'</?nowiki>', '', replace)
             elif pairs[0] == 'hledat':
-                query = pairs[1].replace('{{!}}', '|')
+                if pairs[1] != '':
+                    query = pairs[1].replace('{{!}}', '|')
             elif pairs[0] == 'insource':
                 insource = pairs[1] != 'ne'
             elif pairs[0] == 'auto':
@@ -57,7 +60,7 @@ for template, fielddict in textlib.extract_templates_and_params(content):
                     ok = False
                     break
         if ok is True:
-            if insource is True:
+            if query is not None and insource is True:
                 query = 'insource:/%s/i' % query
             typoRules.append(
                 (query, find, replace)
@@ -76,24 +79,42 @@ def replace_and_summary(match, replacement, replaced):
         pywikibot.output(u'No replacement done in "%s"' % old)
     else:
         fragment = u'%s → %s' % (old, new)
-        if fragment not in replaced:
+        if fragment.lower() not in [i.lower() for i in replaced]:
             replaced.append(fragment)
     return new
 
 for rule in typoRules:
+    if rule[0] is None:
+        continue
+    pywikibot.output(u'Doing %s' % rule[0])
+    i = j = 0.0
     for page in pagegenerators.SearchPageGenerator(rule[0], namespaces=[0], site=site):
+        if u'[[%s]]' % page.title() in false_positives.text:
+            pywikibot.output(u'%s is on whitelist' % page.title())
+            continue
+        if re.search(rule[1], page.title(), re.U) is not None:
+            pywikibot.output(u'Expression matched title: %s' % page.title())
+            continue
         replaced = []
         text = page.get()
         callback = lambda match: replace_and_summary(match, rule[2], replaced)
-        text = textlib.replaceExcept(text, re.compile(rule[1], re.UNICODE), callback, exceptions, site=site)
-        if text == page.text and quick_mode is True:
-            continue
+        text = textlib.replaceExcept(text, re.compile(rule[1], re.U), callback, exceptions, site=site)
+        i += 1
+        if text == page.text:
+            if quick_mode is True:
+                continue
+        else:
+            j += 1
         for sub_rule in typoRules:
+            if re.search(sub_rule[1], page.title(), re.U) is not None:
+                continue
             callback = lambda match: replace_and_summary(match, sub_rule[2], replaced)
-            text = textlib.replaceExcept(text, re.compile(sub_rule[1], re.UNICODE), callback, exceptions, site=site)
+            text = textlib.replaceExcept(text, re.compile(sub_rule[1], re.U), callback, exceptions, site=site)
         if len(replaced) > 0:
             page.text = text
             page.save(summary=u'oprava překlepů: %s' % ', '.join(replaced), async=True)
+    if i > 0.0 and j / i < 0.5:
+        pywikibot.output(u'Inaccurate query {} ({} %)'.format(rule[0], int((j / i) * 100)))
 
 end = datetime.datetime.now()
 

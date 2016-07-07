@@ -30,8 +30,6 @@ QUERY = """SELECT DISTINCT ?item WHERE {
   [] wikibase:claim ?p .
 } ORDER BY ?item""".replace('\n', ' ') % (', wd:'.join(good_cache), ', wd:'.join(bad_cache))
 
-#print(QUERY)
-
 for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
     item.get()
     for prop in item.claims.keys():

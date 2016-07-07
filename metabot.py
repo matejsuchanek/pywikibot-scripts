@@ -129,7 +129,7 @@ def source(item, textvalue):
 def example(item, textvalue):
 	if item.claims.has_key('P31'):
 		for claim in item.claims['P31']:
-			if claim.getTarget().getID() in ['Q15720608', 'Q18615010']:
+			if claim.target_equals(pywikibot.ItemPage(repo, 'Q15720608')):
 				pywikibot.output(u'%s is for qualifier use' % item.title())
 				return
 
@@ -171,8 +171,8 @@ def example(item, textvalue):
 				i = True
 			regex = re.sub(r'((?:^|[^\\])(?:\\\\)*)\(', r'\1(?:', regex) # no capture groups
 			regex = r'([Ff]ile:' + regex + ')'
-			if i:
-				regex = re.compile(regex, re.I)
+			if i is True:
+                                regex = re.compile(regex, re.I)
 	else:
 		if regexes.has_key(item.type):
 			regex = regexes[item.type]

@@ -29,12 +29,13 @@ def redirectsTo(page, target):
     return page.isRedirectPage() and page.getRedirectTarget().title() == target.title()
 
 for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
-    claims = []
-    target = None
     if item.isRedirectPage():
         pywikibot.output("%s is redirect" % item.getID())
+        item.touch()
         continue
 
+    claims = []
+    target = None
     item.get()
     if item.claims.has_key('P460'):
         for claim in item.claims['P460']:
@@ -136,7 +137,10 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
                 data['descriptions'][lang] = ''
     if len(data['descriptions'].keys()) > 0:
         item.editEntity(data, summary="Removing conflicting descriptions before merging")
-    item.mergeInto(target, ignore_conflicts="description")
+    try:
+        item.mergeInto(target, ignore_conflicts="description")
+    except Exception as exc:
+        pywikibot.output("Error when merging %s into %s: %s" % (item.getID(), target.getID(), exc.message))
 
 end = datetime.datetime.now()
 
