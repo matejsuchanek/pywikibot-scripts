@@ -18,10 +18,11 @@ typoRules = []
 exceptions = ['category', 'comment', 'gallery', 'header', 'hyperlink', 'interwiki',
               'invoke', 'pre', 'property', 'source', 'startspace', 'template']
 # tags
-exceptions += ['ce', 'code', 'graph', 'imagemap', 'math', 'nowiki', 'timeline']
+exceptions += ['ce', 'code', 'graph', 'imagemap', 'math', 'nowiki', 'poem',
+               'score', 'section', 'timeline']
 # regexes ('target-part' of a wikilink; quotation marks; italics)
 exceptions += [re.compile(r'\[\[[^\[\]\|]+[\|\]]'), re.compile(ur'„[^“]+“'),
-               re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1).)\1", re.M | re.U)]
+               re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1).)+\1", re.M | re.U)]
 
 pywikibot.output(u'Loading typos')
 WPCTypos = pywikibot.Page(site, u'Wikipedie:WPCleaner/Typo')
@@ -48,8 +49,8 @@ for template, fielddict in textlib.extract_templates_and_params(content):
                     ok = False # only fixed-width look-behind
                     break
             elif pairs[0] == '2':
-                replace = re.sub(r'\$([1-9])', r'\\\1', pairs[1])
-                replace = re.sub(r'</?nowiki>', '', replace)
+                replace = re.sub(r'</?nowiki>', '', pairs[1])
+                replace = re.sub(r'\$([1-9])', r'\\\1', replace)
             elif pairs[0] == 'hledat':
                 if pairs[1] != '':
                     query = pairs[1].replace('{{!}}', '|')
@@ -78,8 +79,8 @@ def replace_and_summary(match, replacement, replaced):
     if old == new:
         pywikibot.output(u'No replacement done in "%s"' % old)
     else:
-        fragment = u'%s → %s' % (old, new)
-        if fragment.lower() not in [i.lower() for i in replaced]:
+        fragment = u' → '.join([re.sub(r'(^ | $)', r'_', j) for j in [old, new]])
+        if fragment.lower() not in [j.lower() for j in replaced]:
             replaced.append(fragment)
     return new
 

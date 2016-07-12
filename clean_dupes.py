@@ -31,7 +31,6 @@ def redirectsTo(page, target):
 for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
     if item.isRedirectPage():
         pywikibot.output("%s is redirect" % item.getID())
-        item.touch()
         continue
 
     claims = []
@@ -80,13 +79,12 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
     ok = True
     for dbname in item.sitelinks.keys():
         if target.sitelinks.has_key(dbname):
-            page = pywikibot.Page(pywikibot.site.APISite.fromDBName(dbname),
-                                  item.sitelinks[dbname])
+            apisite = pywikibot.site.APISite.fromDBName(dbname)
+            page = pywikibot.Page(apisite, item.sitelinks[dbname])
             if not page.exists():
                 sitelinks.append(dbname)
                 continue
-            target_page = pywikibot.Page(pywikibot.site.APISite.fromDBName(dbname),
-                                         target.sitelinks[dbname])
+            target_page = pywikibot.Page(apisite, target.sitelinks[dbname])
             if not target_page.exists():
                 target_sitelinks.append(dbname)
                 continue
@@ -123,12 +121,12 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
     pywikibot.output(u"Merging %s into %s" % (item.getID(), target.getID()))
     if len(sitelinks) > 0:
         item.removeSitelinks(sitelinks)
-    for claim in claims:
-        item.removeClaims(claim)
+    if len(claims) > 0:
+        item.removeClaims(claims)
     if len(target_sitelinks) > 0:
         target.removeSitelinks(target_sitelinks)
-    for claim in target_claims:
-        target.removeClaims(claim)
+    if len(target_claims) > 0:
+        item.removeClaims(target_claims)
 
     data = {'descriptions': {}}
     for lang in item.descriptions.keys():

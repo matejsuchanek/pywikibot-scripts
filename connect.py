@@ -1,6 +1,7 @@
 # -*- coding: utf-8  -*-
 import datetime
 import pywikibot
+
 from pywikibot import pagegenerators
 from pywikibot import textlib
 
@@ -232,11 +233,10 @@ for project in tp_map.keys():
                         try:
                             item = target_page.data_item()
                             item.get()
-                            # FIXME: dbname
-                            if lang + family.replace('wikipedia', 'wiki') in item.sitelinks.keys():
+                            if site.dbName() in item.sitelinks.keys():
                                 continue
-                            item.setSitelink(page, summary=u'Adding sitelink to [[%s:%s:%s]]'
-                                             % (family, lang, page.title()))
+                            item.setSitelink(page, summary=u'Adding sitelink to [[%s:%s]]'
+                                             % (site.sitename(), page.title()))
                             page.touch()
                             break
                         except Exception as exc:

@@ -1,4 +1,5 @@
 # -*- coding: utf-8  -*-
+import datetime
 import pywikibot
 import re
 
@@ -32,7 +33,7 @@ def summary(prop, value, item):
 		value = u'[[%s|%s]]' % (value.title(), value.getID())
 	else:
 		value = u"'%s'" % value
-	rev_id = pywikibot.Page(site, item.getID(), 121).latest_revision_id
+	rev_id = item.toggleTalkPage().latest_revision_id
 	return u'Importing "[[Property:%s]]: %s" from [[Special:PermaLink/%s|talk page]]' % (prop, value, rev_id)
 
 def getregexfromitem(item):
@@ -155,7 +156,7 @@ def example(item, textvalue):
 		if formatter is None:
 			if item.type == "external-id":
 				pywikibot.output(u'Info: No formatter found for "%s"' % item.title())
-			regex = r'^(' + regex + r')$'
+			regex = r'^(%s)$' % regex
 		else:
 			regex = re.sub(r'((?:^|[^\\])(?:\\\\)*)\(', r'\1(?:', regex) # no capture groups
 			regex = r'(?:' + re.sub(r'\\\$1', r'(' + regex + r')', re.escape(formatter)) + r'|(?:^["\'<]?|\s)(' + regex + r')(?:["\'>]?$|\]))'
@@ -166,11 +167,11 @@ def example(item, textvalue):
 			regex = regexes[item.type]
 		else:
 			i = False
-			if regex[0:3] == '(?i)':
+			if regex.startswith('(?i)'):
 				regex = regex[4:]
 				i = True
 			regex = re.sub(r'((?:^|[^\\])(?:\\\\)*)\(', r'\1(?:', regex) # no capture groups
-			regex = r'([Ff]ile:' + regex + ')'
+			regex = r'([Ff]ile:%s)' % regex
 			if i is True:
                                 regex = re.compile(regex, re.I)
 	else:
@@ -188,7 +189,7 @@ def example(item, textvalue):
 			pywikibot.output(u'Example pair not recognized in "%s"' % match)
 			continue
 
-		splitObj = [splitObj[0], splitObj[-1]]
+		splitObj = [splitObj[i] for i in [0, -1]]
 		searchObj = re.search(regexes['wikibase-item'], splitObj[0])
 		if searchObj is None:
 			pywikibot.output(u'No item id found in "%s"' % splitObj[0])
@@ -208,7 +209,7 @@ def example(item, textvalue):
 		for qual_match in re.finditer(regex, splitObj[1]):
 			qual_target = None
 			for string in qual_match.groups():
-				if string in [None, '']:
+				if not string:
 					continue
 				qual_target = string
 				break
@@ -241,7 +242,7 @@ def example(item, textvalue):
 
 			claim = pywikibot.Claim(repo, u'P1855')
 			claim.setTarget(target)
-			qualifier = pywikibot.Claim(repo, item.getID(), isQualifier=True)
+			qualifier = item.newClaim(isQualifier=True)
 			qualifier.setTarget(qual_target)
 			data = {"claims":[claim.toJSON()]}
 			data['claims'][0]['qualifiers'] = {item.getID():[qualifier.toJSON()]}
@@ -256,17 +257,19 @@ func_dict = {
 	u'example': example
 }
 
-start = int(raw_input("Start: "))
-end = int(raw_input("End: ") or start)
+start = int(pywikibot.input("Start: "))
+end = int(pywikibot.input("End: ") or start)
 
-for i in xrange(start, end + 1):
+start_time = datetime.datetime.now()
+
+for i in xrange(start, end + 1): # fixme: pagegenerators?
 	item = pywikibot.PropertyPage(repo, u'P%s' % i)
 	pywikibot.output(u'Looking up for "%s"' % item.title())
 	if not item.exists():
 		pywikibot.output(u'"%s" doesn\'t exist, skipping to the next one' % item.title())
 		continue
 
-	page = pywikibot.Page(site, 'P%s' % i, 121)
+	page = item.toggleTalkPage()
 	if not page.exists():
 		pywikibot.output(u'"%s" doesn\'t exist, skipping to the next one' % page.title())
 		continue
@@ -296,10 +299,10 @@ for i in xrange(start, end + 1):
 							regex = re.sub(r'<\/?nowiki>', '', pairs[1])
 							if regex == '': # FIXME
 								break
-							claim = pywikibot.Claim(repo, u'P1793')
+							claim = pywikibot.Claim(repo, 'P1793')
 							claim.setTarget(regex.strip())
 							item.editEntity({"claims":[claim.toJSON()]},
-                                                                        summary=summary(u'P1793', regex, item))
+                                                                        summary=summary('P1793', regex, item))
 							item.get(force=True)
 						break
 				break
@@ -317,5 +320,8 @@ for i in xrange(start, end + 1):
 				except Exception as exc:
 					pywikibot.output(exc.message)
 				break
+	#page.touch()
 
-pywikibot.output("Bye bye!")
+end_time = datetime.datetime.now()
+
+pywikibot.output("Complete! Took %s seconds" % (end_time - start_time).total_seconds())
