@@ -54,22 +54,22 @@ for page in pagegenerators.WikibaseItemFilterPageGenerator(gen_combined):
                 regex += r'[^\}]*\}\}'
                 page_replaced_text = re.sub(regex, '', page_text)
                 if page_replaced_text == page_text:
-                    pywikibot.output("No replacement done in %s" % page.title())
+                    pywikibot.output(u'No replacement done in %s' % page.title())
                 else:
                     page_replaced_text = re.sub(ur'[\n\r]+==+\ ?Externí\ odkazy\ ?==+\ *[\n\r]+(==|\{\{(?:DEFAULTSORT:|[Pp]ahýl|[Pp]osloupnost|[Aa]utoritní data|[Pp]ortály)|\[\[Kategorie:)',
                                                 r'\n\n\1', page_replaced_text)
                     page.text = page_replaced_text
-                    pywikibot.output("Saving %s" % page.title())
+                    pywikibot.output('Saving %s' % page.title())
                     callback = None
                     if len(deferred_touch) > 0:
                         def_page = deferred_touch.pop(0)
                         callback = lambda _, __: def_touch(def_page)
-                    page.save(summary=u"odstranění odkazu na neexistující kategorii na Commons",
+                    page.save(summary=u'odstranění odkazu na neexistující kategorii na Commons',
                               async=True, callback=callback)
             else:
                 claim = pywikibot.Claim(repo, 'P373')
                 claim.setTarget(cat_name)
-                pywikibot.output('Importing P373 from %s to %s' % (page.title(), item.getID()))
+                pywikibot.output(u'Importing P373 from %s to %s' % (page.title(), item.getID()))
                 item.addClaim(claim)
                 ref = pywikibot.Claim(repo, 'P143', isReference=True)
                 ref.setTarget(pywikibot.ItemPage(repo, 'Q191168'))
@@ -77,10 +77,10 @@ for page in pagegenerators.WikibaseItemFilterPageGenerator(gen_combined):
                 deferred_touch.append(page)
             break
 
-pywikibot.output("Touching remaining pages (%s item%s)" % (len(deferred_touch), 's' if len(deferred_touch) != 1 else ''))
+pywikibot.output('Touching %s remaining page%s' % (len(deferred_touch), 's' if len(deferred_touch) != 1 else ''))
 for def_page in deferred_touch:
     def_touch(def_page)
 
 end = datetime.datetime.now()
 
-pywikibot.output("Complete! Took %s seconds" % (end - start).total_seconds())
+pywikibot.output('Complete! Took %s seconds' % (end - start).total_seconds())

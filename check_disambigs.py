@@ -4,14 +4,15 @@ import pywikibot
 
 from pywikibot import pagegenerators
 
-# hack: dummy clause to create the file if it doesn't exist
-with open('..\log_disambigs.txt', 'w') as f:
-    start = datetime.datetime.now()
+start = datetime.datetime.now()
 
 site = pywikibot.Site('wikidata', 'wikidata')
 repo = site.data_repository()
 
-skip = ['enwiki', 'mkwiki', 'mznwiki', 'specieswiki', 'towiki']
+# hack: dummy clause to create the file if it doesn't exist
+with open('..\log_disambigs.txt', 'w') as f:
+    skip = ['enwiki', 'mkwiki', 'mznwiki', 'specieswiki', 'towiki']
+
 save_rate = 5 * 60 # how often to save (seconds)
     
 log_page = pywikibot.Page(site, u'User:%s/Disambig_errors' % site.username())
@@ -25,7 +26,7 @@ disambig_item = pywikibot.ItemPage(repo, 'Q4167410')
 QUERY = """SELECT DISTINCT ?item {
   ?item wdt:P31 wd:Q4167410;
         schema:dateModified ?date .
-} ORDER BY ?date LIMIT 1000""".replace('\n', ' ')
+} ORDER BY ?date LIMIT 10000""".replace('\n', ' ')
 
 def save_file(log_page, last_saved):
     with open('..\log_disambigs.txt', 'r+') as log_file:
@@ -54,16 +55,12 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
 
     item.get()
     if not item.claims.has_key('P31'):
-        item.touch()
         continue
 
-    ok = False
     for claim in item.claims['P31']:
         if claim.target_equals(disambig_item):
-            ok = True
             break
-    if ok is False:
-        item.touch()
+    else:
         continue
 
     count = len(item.sitelinks.keys())

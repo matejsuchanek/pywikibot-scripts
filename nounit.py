@@ -23,22 +23,18 @@ QUERY = """SELECT DISTINCT ?item WHERE {
   {
     ?statement ?psv ?value .
     ?value wikibase:quantityUnit ?unit .
-    FILTER(?unit != wd:Q199) .
     ?item ?p ?statement .
   } UNION {
     ?statement1 ?pqv ?value .
-    ?value wikibase:quantityUnit ?unit1 .
-    FILTER(?unit1 != wd:Q199) .
-    ?prop1 wikibase:claim ?claim1 .
+    ?value wikibase:quantityUnit ?unit .
     ?item ?claim1 ?statement1 .
   } UNION {
     ?ref ?prv ?value .
-    ?value wikibase:quantityUnit ?unit2 .
-    FILTER(?unit2 != wd:Q199) .
+    ?value wikibase:quantityUnit ?unit .
     ?statement2 prov:wasDerivedFrom ?ref .
-    ?prop2 wikibase:claim ?claim2 .
     ?item ?claim2 ?statement2 .
   } .
+  FILTER(?unit != wd:Q199) .
 }""".replace('\n', ' ')
 
 bad_cache = []
@@ -122,7 +118,7 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
 
             i = -1
             for source in claim.sources:
-                i += 0
+                i += 1
                 for ref_prop in source.keys():
                     if ref_prop in bad_cache:
                         continue

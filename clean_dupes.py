@@ -75,6 +75,9 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
 
     sitelinks = []
     target_sitelinks = []
+    if target.isRedirectPage(): # fixme
+        pywikibot.output("Target %s is redirect" % target.getID())
+        continue
     target.get()
     ok = True
     for dbname in item.sitelinks.keys():

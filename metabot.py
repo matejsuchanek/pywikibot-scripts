@@ -209,19 +209,17 @@ def example(item, textvalue):
 		for qual_match in re.finditer(regex, splitObj[1]):
 			qual_target = None
 			for string in qual_match.groups():
-				if not string:
-					continue
-				qual_target = string
-				break
-
-			if qual_target is None:
+				if string:
+                                        qual_target = string
+                                        break
+			else:
 				pywikibot.output(u'Failed on matching target from "%s"' % splitObj[1])
 				break
 
 			if item.type == "wikibase-item":
 				qual_target = pywikibot.ItemPage(repo, 'Q%s' % qual_target)
 				if qual_target.isRedirectPage():
-					qual_target = pywikibot.ItemPage(repo, qual_target.getRedirectTarget().getID())
+					qual_target = qual_target.getRedirectTarget()
 			elif item.type == "wikibase-property": # FIXME: T113174
 				qual_target = pywikibot.PropertyPage(repo, 'P%s' % qual_target)
 			elif item.type == "commonsMedia":
@@ -305,7 +303,9 @@ for i in xrange(start, end + 1): # fixme: pagegenerators?
                                                                         summary=summary('P1793', regex, item))
 							item.get(force=True)
 						break
+                                #else:
 				break
+                #else:
 
 	for func_key in func_dict:
 		for field, field_value in fields.items():
@@ -320,7 +320,9 @@ for i in xrange(start, end + 1): # fixme: pagegenerators?
 				except Exception as exc:
 					pywikibot.output(exc.message)
 				break
-	#page.touch()
+		#else:
+	#else:
+        #page.touch()
 
 end_time = datetime.datetime.now()
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8  -*-
 import datetime
 import pywikibot
+
 from pywikibot import pagegenerators
 
 start = datetime.datetime.now()
@@ -55,17 +56,14 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
                             bad_cache.append(ref_prop)
                             continue
 
-                        ok = False
                         for prop_claim in prop_data.claims['P31']:
                             if prop_claim.target_equals(good_item):
-                                ok = True
                                 break
-
-                        if ok is False:
+                        else:
                             bad_cache.append(ref_prop)
                             continue
-                        else:
-                            good_cache.append(ref_prop)
+
+                        good_cache.append(ref_prop)
 
                     for snak in source[ref_prop]:
                         if not data['claims'][0].has_key('qualifiers'):
@@ -87,10 +85,10 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
 
             if changed is True:
                 pywikibot.output("Fixing %s claim in %s" % (prop, item.getID()))
-                moved = map(lambda x: int(x[1:]), moved)
-                moved = map(lambda x: '[[Property:P%s]]' % x, sorted(moved))
+                moved = map(lambda x: '[[Property:P%s]]' % x, sorted(map(lambda x: int(x[1:]), moved)))
                 summary = "[[Property:%s]]: moving misplaced reference%s %s to qualifiers" % (
-                    prop, 's' if len(moved) > 1 else '', '%s and %s' % (', '.join(moved[:-1]), moved[-1]) if len(moved) > 1 else moved[0])
+                    prop, 's' if len(moved) > 1 else '', '%s and %s' % (
+                        ', '.join(moved[:-1]), moved[-1]) if len(moved) > 1 else moved[0])
                 item.editEntity(data, summary=summary)
 
 end = datetime.datetime.now()
