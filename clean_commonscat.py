@@ -8,6 +8,10 @@ from pywikibot import textlib
 
 start = datetime.datetime.now()
 
+"""Whether to create a non-empty category on Commons when it doesn't exist"""
+create_category = False
+#create_category = True
+
 cswiki = pywikibot.Site('cs', 'wikipedia')
 commons = pywikibot.Site('commons', 'commons')
 repo = cswiki.data_repository()
@@ -47,7 +51,26 @@ for page in pagegenerators.WikibaseItemFilterPageGenerator(gen_combined):
                         break
 
             commons_cat = pywikibot.Category(commons, cat_name)
-            if not commons_cat.exists():
+            cancontinue = True
+            exists = commons_cat.exists()
+            if not exists:
+                for _ in pagegenerators.CategorizedPageGenerator(commons_cat, namespaces=6):
+                    if create_category is True:
+                        callback = None
+                        if len(deferred_touch) > 0:
+                            def_page = deferred_touch.pop(0)
+                            callback = lambda _, __: def_touch(def_page)
+                        pywikibot.output(u'Creating %s on Commons' % commons_cat.title())
+                        commons_cat.text = u'{{Uncategorized}}'
+                        commons_cat.save(async=True, callback=callback)
+                        exists = True
+                    else:
+                        pywikibot.output(u'%s: %s contains some files' % (page.title(), commons_cat.title()))
+                        cancontinue = False
+                    break
+            if not cancontinue:
+                break
+            if not exists:
                 regex = r'(?:[\n\r]?|^)(?:\* *)?\{\{ *[Cc]ommons(?:cat|[_ ]?category) *'
                 if has_param is True:
                     regex += r'\| *' + re.escape(cat_name).replace('\ ', '[_ ]')
