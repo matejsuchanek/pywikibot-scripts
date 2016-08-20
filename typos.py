@@ -13,6 +13,10 @@ site = pywikibot.Site('cs', 'wikipedia')
 quick_mode = True
 #quick_mode = False
 
+"""Whether to ask for each replacement?"""
+prompt = True
+#prompt = False
+
 typoRules = []
 # default
 exceptions = ['category', 'comment', 'gallery', 'header', 'hyperlink', 'interwiki',
@@ -41,7 +45,9 @@ for template, fielddict in textlib.extract_templates_and_params(content):
         for pairs in fielddict.items():
             if pairs[0] == '1':
                 find = re.sub(r'</?nowiki>', '', pairs[1])
-                if re.search(r'\(\?<[=!][^\(\)]*([\^\$\(\{\}\+\*\?\|]|\\[1-9b])', find):
+                try:
+                    _ = re.compile(find)
+                except re.error:
                     # only fixed-width look-behind
                     break
             elif pairs[0] == '2':
@@ -57,7 +63,12 @@ for template, fielddict in textlib.extract_templates_and_params(content):
                     break
         else:
             if query is not None and insource is True:
-                query = 'insource:/%s/i' % query
+                try:
+                    _ = re.compile(query)
+                    query = 'insource:/%s/i' % query
+                except re.error as exc:
+                    pywikibot.output(u'Invalid query "%s": %s' % (query, exc.message))
+                    query = None
             typoRules.append(
                 (query, find, replace)
             )
@@ -114,8 +125,24 @@ for rule in typoRules:
             callback = lambda match: my_summary_hook(match, sub_rule[2], replaced)
             text = textlib.replaceExcept(text, re.compile(sub_rule[1], re.U), callback, exceptions, site=site)
         if len(replaced) > 0:
+            if prompt is True:
+                pywikibot.showDiff(page.text, text)
+                choice = pywikibot.input_choice(
+                    u'Do you want to accept these changes?',
+                    [('Yes', 'y'), ('No', 'n'), ('False positive', 'f'), ('open in Browser', 'b'), ('Always', 'a')],
+                    default='n')
+                if choice == 'n':
+                    continue
+                if choice == 'b':
+                    pywikibot.bot.open_webbrowser(page)
+                    continue
+                if choice == 'f':
+                    false_positives.text += u'\n* [[%s]]' % page.title()
+                    false_positives.save(summary=u'[[%s]]' % page.title(), async=True)
+                    continue
+                if choice == 'a':
+                    prompt = False
             page.text = text
-            #pywikibot.output(', '.join(replaced))
             try:
                 page.save(summary=u'oprava překlepů: %s' % ', '.join(replaced), async=True)
             except Exception as exc:
