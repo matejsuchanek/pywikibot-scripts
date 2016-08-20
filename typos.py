@@ -124,7 +124,7 @@ for rule in typoRules:
         if i < 1:
             pywikibot.output(u'No results from query %s' % rule[0])
         else:
-            pywikibot.output(u'{}% accurancy of query {}'.format(int((j / i) * 100), rule[0]))
+            pywikibot.output(u'{}% accuracy of query {}'.format(int((j / i) * 100), rule[0]))
 
 end = datetime.datetime.now()
 
