@@ -13,9 +13,10 @@ site = pywikibot.Site('cs', 'wikipedia')
 quick_mode = True
 #quick_mode = False
 
-"""Whether to ask for each replacement?"""
-prompt = True
-#prompt = False
+"""User interaction"""
+#prompt = 0 # never ask, just run
+prompt = 1 # always ask, ignore disputable or inaccurate rules
+#prompt = 2 # always ask, resolve disputable and inaccurate rules
 
 typoRules = []
 # default
@@ -34,14 +35,14 @@ content = typo_page.get()
 
 for template, fielddict in textlib.extract_templates_and_params(content):
     if template.lower() == 'typo':
-        if 'auto' not in fielddict.keys():
+        if prompt < 2 and 'auto' not in fielddict.keys():
             continue
-        if '3' in fielddict.keys():
+        if prompt < 2 and '3' in fielddict.keys():
             continue
         insource = True
         query = None
         find = None
-        replace = None
+        replace = []
         for pairs in fielddict.items():
             if pairs[0] == '1':
                 find = re.sub(r'</?nowiki>', '', pairs[1])
@@ -50,16 +51,15 @@ for template, fielddict in textlib.extract_templates_and_params(content):
                 except re.error:
                     # only fixed-width look-behind
                     break
-            elif pairs[0] == '2':
-                replace = re.sub(r'</?nowiki>', '', pairs[1])
-                replace = re.sub(r'\$([1-9])', r'\\\1', replace)
+            elif pairs[0] in ['2', '3', '4', '5', '6']:
+                replace.append(re.sub(r'\$([1-9])', r'\\\1', re.sub(r'</?nowiki>', '', pairs[1])))
             elif pairs[0] == 'hledat':
                 if pairs[1] != '':
                     query = pairs[1].replace('{{!}}', '|')
             elif pairs[0] == 'insource':
                 insource = pairs[1] != 'ne'
             elif pairs[0] == 'auto':
-                if pairs[1] != 'ano':
+                if prompt < 2 and pairs[1] != 'ano':
                     break
         else:
             if query is not None and insource is True:
@@ -79,13 +79,22 @@ del content
 false_positives = pywikibot.Page(site, u'Wikipedie:WPCleaner/Typo/False')
 false_positives.get()
 
-def my_summary_hook(match, replacement, replaced):
-    old = match.group(0)
-    new = replacement
-    i = 0
-    for group in match.groups(''):
-        i += 1
-        new = new.replace('\%s' % i, group)
+def my_summary_hook(match, replacements, replaced):
+    new = old = match.group(0)
+    if len(replacements) > 1:
+        options = [('Keep', 'k')]
+        for i in range(0, len(replacements)):
+            replacements[i] = match.expand(replacements[i])
+            options.append(
+                (u"%s %s" % (i + 1, replacements[i]), str(i + 1))
+            )
+        pywikibot.output(match.string[max(0, match.start() - 30):match.end() + 30])
+        choice = pywikibot.input_choice('Choose the best replacement', options, automatic_quit=False, default='k')
+        if choice != 'k':
+            new = replacements[int(choice) - 1]
+    else:
+        new = match.expand(replacements[0])
+
     if old == new:
         pywikibot.output(u'No replacement done in string "%s"' % old)
     else:
@@ -96,6 +105,8 @@ def my_summary_hook(match, replacement, replaced):
 
 for rule in typoRules:
     if rule[0] is None:
+        continue
+    if prompt < 2 and len(rule[2]) > 1:
         continue
     pywikibot.output(u'Doing %s' % rule[0])
     i = j = 0.0
@@ -122,15 +133,18 @@ for rule in typoRules:
         for sub_rule in typoRules:
             if re.search(sub_rule[1], page.title(), re.U) is not None:
                 continue
+            if prompt < 2 and len(sub_rule[2]) > 1:
+                continue
             callback = lambda match: my_summary_hook(match, sub_rule[2], replaced)
             text = textlib.replaceExcept(text, re.compile(sub_rule[1], re.U), callback, exceptions, site=site)
         if len(replaced) > 0:
-            if prompt is True:
+            if prompt > 0:
                 pywikibot.showDiff(page.text, text)
                 choice = pywikibot.input_choice(
                     u'Do you want to accept these changes?',
                     [('Yes', 'y'), ('No', 'n'), ('False positive', 'f'), ('open in Browser', 'b'), ('Always', 'a')],
                     default='n')
+
                 if choice == 'n':
                     continue
                 if choice == 'b':
@@ -141,7 +155,7 @@ for rule in typoRules:
                     false_positives.save(summary=u'[[%s]]' % page.title(), async=True)
                     continue
                 if choice == 'a':
-                    prompt = False
+                    prompt = 0
             page.text = text
             try:
                 page.save(summary=u'oprava překlepů: %s' % ', '.join(replaced), async=True)
