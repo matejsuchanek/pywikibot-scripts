@@ -1,6 +1,7 @@
 # -*- coding: utf-8  -*-
 import datetime
 import pywikibot
+
 from pywikibot import pagegenerators
 
 start = datetime.datetime.now()
@@ -36,7 +37,7 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
     claims = []
     target = None
     item.get()
-    if item.claims.has_key('P460'):
+    if 'P460' in item.claims.keys():
         for claim in item.claims['P460']:
             if claim.snaktype != "value":
                 continue
@@ -48,14 +49,14 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
                     target = False
                     break
 
-    if target is not False and item.claims.has_key('P31'):
+    if target is not False and 'P31' in item.claims.keys():
         for claim in item.claims['P31']:
             if claim.snaktype != "value":
                 continue
             if claim.target_equals(dupe_item):
                 claims.append(claim)
                 for prop in ['P460', 'P642']:
-                    if claim.qualifiers.has_key(prop):
+                    if prop in claim.qualifiers.keys():
                         for snak in claim.qualifiers[prop]:
                             if target is False:
                                 break
@@ -81,7 +82,7 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
     target.get()
     ok = True
     for dbname in item.sitelinks.keys():
-        if target.sitelinks.has_key(dbname):
+        if dbname in target.sitelinks.keys():
             apisite = pywikibot.site.APISite.fromDBName(dbname)
             page = pywikibot.Page(apisite, item.sitelinks[dbname])
             if not page.exists():
@@ -100,20 +101,20 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
         continue
 
     target_claims = []
-    if target.claims.has_key('P460'):
+    if 'P460' in target.claims.keys():
         for claim in target.claims['P460']:
             if claim.snaktype != "value":
                 continue
             if claim.target_equals(item):
                 target_claims.append(claim)
 
-    if target.claims.has_key('P31'):
+    if 'P31' in target.claims.keys():
         for claim in target.claims['P31']:
             if claim.snaktype != "value":
                 continue
             if claim.target_equals(dupe_item):
                 for prop in ['P460', 'P642']:
-                    if claim.qualifiers.has_key(prop):
+                    if prop in claim.qualifiers.keys():
                         for snak in claim.qualifiers[prop]:
                             if snak.snaktype != "value":
                                 continue
@@ -136,7 +137,7 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
         if lang in target.descriptions.keys():
             if item.descriptions[lang] != target.descriptions[lang]:
                 data['descriptions'][lang] = ''
-    if len(data['descriptions'].keys()) > 0:
+    if len(data['descriptions']) > 0:
         item.editEntity(data, summary="Removing conflicting descriptions before merging")
     try:
         item.mergeInto(target, ignore_conflicts="description")
