@@ -15,11 +15,11 @@ good_cache = []
 
 for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
     item.get()
-    if not item.claims.has_key('P2096'):
+    if 'P2096' not in item.claims.keys():
         continue
 
     our_prop = 'P18'
-    if not item.claims.has_key(our_prop):
+    if our_prop not inn item.claims.keys():
         our_prop = None
         for prop in item.claims.keys():
             if prop not in good_cache:
@@ -45,15 +45,15 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
     remove_claims = []
     media_claim = item.claims[our_prop][0]
     for caption in item.claims['P2096']:
-        target = caption.getTarget()
-        if media_claim.qualifiers.has_key('P2096'):
+        if 'P2096' not in media_claim.qualifiers.keys():
+            target = caption.getTarget()
             has_same_lang = False
             for claim in media_claim.qualifiers['P2096']:
                 if claim.getTarget().language == target.language:
                     has_same_lang = True
                     break
             if has_same_lang is True:
-                pywikibot.output("%s: %s property already has a description in language %s" % (item.title(), our_prop, target.language))
+                pywikibot.output("%s: %s property already has a caption in language %s" % (item.title(), our_prop, target.language))
                 continue
 
         caption.isQualifier = True
