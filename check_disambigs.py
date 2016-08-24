@@ -14,7 +14,7 @@ with open('..\log_disambigs.txt', 'w') as f:
     skip = ['enwiki', 'mkwiki', 'mznwiki', 'specieswiki', 'towiki']
 
 save_rate = 5 * 60 # how often to save (seconds)
-    
+
 log_page = pywikibot.Page(site, u'User:%s/Disambig_errors' % site.username())
 try:
     log_page.get()
@@ -54,7 +54,7 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
         continue
 
     item.get()
-    if not item.claims.has_key('P31'):
+    if 'P31' not in item.claims.keys():
         continue
 
     for claim in item.claims['P31']:
@@ -63,7 +63,7 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
     else:
         continue
 
-    count = len(item.sitelinks.keys())
+    count = len(item.sitelinks)
     if count == 0:
         append_text += '\n** no sitelinks'
 
