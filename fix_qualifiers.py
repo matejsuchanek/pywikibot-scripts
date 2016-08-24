@@ -51,7 +51,7 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
                     if ref_prop not in good_cache:
                         prop_data = pywikibot.PropertyPage(repo, ref_prop)
                         prop_data.get()
-                        if not prop_data.claims.has_key('P31'):
+                        if 'P31' not in prop_data.claims.keys():
                             pywikibot.output("%s is not classified" % ref_prop)
                             bad_cache.append(ref_prop)
                             continue
@@ -66,9 +66,9 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
                         good_cache.append(ref_prop)
 
                     for snak in source[ref_prop]:
-                        if not data['claims'][0].has_key('qualifiers'):
+                        if 'qualifiers' not in data['claims'][0].keys():
                             data['claims'][0]['qualifiers'] = {}
-                        if not data['claims'][0]['qualifiers'].has_key(ref_prop):
+                        if ref_prop not in data['claims'][0]['qualifiers'].keys():
                             data['claims'][0]['qualifiers'][ref_prop] = []
                         snak.isReference = False
                         snak.isQualifier = True
@@ -76,7 +76,7 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
                         del data['claims'][0]['references'][i]['snaks'][ref_prop][0]
                         if len(data['claims'][0]['references'][i]['snaks'][ref_prop]) == 0:
                             del data['claims'][0]['references'][i]['snaks'][ref_prop]
-                            if len(data['claims'][0]['references'][i]['snaks'].keys()) == 0:
+                            if len(data['claims'][0]['references'][i]['snaks']) == 0:
                                 del data['claims'][0]['references'][i]
                                 i = i - 1
                         changed = True
@@ -85,7 +85,7 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
 
             if changed is True:
                 pywikibot.output("Fixing %s claim in %s" % (prop, item.getID()))
-                moved = map(lambda x: '[[Property:P%s]]' % x, sorted(map(lambda x: int(x[1:]), moved)))
+                moved = list(map(lambda x: '[[Property:P%s]]' % x, sorted(map(lambda x: int(x[1:]), moved))))
                 summary = "[[Property:%s]]: moving misplaced reference%s %s to qualifiers" % (
                     prop, 's' if len(moved) > 1 else '', '%s and %s' % (
                         ', '.join(moved[:-1]), moved[-1]) if len(moved) > 1 else moved[0])
