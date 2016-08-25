@@ -26,10 +26,10 @@ exceptions = ['category', 'comment', 'gallery', 'header', 'hyperlink', 'interwik
 exceptions += ['ce', 'code', 'graph', 'imagemap', 'math', 'nowiki', 'poem',
                'score', 'section', 'timeline']
 # regexes ('target-part' of a wikilink; quotation marks; italics)
-exceptions += [re.compile(r'\[\[[^\[\]\|]+[\|\]]'), re.compile(ur'„[^“]+“'),
+exceptions += [re.compile(r'\[\[[^\[\]\|]+[\|\]]'), re.compile(u'„[^“]+“'),
                re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1).)+\1", re.M | re.U)]
 
-pywikibot.output(u'Loading typos')
+pywikibot.output('Loading typos')
 typo_page = pywikibot.Page(site, u'Wikipedie:WPCleaner/Typo')
 content = typo_page.get()
 
@@ -47,9 +47,10 @@ for template, fielddict in textlib.extract_templates_and_params(content):
             if pairs[0] == '1':
                 find = re.sub(r'</?nowiki>', '', pairs[1])
                 try:
-                    _ = re.compile(find)
-                except re.error:
-                    # only fixed-width look-behind
+                    re.compile(find)
+                except re.error as exc:
+                    if exc.message.find('fixed-width') == -1:
+                        pywikibot.warning(u'Invalid regular expression %s: %s' % (find, exc.message))
                     break
             elif pairs[0] in ['2', '3', '4', '5', '6']:
                 replace.append(re.sub(r'\$([1-9])', r'\\\1', re.sub(r'</?nowiki>', '', pairs[1])))
@@ -64,16 +65,16 @@ for template, fielddict in textlib.extract_templates_and_params(content):
         else:
             if query is not None and insource is True:
                 try:
-                    _ = re.compile(query)
-                    query = 'insource:/%s/i' % query
+                    re.compile(query)
+                    query = u'insource:/%s/i' % query
                 except re.error as exc:
-                    pywikibot.output(u'Invalid query "%s": %s' % (query, exc.message))
+                    pywikibot.warning(u'Invalid query "%s": %s' % (query, exc.message))
                     query = None
             typoRules.append(
                 (query, find, replace)
             )
 
-pywikibot.output(u'%s typos loaded' % len(typoRules))
+pywikibot.output('%s typos loaded' % len(typoRules))
 del content
 
 false_positives = pywikibot.Page(site, u'Wikipedie:WPCleaner/Typo/False')
@@ -98,8 +99,8 @@ def my_summary_hook(match, replacements, replaced):
     if old == new:
         pywikibot.output(u'No replacement done in string "%s"' % old)
     else:
-        fragment = u' → '.join([re.sub(r'(^ | $)', r'_', re.sub(r'\n', r'\\n', j)) for j in [old, new]])
-        if fragment.lower() not in [j.lower() for j in replaced]:
+        fragment = u' → '.join([re.sub(r'(^ | $)', r'_', re.sub('\n', r'\\n', i)) for i in [old, new]])
+        if fragment.lower() not in [i.lower() for i in replaced]:
             replaced.append(fragment)
     return new
 
@@ -141,8 +142,8 @@ for rule in typoRules:
             if prompt > 0:
                 pywikibot.showDiff(page.text, text)
                 choice = pywikibot.input_choice(
-                    u'Do you want to accept these changes?',
-                    [('Yes', 'y'), ('No', 'n'), ('False positive', 'f'), ('open in Browser', 'b'), ('Always', 'a')],
+                    'Do you want to accept these changes?',
+                    [('yes', 'y'), ('no', 'n'), ('false positive', 'f'), ('open in browser', 'b'), ('always', 'a')],
                     default='n')
 
                 if choice == 'n':
