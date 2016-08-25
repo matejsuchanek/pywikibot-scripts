@@ -23,7 +23,7 @@ tp_map = {
                 'lang': 'commons',
                 'family': 'commons',
                 'pattern': 'Category:%s',
-                'namespaces': [14]
+                'namespaces': (14)
             },
         },
         u'wikicitáty': {
@@ -66,7 +66,7 @@ tp_map = {
                 'lang': 'commons',
                 'family': 'commons',
                 'pattern': 'Category:%s',
-                'namespaces': [14]
+                'namespaces': (14)
             },
         },
         'wikipedie': {
@@ -83,7 +83,7 @@ tp_map = {
                 'lang': 'commons',
                 'family': 'commons',
                 'pattern': 'Category:%s',
-                'namespaces': [14]
+                'namespaces': (14)
             },
         },
         'autorinfo': {
@@ -200,10 +200,10 @@ for project in tp_map.keys():
             continue
 
         for template, fields in textlib.extract_templates_and_params(page.get()):
-            if tp_map[project].has_key(template.lower()):
+            if template.lower() in tp_map[project].keys():
                 params = tp_map[project][template.lower()]
                 for key in fields.keys():
-                    if params.has_key(key):
+                    if key in params.keys():
                         title = fields[key].strip()
                         if not title:
                             continue
@@ -211,13 +211,13 @@ for project in tp_map.keys():
                         target_lang = lang
                         target_family = family
                         if type(params[key]) == type({}):
-                            if params[key].has_key('namespaces') and page.namespace() not in params[key]['namespaces']:
+                            if 'namespaces' in params[key].keys() and page.namespace() not in params[key]['namespaces']:
                                 continue
-                            if params[key].has_key('pattern'):
+                            if 'pattern' in params[key].keys():
                                 title = params[key]['pattern'] % title
-                            if params[key].has_key('family'):
+                            if 'family' in params[key].keys():
                                 target_family = params[key]['family']
-                            if params[key].has_key('lang'):
+                            if 'lang' in params[key].keys():
                                 target_lang = params[key]['lang']
                         else:
                             target_family = params[key]
