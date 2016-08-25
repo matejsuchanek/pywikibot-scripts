@@ -30,13 +30,11 @@ def def_touch(def_page):
 for page in pagegenerators.WikibaseItemFilterPageGenerator(gen_combined):
     item = pywikibot.ItemPage.fromPage(page)
     item.get()
-    if item.claims.has_key('P373'):
+    if 'P373' in item.claims.keys():
         deferred_touch.append(page)
         continue
 
-    page_text = page.get()
-    extra = textlib.extract_templates_and_params(page_text, remove_disabled_parts=True, strip=True)
-    for template, fielddict in textlib.extract_templates_and_params(page.get()):
+    for template, fielddict in textlib.extract_templates_and_params(page.get(), remove_disabled_parts=True, strip=True):
         if template.lower() == 'commonscat':
             has_param = False
             cat_name = page.title(withNamespace=False)
@@ -75,11 +73,13 @@ for page in pagegenerators.WikibaseItemFilterPageGenerator(gen_combined):
                 if has_param is True:
                     regex += r'\| *' + re.escape(cat_name).replace('\ ', '[_ ]')
                 regex += r'[^\}]*\}\}'
-                page_replaced_text = re.sub(regex, '', page_text)
-                if page_replaced_text == page_text:
+                page_replaced_text = re.sub(regex, '', page.text)
+                if page_replaced_text == page.text:
                     pywikibot.output(u'No replacement done in %s' % page.title())
                 else:
-                    page_replaced_text = re.sub(ur'[\n\r]+==+\ ?Externí\ odkazy\ ?==+\ *[\n\r]+(==|\{\{(?:DEFAULTSORT:|[Pp]ahýl|[Pp]osloupnost|[Aa]utoritní data|[Pp]ortály)|\[\[Kategorie:)',
+                    templates = ('DEFAULTSORT:', '[Pp]ahýl', '[Pp]osloupnost', '[Aa]utoritní data', '[Pp]ortály')
+                    el = u'Externí odkazy'
+                    page_replaced_text = re.sub(r'[\n\r]+==+\ ?' + el + r'\ ?==+\ *[\n\r]+(==|\{\{(?:' + '|'.join(templates) + r')|\[\[Kategorie:)',
                                                 r'\n\n\1', page_replaced_text)
                     page.text = page_replaced_text
                     pywikibot.output('Saving %s' % page.title())
