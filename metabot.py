@@ -37,14 +37,14 @@ def summary(prop, value, item):
 	return u'Importing "[[Property:%s]]: %s" from [[Special:PermaLink/%s|talk page]]' % (prop, value, rev_id)
 
 def getregexfromitem(item):
-	if item.claims.has_key('P1793'):
+	if 'P1793' in item.claims.keys():
 		for claim in item.claims['P1793']:
 			return claim.getTarget()
 	return
 
 def getformatterregex():
-	if not regexes.has_key('formatter'):
-		prop = pywikibot.PropertyPage(repo, u'P1630')
+	if 'formatter' not in regexes.keys():
+		prop = pywikibot.PropertyPage(repo, 'P1630')
 		prop.get()
 		regexes['formatter'] = getregexfromitem(prop)
 	return re.compile(regexes['formatter'])
@@ -53,26 +53,26 @@ def formatter(item, textvalue):
 	if item.type not in ['commonsMedia', 'external-id', 'string']:
 		pywikibot.output(u'Redundant to harvest formatter URL for "%s" datatype' % item.type)
 		return
-	if item.claims.has_key('P1630'):
+	if 'P1630' in item.claims.keys():
 		pywikibot.output(u'Formatter URL for "%s" already exists' % item.title())
 		return
 
 	for match in re.findall(getformatterregex(), textvalue):
-		claim = pywikibot.Claim(repo, u'P1630')
+		claim = pywikibot.Claim(repo, 'P1630')
 		claim.setTarget(match)
-		item.editEntity({"claims":[claim.toJSON()]}, summary=summary(u'P1630', match, item))
+		item.editEntity({"claims":[claim.toJSON()]}, summary=summary('P1630', match, item))
 		item.get()
 
 def subject_item(item, textvalue):
-	if item.claims.has_key('P1629'):
+	if 'P1629' in item.claims.keys():
 		pywikibot.output(u'Subject item for "%s" already exists' % item.title())
 		return
 
 	for itemid in re.findall(r'\b[Qq][1-9]\d*\b', textvalue):
-		claim = pywikibot.Claim(repo, u'P1629')
+		claim = pywikibot.Claim(repo, 'P1629')
 		target = pywikibot.ItemPage(repo, itemid.upper())
 		claim.setTarget(target)
-		item.editEntity({"claims":[claim.toJSON()]}, summary=summary(u'P1629', target, item))
+		item.editEntity({"claims":[claim.toJSON()]}, summary=summary('P1629', target, item))
 		item.get()
 
 		rev_id = item.latest_revision_id
@@ -104,7 +104,7 @@ def source(item, textvalue):
 	for match in re.split(regexes['split'], textvalue):
 		if match == '':
 			continue
-		regex = re.compile(r'(?:\[' + regexes['url'] + r'(?: [^\]]*)?\]|^' + regexes['url'] + '$)')
+		regex = r'(?:\[' + regexes['url'] + r'(?: [^\]]*)?\]|^' + regexes['url'] + '$)'
 		searchObj = re.search(regex, match)
 		if searchObj is None or (searchObj.group(1) is None and searchObj.group(2) is None):
 			pywikibot.output(u'Could not match source "%s"' % match)
@@ -112,7 +112,7 @@ def source(item, textvalue):
 
 		target = searchObj.group(1) or searchObj.group(2)
 		hasTarget = False
-		if item.claims.has_key('P1896'):
+		if 'P1896' in item.claims.keys():
 			for claim in item.claims['P1896']:
 				if claim.target_equals(target):
 					hasTarget = True
@@ -122,13 +122,13 @@ def source(item, textvalue):
 			pywikibot.output(u'"%s" already has "%s" as the source' % (item.title(), target))
 			continue
 
-		claim = pywikibot.Claim(repo, u'P1896')
+		claim = pywikibot.Claim(repo, 'P1896')
 		claim.setTarget(target)
-		item.editEntity({"claims":[claim.toJSON()]}, summary=summary(u'P1896', target, item))
+		item.editEntity({"claims":[claim.toJSON()]}, summary=summary('P1896', target, item))
 		item.get()
 
 def example(item, textvalue):
-	if item.claims.has_key('P31'):
+	if 'P31' in item.claims.keys():
 		for claim in item.claims['P31']:
 			if claim.target_equals(pywikibot.ItemPage(repo, 'Q15720608')):
 				pywikibot.output(u'%s is for qualifier use' % item.title())
@@ -141,7 +141,7 @@ def example(item, textvalue):
 			return
 
 		formatter = None
-		if item.claims.has_key('P1630'):
+		if 'P1630' in item.claims.keys():
 			for claim in item.claims['P1630']:
 				if claim.snaktype != 'value':
 					continue
@@ -156,24 +156,22 @@ def example(item, textvalue):
 		if formatter is None:
 			if item.type == "external-id":
 				pywikibot.output(u'Info: No formatter found for "%s"' % item.title())
-			regex = r'^(%s)$' % regex
+			regex = '^(%s)$' % regex
 		else:
 			regex = re.sub(r'((?:^|[^\\])(?:\\\\)*)\(', r'\1(?:', regex) # no capture groups
-			regex = r'(?:' + re.sub(r'\\\$1', r'(' + regex + r')', re.escape(formatter)) + r'|(?:^["\'<]?|\s)(' + regex + r')(?:["\'>]?$|\]))'
+			regex = r'(?:' + re.sub(r'\\\$1', '(%s)' % regex, re.escape(formatter)) + r'|(?:^["\'<]?|\s)(' + regex + r')(?:["\'>]?$|\]))'
 
 	elif item.type == "commonsMedia":
 		regex = getregexfromitem(item)
 		if regex is None:
 			regex = regexes[item.type]
 		else:
-			i = False
+			flags = 0
 			if regex.startswith('(?i)'):
 				regex = regex[4:]
-				i = True
+				flags |= re.I
 			regex = re.sub(r'((?:^|[^\\])(?:\\\\)*)\(', r'\1(?:', regex) # no capture groups
-			regex = r'([Ff]ile:%s)' % regex
-			if i is True:
-                                regex = re.compile(regex, re.I)
+			regex = re.compile(r'([Ff]ile:%s)' % regex, flags)
 	else:
 		if regexes.has_key(item.type):
 			regex = regexes[item.type]
@@ -197,7 +195,7 @@ def example(item, textvalue):
 
 		item_match = 'Q%s' % searchObj.group(1)
 		exists = False
-		if item.claims.has_key('P1855'):
+		if 'P1855' in item.claims.keys():
 			for claim in item.claims['P1855']:
 				if item_match == claim.getTarget().getID():
 					exists = True
@@ -210,8 +208,8 @@ def example(item, textvalue):
 			qual_target = None
 			for string in qual_match.groups():
 				if string:
-                                        qual_target = string
-                                        break
+					qual_target = string
+					break
 			else:
 				pywikibot.output(u'Failed on matching target from "%s"' % splitObj[1])
 				break
@@ -238,13 +236,13 @@ def example(item, textvalue):
 			if target.isRedirectPage():
 				target = target.getRedirectTarget()
 
-			claim = pywikibot.Claim(repo, u'P1855')
+			claim = pywikibot.Claim(repo, 'P1855')
 			claim.setTarget(target)
 			qualifier = item.newClaim(isQualifier=True)
 			qualifier.setTarget(qual_target)
 			data = {"claims":[claim.toJSON()]}
 			data['claims'][0]['qualifiers'] = {item.getID():[qualifier.toJSON()]}
-			item.editEntity(data, summary=summary(u'P1855', target, item))
+			item.editEntity(data, summary=summary('P1855', target, item))
 			item.get()
 			break # only the first value match
 
@@ -278,34 +276,30 @@ for i in xrange(start, end + 1): # fixme: pagegenerators?
 		if template.lower() == template_metadata:
 			fields = fielddict
 			break
-
-	if fields is None:
+	else:
 		pywikibot.output(u'Template "%s" not found' % template_metadata)
 		continue
 
 	item.get()
 
-	if item.type in ['commonsMedia', 'external-id', 'string', 'url']:
+	if item.type in ['commonsMedia', 'external-id', 'string', 'url'] and 'P1793' not in item.claims.keys():
 		for template, fielddict in templates:
 			if template.lower() == template_regex:
-				pywikibot.output(u'Found field "regex"')
+				pywikibot.output('Found field "regex"')
 				for pairs in fielddict.items():
 					if pairs[0] == 'pattern':
-						if item.claims.has_key('P1793'):
-							pywikibot.output(u'"%s" already has a regex' % item.title())
-						else:
-							regex = re.sub(r'<\/?nowiki>', '', pairs[1])
-							if regex == '': # FIXME
-								break
-							claim = pywikibot.Claim(repo, 'P1793')
-							claim.setTarget(regex.strip())
-							item.editEntity({"claims":[claim.toJSON()]},
-                                                                        summary=summary('P1793', regex, item))
-							item.get(force=True)
+						regex = re.sub(r'<\/?nowiki>', '', pairs[1])
+						if regex == '': # FIXME
+							# pywikibot.output(pairs[1])
+							break
+						claim = pywikibot.Claim(repo, 'P1793')
+						claim.setTarget(regex.strip())
+						item.editEntity({"claims":[claim.toJSON()]}, summary=summary('P1793', regex, item))
+						item.get(force=True)
 						break
-                                #else:
+				#else:
 				break
-                #else:
+        #else:
 
 	for func_key in func_dict:
 		for field, field_value in fields.items():
