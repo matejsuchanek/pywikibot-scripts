@@ -1,6 +1,7 @@
 # -*- coding: utf-8  -*-
 import datetime
 import pywikibot
+
 from pywikibot import pagegenerators
 
 start = datetime.datetime.now()
@@ -41,70 +42,58 @@ bad_cache = []
 good_cache = []
 good_item = pywikibot.ItemPage(repo, 'Q21027105')
 
+def checkProp(prop):
+    prop_data = pywikibot.PropertyPage(repo, prop)
+    prop_data.get()
+    if prop_data.type != "quantity":
+        return False
+    if 'P2237' not in prop_data.claims.keys():
+        return False
+    for claim in prop_data.claims['P2237']:
+        if claim.snaktype == "novalue":
+            continue
+        if claim.snaktype == "value" and claim.target_equals(good_item):
+            continue
+        return False
+    return True
+
 for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
     item.get()
     for prop in item.claims.keys():
         for claim in item.claims[prop]:
-            if claim.type == "quantity":
-                if prop in bad_cache:
-                    break
+            if claim.type != "quantity":
+                bad_cache.append(prop)
+            if prop not in bad_cache:
                 if prop not in good_cache:
-                    prop_data = pywikibot.PropertyPage(repo, prop)
-                    prop_data.get()
-                    ok = False
-                    if prop_data.claims.has_key('P2237'):
-                        ok = True
-                        for prop_claim in prop_data.claims['P2237']:
-                            if prop_claim.snaktype == "novalue":
-                                continue
-                            if prop_claim.target_equals(good_item):
-                                continue
-                            ok = False
-                            break
-
-                    if ok is False:
+                    if checkProp(prop):
+                        good_cache.append(prop)
+                    else:
                         bad_cache.append(prop)
-                        break
 
-                good_cache.append(prop)
-                target = claim.getTarget()
-                if target is None:
-                    continue
-                if target.unit == "1":
-                    continue
-                target.unit = "1"
-                pywikibot.output("Removing unit in %s for property %s" % (item.getID(), prop))
-                claim.changeTarget(target, summary="removing invalid unit, see [[P:%s#P2237|property's page]]" % prop)
+                if prop in good_cache:
+                    target = claim.getTarget()
+                    if target is None:
+                        continue
+                    if target.unit == "1":
+                        continue
+                    target.unit = "1"
+                    pywikibot.output("Removing unit in %s for property %s" % (item.getID(), prop))
+                    claim.changeTarget(target, summary="removing invalid unit, see [[P:%s#P2237|property's page]]" % prop)
 
             data = {"claims":[claim.toJSON()]}
             changed = False
             for qprop in claim.qualifiers.keys():
+                if qprop in bad_cache:
+                    continue
+                if qprop not in good_cache:
+                    if checkProp(qprop):
+                        good_cache.append(qprop)
+                    else:
+                        bad_cache.append(qprop)
+                        continue
                 i = -1
                 for snak in claim.qualifiers[qprop]:
                     i += 1
-                    if snak.type != "quantity":
-                        break
-                    if qprop in bad_cache:
-                        break
-                    if qprop not in good_cache:
-                        qprop_data = pywikibot.PropertyPage(repo, qprop)
-                        qprop_data.get()
-                        ok = False
-                        if qprop_data.claims.has_key('P2237'):
-                            ok = True
-                            for qprop_claim in qprop_data.claims['P2237']:
-                                if qprop_claim.snaktype == "novalue":
-                                    continue
-                                if qprop_claim.target_equals(good_item):
-                                    continue
-                                ok = False
-                                break
-
-                        if ok is False:
-                            bad_cache.append(qprop)
-                            break
-
-                    good_cache.append(qprop)
                     target = snak.getTarget()
                     if target is None:
                         continue
@@ -123,21 +112,12 @@ for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
                     if ref_prop in bad_cache:
                         continue
                     if ref_prop not in good_cache:
-                        ref_prop_data = pywikibot.PropertyPage(repo, ref_prop)
-                        ref_prop_data.get()
-                        if not ref_prop_data.claims.has_key('P2237'):
-                            continue
-                        for ref_prop_claim in ref_prop_data.claims['P2237']:
-                            if ref_prop_claim.snaktype != "novalue":
-                                if not ref_prop_claim.target_equals(good_item):
-                                    ok = False
-                                    break
-
-                        if ok is False:
-                            bad_cache.append(ref_prop)
+                        if checkProp(qprop):
+                            good_cache.append(qprop)
+                        else:
+                            bad_cache.append(qprop)
                             continue
 
-                    good_cache.append(ref_prop)
                     j = -1
                     for snak in source[ref_prop]:
                         j += 1
