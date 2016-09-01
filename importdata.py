@@ -7,23 +7,25 @@ from datetime import datetime
 site = pywikibot.Site('wikidata', 'wikidata')
 repo = site.data_repository()
 
-with open('..\data.txt', 'r') as file_data:
+direct = pywikibot.input('File directory: ')
+date = pywikibot.WbTime(year=2016, month=1, day=1)
+
+with open(direct, 'r') as file_data:
     for line in file_data:
-        split = re.split(r"\t", line)
+        split = line.split("\t")
         item = pywikibot.ItemPage(site, split[0])
         item.get()
         hasNewClaim = False
-        upToDateClaim = None
+        upToDateClaims = []
         count = int(split[1])
-        if item.claims.has_key('P1082'):
+        if 'P1082' in item.claims.keys():
             for claim in item.claims['P1082']:
                 if claim.getRank() == 'preferred':
-                    upToDateClaim = claim
-                    upToDateClaim.setRank('normal')
-                if count == int(claim.getTarget().amount):
-                    if claim.qualifiers.has_key('P1539'):
-                        hasNewClaim = True
-                        break
+                    claim.setRank('normal')
+                    upToDateClaims.append(claim)
+                if 'P585' in claim.qualifiers.keys() and claim.qualifiers['P585'][0].target_equals(date):
+                    hasNewClaim = True
+                    break
 
         if hasNewClaim is True:
             continue
@@ -37,7 +39,7 @@ with open('..\data.txt', 'r') as file_data:
         data['claims'][0]['references'] = [{'snaks':{}}]
 
         newClaim_date = pywikibot.Claim(repo, 'P585', isQualifier=True)
-        newClaim_date.setTarget(pywikibot.WbTime(year=2016, month=1, day=1))
+        newClaim_date.setTarget(date)
         data['claims'][0]['qualifiers']['P585'] = [newClaim_date.toJSON()]
 
         #newClaim_method = pywikibot.Claim(repo, 'P459', isQualifier=True)
@@ -66,7 +68,7 @@ with open('..\data.txt', 'r') as file_data:
         access_date.setTarget(pywikibot.WbTime(year=now.year, month=now.month, day=now.day))
         data['claims'][0]['references'][0]['snaks']['P813'] = [access_date.toJSON()]
 
-        if upToDateClaim is not None:
+        for upToDateClaim in upToDateClaims:
             data['claims'].append(upToDateClaim.toJSON())
 
         item.editEntity(data, summary=u'Adding [[Property:P1082]]: %s, based on data from [[Q3504917]], see [[%s]]' % (count, ref_item))
