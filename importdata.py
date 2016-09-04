@@ -13,7 +13,7 @@ date = pywikibot.WbTime(year=2016, month=1, day=1)
 with open(direct, 'r') as file_data:
     for line in file_data:
         split = line.split("\t")
-        item = pywikibot.ItemPage(site, split[0])
+        item = pywikibot.ItemPage(repo, split[0])
         item.get()
         hasNewClaim = False
         upToDateClaims = []
@@ -42,12 +42,8 @@ with open(direct, 'r') as file_data:
         newClaim_date.setTarget(date)
         data['claims'][0]['qualifiers']['P585'] = [newClaim_date.toJSON()]
 
-        #newClaim_method = pywikibot.Claim(repo, 'P459', isQualifier=True)
-        #newClaim_method.setTarget(pywikibot.ItemPage(site, ''))
-        #data['claims'][0]['qualifiers']['P459'] = [newClaim_method.toJSON()]
-
         newClaim_criter = pywikibot.Claim(repo, 'P1013', isQualifier=True)
-        newClaim_criter.setTarget(pywikibot.ItemPage(site, 'Q2641256'))
+        newClaim_criter.setTarget(pywikibot.ItemPage(repo, 'Q2641256'))
         data['claims'][0]['qualifiers']['P1013'] = [newClaim_criter.toJSON()]
 
         newClaim_men = pywikibot.Claim(repo, 'P1540', isQualifier=True)
@@ -60,7 +56,7 @@ with open(direct, 'r') as file_data:
 
         ref_item = 'Q24560797'
         ref = pywikibot.Claim(repo, 'P248', isReference=True)
-        ref.setTarget(pywikibot.ItemPage(site, ref_item))
+        ref.setTarget(pywikibot.ItemPage(repo, ref_item))
         data['claims'][0]['references'][0]['snaks']['P248'] = [ref.toJSON()]
 
         now = datetime.now()
