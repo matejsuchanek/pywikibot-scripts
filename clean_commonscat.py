@@ -1,109 +1,127 @@
 # -*- coding: utf-8  -*-
-import datetime
 import pywikibot
 import re
 
 from pywikibot import pagegenerators
 from pywikibot import textlib
 
-start = datetime.datetime.now()
+from scripts.deferred import DeferredCallbacksBot
+from scripts.wikidata import WikidataEntityBot
+from scripts.wikitext import WikitextFixingNot
 
-"""Whether to create a non-empty category on Commons when it doesn't exist"""
-create_category = False
-#create_category = True
+class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallbacksBot):
 
-cswiki = pywikibot.Site('cs', 'wikipedia')
-commons = pywikibot.Site('commons', 'commons')
-repo = cswiki.data_repository()
+    def __init__(self, site, **kwargs):
+        self.availableOptions.update({
+            'createnew': False,
+        })
+        super(CommonscatCleaningBot, self).__init__(site, **kwargs)
+        self.commons = pywikibot.Site('commons', 'commons')
 
-category = pywikibot.Category(cswiki, u'Údržba:Commonscat není na Wikidatech')
-gen_articles = pagegenerators.CategorizedPageGenerator(category, namespaces=0)
-gen_subcats = pagegenerators.SubCategoriesPageGenerator(category)
-gen_combined = pagegenerators.CombinedPageGenerator([gen_articles, gen_subcats])
+    def init_page(self, page):
+        page.get()
 
-deferred_touch = []
+    def treat_page(self):
+        page = self.current_page
+        item = pywikibot.ItemPage.fromPage(page)
+        item.get()
+        if 'P373' in item.claims.keys():
+            self.addCallback(page.touch, botflag=True)
+            pywikibot.output("Already has a category on Commons")
+            return
 
-def def_touch(def_page):
-    pywikibot.output("Deferred touching %s" % def_page.title())
-    def_page.touch(botflag=True)
-
-for page in pagegenerators.WikibaseItemFilterPageGenerator(gen_combined):
-    item = pywikibot.ItemPage.fromPage(page)
-    item.get()
-    if 'P373' in item.claims.keys():
-        deferred_touch.append(page)
-        continue
-
-    for template, fielddict in textlib.extract_templates_and_params(page.get(), remove_disabled_parts=True, strip=True):
-        if template.lower() == 'commonscat':
-            has_param = False
-            cat_name = page.title(withNamespace=False)
-            if '1' in fielddict.keys():
-                for pairs in fielddict.items():
-                    if pairs[0] == '1':
-                        cat_name = pairs[1].strip()
+        cat_name = None
+        has_param = False
+        for template, fielddict in textlib.extract_templates_and_params(
+            page.text, remove_disabled_parts=True, strip=True):
+            if template.lower() in ['commonscat', 'commons category']:
+                cat_name = page.title(withNamespace=False)
+                for key, value in fielddict.items():
+                    if key == '1':
+                        cat_name = value.strip()
                         if cat_name != '':
                             has_param = True
                         else:
                             cat_name = page.title(withNamespace=False)
                         break
 
-            commons_cat = pywikibot.Category(commons, cat_name)
-            cancontinue = True
-            exists = commons_cat.exists()
-            if not exists:
-                for _ in pagegenerators.CategorizedPageGenerator(commons_cat, namespaces=6):
-                    if create_category is True:
-                        callback = None
-                        if len(deferred_touch) > 0:
-                            def_page = deferred_touch.pop(0)
-                            callback = lambda _, __: def_touch(def_page)
-                        pywikibot.output(u'Creating %s on Commons' % commons_cat.title())
-                        commons_cat.text = u'{{Uncategorized}}'
-                        commons_cat.save(async=True, callback=callback)
-                        exists = True
-                    else:
-                        pywikibot.output(u'%s: %s contains some files' % (page.title(), commons_cat.title()))
-                        cancontinue = False
-                    break
-            if not cancontinue:
-                break
-            if not exists:
-                regex = r'(?:[\n\r]?|^)(?:\* *)?\{\{ *[Cc]ommons(?:cat|[_ ]?category) *'
-                if has_param is True:
-                    regex += r'\| *' + re.escape(cat_name).replace('\ ', '[_ ]')
-                regex += r'[^\}]*\}\}'
-                page_replaced_text = re.sub(regex, '', page.text)
-                if page_replaced_text == page.text:
-                    pywikibot.output(u'No replacement done in %s' % page.title())
+        if cat_name is None:
+            pywikibot.warning("Template not found")
+            return
+
+        commons_cat = pywikibot.Category(self.commons, cat_name)
+        exists = commons_cat.exists()
+        if not exists:
+            if not commons_cat.isEmptyCategory():
+                if self.getOption('createnew') is True:
+                    commons_cat.text = u'{{Uncategorized}}'
+                    exists = self.doWithCallback(
+                        self._save_page, commons_cat, commons_cat.save,
+                        summary=u'odstranění odkazu na neexistující kategorii na Commons')
                 else:
-                    templates = ('DEFAULTSORT:', '[Pp]ahýl', '[Pp]osloupnost', '[Aa]utoritní data', '[Pp]ortály')
-                    el = u'Externí odkazy'
-                    page_replaced_text = re.sub(r'[\n\r]+==+\ ?' + el + r'\ ?==+\ *[\n\r]+(==|\{\{(?:' + '|'.join(templates) + r')|\[\[Kategorie:)',
-                                                r'\n\n\1', page_replaced_text)
-                    page.text = page_replaced_text
-                    pywikibot.output('Saving %s' % page.title())
-                    callback = None
-                    if len(deferred_touch) > 0:
-                        def_page = deferred_touch.pop(0)
-                        callback = lambda _, __: def_touch(def_page)
-                    page.save(summary=u'odstranění odkazu na neexistující kategorii na Commons',
-                              async=True, callback=callback)
+                    pywikibot.warning(u'%s is not empty' % commons_cat.title())
+                    return
+
+        if not exists:
+            regex = r'(?:[\n\r]?|^)(?:\* *)?\{\{ *[Cc]ommons(?:cat|[_ ]?category) *'
+            if has_param is True:
+                regex += r'\| *' + re.escape(cat_name).replace('\ ', '[_ ]')
+            regex += r'[^\}]*\}\}'
+            page_replaced_text = re.sub(regex, '', page.text, flags=re.M | re.U)
+            if page_replaced_text == page.text:
+                pywikibot.warning('No replacement done')
             else:
-                claim = pywikibot.Claim(repo, 'P373')
-                claim.setTarget(cat_name)
-                pywikibot.output(u'Importing P373 from %s to %s' % (page.title(), item.getID()))
-                item.addClaim(claim)
-                ref = pywikibot.Claim(repo, 'P143', isReference=True)
-                ref.setTarget(pywikibot.ItemPage(repo, 'Q191168'))
-                claim.addSource(ref)
-                deferred_touch.append(page)
-            break
+                templates = ('DEFAULTSORT:', u'[Pp]ahýl', '[Pp]osloupnost', u'[Aa]utoritní data', u'[Pp]ortály')
+                el = u'Externí odkazy'
+                page_replaced_text = re.sub(r'[\n\r]+==+\ ?' + el + r'\ ?==+\ *[\n\r]+(==|\{\{(?:' + '|'.join(templates) + r')|\[\[Kategorie:)',
+                                            r'\n\n\1', page_replaced_text)
+                if not self.getOption('always'):
+                    pywikibot.showDiff(page.text, page_replaced_text)
+                page.text = page_replaced_text
+                self.doWithCallback(self._save_article, page, page.save,
+                                    summary=u'odstranění odkazu na neexistující kategorii na Commons')
+        else:
+            claim = pywikibot.Claim(self.repo, 'P373')
+            claim.setTarget(cat_name)
+            pywikibot.output(u'Importing P373 from %s to %s' % (page.title(), item.getID()))
+            ok = self._save_page(item, self._save_entity, item.addClaim, claim)
+            if ok is True:
+                old = self.getOption('always')
+                self.options['always'] = True
+                ref = self.getSource()
+                self._save_page(item, self._save_entity, claim.addSource, ref)
+                self.options['always'] = old
+                self.addCallback(page.touch, botflag=True)
 
-pywikibot.output('Touching %s remaining page%s' % (len(deferred_touch), 's' if len(deferred_touch) != 1 else ''))
-for def_page in deferred_touch:
-    def_touch(def_page)
+def main(*args):
+    options = {}
+    for arg in pywikibot.handle_args(args):
+        if arg.startswith('-'):
+            arg, sep, value = arg.partition(':')
+            if value != '':
+                options[arg[1:]] = value if not value.isdigit() else int(value)
+            else:
+                options[arg[1:]] = True
 
-end = datetime.datetime.now()
+    site = pywikibot.Site()
+    repo = site.data_repository()
+    item = pywikibot.ItemPage(repo, 'Q11925744')
+    try:
+        title = item.getSitelink(site)
+    except pywikibot.NoPage:
+        pywikibot.output("%s doesn't have an appropriate category" % site)
+        return
 
-pywikibot.output('Complete! Took %s seconds' % (end - start).total_seconds())
+    category = pywikibot.Category(site, title)
+    gen_articles = category.articles(namespaces=0)
+    gen_subcats = category.subcategories()
+    gen_combined = pagegenerators.CombinedPageGenerator([gen_articles, gen_subcats])
+    gen_filtered = pagegenerators.WikibaseItemFilterPageGenerator(gen_combined)
+
+    options['generator'] = gen_filtered
+
+    bot = CommonscatCleaningBot(site, **options)
+    bot.run()
+
+if __name__ == "__main__":
+    main()

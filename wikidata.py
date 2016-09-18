@@ -8,7 +8,7 @@ from pywikibot.bot import (
 class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
     '''
-    Bot interacting and editing Wikidata entities
+    Bot editing Wikidata entities
     Features:
     * Works around [[phab:T86074]]
     * Caches properties so that iterating claims is faster
