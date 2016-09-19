@@ -7,7 +7,7 @@ from pywikibot import textlib
 
 from scripts.deferred import DeferredCallbacksBot
 from scripts.wikidata import WikidataEntityBot
-from scripts.wikitext import WikitextFixingNot
+from scripts.wikitext import WikitextFixingBot
 
 class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallbacksBot):
 

@@ -5,7 +5,7 @@ from pywikibot import pagegenerators
 
 from pywikibot.bot import BaseBot
 
-from scripts.typos import TyposLoader
+from scripts.typoloader import TyposLoader
 
 class WikitextFixingBot(BaseBot):
 

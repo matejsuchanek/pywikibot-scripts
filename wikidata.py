@@ -39,7 +39,7 @@ class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
     def cacheProperty(self, prop):
         prop_page = pywikibot.PropertyPage(self.repo, prop)
-        if self.filterProperty(prop_page) is True:
+        if self.filterProperty(prop_page):
             self.good_cache.append(prop)
         else:
             self.bad_cache.append(prop)
