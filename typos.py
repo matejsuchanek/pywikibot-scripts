@@ -14,53 +14,46 @@ class InaccurateTypoRuleException(Exception):
     '''Exception to stop the bot on an inefficient query'''
     pass
 
-class SingleRuleTypoBot(SingleSiteBot, WikitextFixingBot, ExistingPageBot, NoRedirectPageBot):
+class IteratingTypoBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot):
 
-    '''Bot to handle one typo rule. Factored by TypoBot'''
+    '''Bot to iterate and fix typos in a given set of pages'''
 
-    def __init__(self, site, rule, rules, whitelist, fp_page, **kwargs):
+    def __init__(self, site, rules, whitelist, fp_page, **kwargs):
         self.availableOptions.update({
             'allrules': False,
             'threshold': 10,
             'quick': False,
         })
         kwargs['typos'] = False
-        super(SingleRuleTypoBot, self).__init__(site, **kwargs)
-        self.rule = rule
+        kwargs['cw'] = True
+        super(IteratingTypoBot, self).__init__(site, **kwargs)
         self.rules = rules
         self.whitelist = whitelist
         self.fp_page = fp_page
-        self.processed = 0.0
-        self.replaced = 0.0
 
-    def run(self):
-        super(SingleRuleTypoBot, self).run()
-        return self._save_counter
+    def exit(self):
+        super(IteratingTypoBot, self).exit()
+        rules = sorted(self.rules, key=lambda rule: rule.longest, reverse=True)[:3]
+        pywikibot.output("\nSlowest rules:")
+        for i, rule in enumerate(rules):
+            pywikibot.output("%s. %s - %s" % (i+1, rule.find.pattern, rule.longest))
+
+    def saveFalsePositive(self):
+        title = self.current_page.title()
+        self.fp_page.text += u'\n* [[%s]]' % title
+        self.fp_page.save(summary=u'[[%s]]' % title, async=True)
+        self.whitelist.append(title)
 
     def init_page(self, page):
-        if not self.isAccurate():
-            raise InaccurateTypoRuleException
-
         if page.title() in self.whitelist:
             raise SkipPageError(page, 'Page is whitelisted')
 
-        if self.rule.matches(page.title()):
-            raise SkipPageError(page, 'Rule matched title')
-
+        self.done_replacements = []
         page.get()
 
     def treat_page(self):
         page = self.current_page
         text = page.text
-        replaced = []
-        text = self.rule.apply(text, replaced)
-        self.processed += 1
-        if page.text == text:
-            if self.getOption('quick') is True:
-                return
-        else:
-            self.replaced += 1
-
         for rule in self.rules:
             if rule.matches(page.title()):
                 continue
@@ -68,9 +61,9 @@ class SingleRuleTypoBot(SingleSiteBot, WikitextFixingBot, ExistingPageBot, NoRed
                (self.getOption('allrules') is not True
                 and rule.needsDecision()):
                 continue
-            text = rule.apply(text, replaced)
+            text = rule.apply(text, self.done_replacements)
 
-        if len(replaced) > 0:
+        if len(self.done_replacements) > 0:
             always = (self.getOption('always') is True or
                       self.getOption('quick') is True)
             if not always:
@@ -98,15 +91,46 @@ class SingleRuleTypoBot(SingleSiteBot, WikitextFixingBot, ExistingPageBot, NoRed
 
             page.text = text
             self.options['always'] = True
-            self._save_article(page, self._save_page, page.save, async=True,
-                               summary=u'oprava překlepů: %s' % ', '.join(replaced))
+            self._save_page(
+                page, self.fix_wikitext, page, async=True,
+                summary=u'oprava překlepů: %s' % ', '.join(self.done_replacements))
             self.options['always'] = always
 
-    def saveFalsePositive(self):
-        title = self.current_page.title()
-        fb_page.text += u'\n* [[%s]]' % title
-        fb_page.save(summary=u'[[%s]]' % title, async=True)
-        self.whitelist.append(title)
+class SingleRuleTypoBot(IteratingTypoBot):
+
+    '''Bot to iterate one typo rule over pages where it may apply. Factored by TypoBot'''
+
+    def __init__(self, site, rule, rules, whitelist, fp_page, **kwargs):
+        super(SingleRuleTypoBot, self).__init__(site, rules, whitelist, fp_page, **kwargs)
+        self.rule = rule
+        self.processed = 0.0
+        self.replaced = 0.0
+
+    def run(self):
+        super(SingleRuleTypoBot, self).run()
+        return self._save_counter
+
+    def init_page(self, page):
+        if not self.isAccurate():
+            raise InaccurateTypoRuleException
+
+        if self.rule.matches(page.title()):
+            raise SkipPageError(page, 'Rule matched title')
+
+        super(SingleRuleTypoBot, self).init_page(page)
+
+    def treat_page(self):
+        page = self.current_page
+        text = page.text
+        text = self.rule.apply(text, self.done_replacements)
+        self.processed += 1
+        if page.text == text:
+            if self.getOption('quick') is True:
+                return
+        else:
+            self.replaced += 1
+            page.text = text
+        super(SingleRuleTypoBot, self).treat_page()
 
     def isAccurate(self):
         threshold = self.getOption('threshold')
@@ -138,7 +162,7 @@ class TypoBot(SingleSiteBot):
     * -whitelistpage: - what page holds pages which should be skipped
     '''
 
-    def __init__(self, site, **kwargs):
+    def __init__(self, site, genFactory, **kwargs):
         self.availableOptions.update({
             'allrules': False,
             'offset': 0,
@@ -150,25 +174,33 @@ class TypoBot(SingleSiteBot):
         super(TypoBot, self).__init__(site, **kwargs)
         loader = TyposLoader(site, **kwargs)
         self.typoRules = loader.loadTypos()
+        self.fp_page = loader.getWhitelistPage()
         self.whitelist = loader.loadWhitelist()
+        self.generator = genFactory.getCombinedGenerator()
 
     def run(self):
-        i = 0
+        opts = dict(allrules=self.getOption('allrules'),
+                    always=self.getOption('always'),
+                    quick=self.getOption('quick'),
+                    threshold=self.getOption('threshold'))
+        if self.generator:
+            opts['generator'] = self.generator
+            bot = IteratingTypoBot(self.site, self.typoRules[:],
+                                   self.whitelist, self.fp_page, **opts)
+            bot.run()
+            return
+
+        i = -1
         offset = self.getOption('offset')
         for rule in self.typoRules:
+            i += 1
             if offset > i:
                 continue
             if not rule.canSearch():
                 continue
 
-            i += 1
             pywikibot.output(u'Doing %s' % rule.query)
-            opts = dict(allrules=self.getOption('allrules'),
-                        always=self.getOption('always'),
-                        generator=rule.querySearch(),
-                        quick=self.getOption('quick'),
-                        threshold=self.getOption('threshold'))
-
+            opts['generator'] = rule.querySearch()
             bot = SingleRuleTypoBot(self.site, rule, self.typoRules[:],
                                     self.whitelist, self.fp_page, **opts)
             self._save_counter += bot.run()
@@ -176,16 +208,20 @@ class TypoBot(SingleSiteBot):
 
 def main(*args):
     options = {}
-    for arg in pywikibot.handle_args(args):
-        if arg.startswith('-'):
-            arg, sep, value = arg.partition(':')
-            if value != '':
-                options[arg[1:]] = value if not value.isdigit() else int(value)
-            else:
-                options[arg[1:]] = True
+    local_args = pywikibot.handle_args(args)
+    local_args.append('-ns:0')
+    genFactory = pagegenerators.GeneratorFactory()
+    for arg in local_args:
+        if not genFactory.handleArg(arg):
+            if arg.startswith('-'):
+                arg, sep, value = arg.partition(':')
+                if value != '':
+                    options[arg[1:]] = value if not value.isdigit() else int(value)
+                else:
+                    options[arg[1:]] = True
 
     site = pywikibot.Site()
-    bot = TypoBot(site, **options)
+    bot = TypoBot(site, genFactory, **options)
     bot.run()
 
 if __name__ == "__main__":

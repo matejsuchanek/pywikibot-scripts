@@ -1,6 +1,7 @@
 # -*- coding: utf-8  -*-
 import pywikibot
 import re
+import time
 
 from pywikibot import pagegenerators
 from pywikibot import textlib
@@ -28,10 +29,12 @@ class TypoRule(object):
     # tags
     exceptions += ['ce', 'code', 'graph', 'imagemap', 'mapframe', 'maplink',
                    'math', 'nowiki', 'poem', 'score', 'section', 'timeline']
-    # regexes ('target-part' of a wikilink; quotation marks; italics)
-    exceptions += [re.compile(r'\[\[[^][|]+[]|]'),
-                   re.compile(u'„[^“]+“'),
-                   re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1).)+\1", re.M | re.U)]
+
+    exceptions += [re.compile(r'\[\[[^][|]+[]|]'), # 'target-part' of a wikilink
+                   re.compile('<[a-z]+ [^>]+>'), # HTML tag
+                   re.compile(u'„[^“]+“'), # quotation marks
+                   re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1).)+\1", # italics
+                              re.M | re.U)]
 
     def __init__(self, find, replacements, site, auto=False, query=None):
         self.find = find
@@ -39,6 +42,7 @@ class TypoRule(object):
         self.site = site
         self.auto = auto
         self.query = query
+        self.longest = 0
 
     def needsDecision(self):
         return not self.auto or len(self.replacements) > 1
@@ -98,7 +102,15 @@ class TypoRule(object):
     def matches(self, text):
         return re.search(self.find, text) is not None
 
-    def summary_hook(self, match, replaced):
+    def summary_hook(self, match, replaced, hook_time=0):
+        def underscores(string):
+            if string.startswith(' '):
+                string = '_' + string[1:]
+            if string.endswith(' '):
+                string = string[:-1] + '_'
+            return string
+
+        start = time.clock()
         new = old = match.group(0)
         if self.needsDecision():
             options = [('keep', 'k')]
@@ -107,15 +119,22 @@ class TypoRule(object):
                 replacement = match.expand(repl)
                 replacements.append(replacement)
                 options.append(
-                    (u"%s %s" % (i + 1, replacement), str(i + 1))
+                    (u"%s %s" % (i + 1, underscores(replacement)), str(i + 1))
                 )
             text = match.string
-            pywikibot.output(text[max(0, match.start() - 30):match.start()]
-                             + color_format(u'{lightred}{0}{default}', old)
-                             + text[match.end():match.end() + 30])
+            pre = text[max(0, match.start() - 30):match.start()]
+            post = text[match.end():match.end() + 30]
+            while "\n" in pre:
+                pre = pre[pre.index("\n") + 1:]
+            if "\n" in post:
+                post = post[:post.index("\n")]
+            pywikibot.output(
+                pre + color_format(u'{lightred}{0}{default}', old) + post)
             choice = pywikibot.input_choice('Choose the best replacement',
                                             options, automatic_quit=False,
                                             default='k')
+            finish = time.clock()
+            hook_time = finish - start
             if choice != 'k':
                 new = replacements[int(choice) - 1]
         else:
@@ -123,16 +142,22 @@ class TypoRule(object):
             if old == new:
                 pywikibot.warning(u'No replacement done in string "%s"' % old)
 
-        if old == new:
-            fragment = u' → '.join([re.sub('(^ | $)', '_', re.sub('\n', r'\\n', i)) for i in [old, new]])
+        if old != new:
+            fragment = u' → '.join([underscores(re.sub('\n', r'\\n', i)) for i in [old, new]])
             if fragment.lower() not in [i.lower() for i in replaced]:
                 replaced.append(fragment)
         return new
 
     def apply(self, text, replaced=[]):
-        hook = lambda match: self.summary_hook(match, replaced)
-        return textlib.replaceExcept(text, self.find, hook, self.exceptions,
+        hook_time = 0
+        hook = lambda match: self.summary_hook(match, replaced, hook_time)
+        start = time.clock()
+        text = textlib.replaceExcept(text, self.find, hook, self.exceptions,
                                      self.site)
+        finish = time.clock()
+        delta = finish - start - hook_time # works?
+        self.longest = delta if delta > self.longest else self.longest
+        return text
 
 class TyposLoader(object):
 
@@ -144,17 +169,23 @@ class TyposLoader(object):
         self.whitelist_page_name = kwargs.pop('whitelistpage', None)
         self.load_all = kwargs.pop('allrules', False)
 
+    def getWhitelistPage(self):
+        if self.whitelist_page_name is None:
+            self.whitelist_page_name = u'Wikipedie:WPCleaner/Typo/False'
+        
+        return pywikibot.Page(self.site, self.whitelist_page_name)
+
     def loadTypos(self):
+        pywikibot.output('Loading typo rules')
         self.typoRules = []
+        
         if self.typos_page_name is None:
             self.typos_page_name = u'Wikipedie:WPCleaner/Typo'
-
-        pywikibot.output('Loading typo rules')
         typos_page = pywikibot.Page(self.site, self.typos_page_name)
         if not typos_page.exists():
             return
-        content = typos_page.get()
 
+        content = typos_page.get()
         load_all = self.load_all is True
         for template, fielddict in textlib.extract_templates_and_params(content, False, False):
             if template.lower() == 'typo':
@@ -175,11 +206,8 @@ class TyposLoader(object):
         return self.typoRules
 
     def loadWhitelist(self):
-        if self.whitelist_page_name is None:
-            self.whitelist_page_name = u'Wikipedie:WPCleaner/Typo/False'
-
         self.whitelist = []
-        self.fp_page = pywikibot.Page(self.site, self.whitelist_page_name)
+        self.fp_page = self.getWhitelistPage()
         if self.fp_page.exists():
             content = self.fp_page.get()
             for match in re.finditer(r'\[\[([^]|]+)\]\]', content):

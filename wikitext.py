@@ -2,12 +2,14 @@
 import pywikibot
 
 from pywikibot import pagegenerators
+from pywikibot import textlib
 
-from pywikibot.bot import BaseBot
+from pywikibot.bot import SingleSiteBot
 
+from scripts.checkwiki import CheckWiki
 from scripts.typoloader import TyposLoader
 
-class WikitextFixingBot(BaseBot):
+class WikitextFixingBot(SingleSiteBot):
 
     '''
     Class for bots that save wikitext. Applies regular expressions
@@ -18,9 +20,9 @@ class WikitextFixingBot(BaseBot):
     * -typos - fixing common typos
     ** -maxsummarytypos - how many typo replacements to show
        in edit summary at most?
+    ** -cw - fixes Check Wikipedia errors
 
     Planned:
-    * CheckWiki
     * redirects
     * template redirects
     * and more...
@@ -29,16 +31,19 @@ class WikitextFixingBot(BaseBot):
     def __init__(self, site, **kwargs):
         self.availableHooks = {
             'cw': self.initCheckWiki(),
+            #'interwiki': self.loadInterwiki,
             'redirects': self.loadRedirects,
             'templates': self.loadTemplates,
             'typos': self.initTypos()
         }
+        do_all = kwargs.pop('all', False)
         self.availableOptions.update(dict(zip(
             self.availableHooks.keys(),
-            [False for i in range(0, len(self.availableHooks))]
+            [do_all for i in range(0, len(self.availableHooks))]
         )))
         self.availableOptions.update({
-            'maxsummarytypos': 5
+            'maxsummarycw': 5,
+            'maxsummarytypos': 5,
         })
         super(WikitextFixingBot, self).__init__(site, **kwargs)
         self.hooks = []
@@ -55,15 +60,14 @@ class WikitextFixingBot(BaseBot):
         return self.loadCheckWiki
 
     def loadCheckWiki(self, **kwargs):
-        self.cwrules = []
         return self.fixCheckWiki
 
     def fixCheckWiki(self, page, summary):
         replaced = []
-        text = page.text
-        for rule in self.cwrules:
-            text = rule.apply(text, replaced)
-        page.text = text
+        cw = CheckWiki(self.site)
+        page.text = cw.applyErrors(page.text, replaced)
+        if len(replaced) > 0: # todo: maxsummarycw
+            summary += u'; [[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced)
         return summary
 
     def initTypos(self):
@@ -94,15 +98,15 @@ class WikitextFixingBot(BaseBot):
         if count > 0:
             if count > 1:
                 max_typos = self.getOption('maxsummarytypos')
-                summary += '; oprava překlepů: %s' % ', '.join(replaced[:5])
+                summary += u'; oprava překlepů: %s' % ', '.join(replaced[:5])
                 if count > max_typos:
-                    summary += ' a %s další' % (count - max_typos)
+                    summary += u' a %s další' % (count - max_typos)
                     if count - max_typos > 1:
                         summary += 'ch'
                     else:
                         summary += 'ho'
             else:
-                summary += '; oprava překlepu: %s' % replaced[0]
+                summary += u'; oprava překlepu: %s' % replaced[0]
         return summary
 
     def loadRedirects(self, **kwargs):
@@ -111,7 +115,21 @@ class WikitextFixingBot(BaseBot):
     def loadTemplates(self, **kwargs):
         pass
 
-    def _save_article(self, page, func, *data, **kwargs):
+##    def loadInterwiki(self, **kwargs):
+##        return self.fixInterWiki
+
+##    def fixInterwiki(self, page, summary):
+##        iwlinks = page.interwiki()
+##        if len(iwlinks) < 1:
+##            return
+##        try:
+##            item = pywikibot.ItemPage.fromPage(page)
+##            sitelinks = item.get().sitelinks
+##            #for site in iwlinks:
+##        except pywikibot.NoPage:
+##            return
+
+    def fix_wikitext(self, page, *data, **kwargs):
         for hook in self.hooks:
             kwargs['summary'] = hook(page, kwargs.pop('summary'))
-        return super(WikitextFixingBot, self)._save_page(page, func, *data, **kwargs)
+        return page.save(*data, **kwargs)

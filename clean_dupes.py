@@ -1,15 +1,146 @@
 # -*- coding: utf-8  -*-
-import datetime
 import pywikibot
 
 from pywikibot import pagegenerators
 
-start = datetime.datetime.now()
+from pywikibot.bot import SkipPageError
 
-site = pywikibot.Site('wikidata', 'wikidata')
-repo = site.data_repository()
+from scripts.wikidata import WikidataEntityBot
 
-QUERY = """SELECT DISTINCT ?item WHERE {
+class DupesMergingBot(WikidataEntityBot):
+
+    def __init__(self, site, **kwargs):
+        super(DupesMergingBot, self).__init__(site, **kwargs)
+        self.__dupe_item = pywikibot.ItemPage(self.repo, 'Q17362920')
+
+    def init_page(self, item):
+        super(DupesMergingBot, self).init_page(item)
+        if 'P31' not in item.claims:
+            raise SkipPageError(
+                item,
+                "Missing P31 property"
+            )
+
+    #def getClaimsToRemove(self, claims, target, remove_claims):
+
+    def treat_page(self):
+        item = self.current_page
+        claims = []
+        target = None
+        for claim in item.claims['P31']:
+            if claim.snaktype != 'value':
+                continue
+            if claim.target_equals(self.__dupe_item):
+                claims.append(claim)
+                for prop in ['P460', 'P642']:
+                    if prop in claim.qualifiers.keys():
+                        for snak in claim.qualifiers[prop]:
+                            if snak.snaktype != 'value':
+                                continue
+                            if target is None:
+                                target = snak.getTarget()
+                            else:
+                                if not snak.target_equals(target):
+                                    pywikibot.output("Multiple targets found")
+                                    return
+
+        if 'P460' in item.claims.keys():
+            for claim in item.claims['P460']:
+                if claim.snaktype != 'value':
+                    continue
+                claims.append(claim)
+                if target is None:
+                    target = claim.getTarget()
+                else:
+                    if not claim.target_equals(target):
+                        pywikibot.output("Multiple targets found")
+                        return
+
+        if target is None:
+            pywikibot.output("No target found")
+            return
+
+        sitelinks = []
+        target_sitelinks = []
+        while target.isRedirectPage():
+            pywikibot.warning("Target %s is redirect" % target.getID())
+            target = target.getRedirectTarget()
+
+        target.get()
+        for dbname, sitelink in item.sitelinks.items():
+            if dbname in target.sitelinks.keys():
+                apisite = pywikibot.site.APISite.fromDBName(dbname)
+                page = pywikibot.Page(apisite, sitelink)
+                if not page.exists():
+                    sitelinks.append(dbname)
+                    continue
+                target_page = pywikibot.Page(apisite, target.sitelinks[dbname])
+                if not target_page.exists():
+                    target_sitelinks.append(dbname)
+                    continue
+                if self.redirectsTo(page, target_page) or self.redirectsTo(target_page, page):
+                    continue
+
+                pywikibot.output("Target has a conflicting sitelink: %s" % dbname)
+                return
+
+        target_claims = []
+        if 'P460' in target.claims.keys():
+            for claim in target.claims['P460']:
+                if claim.snaktype != 'value':
+                    continue
+                if claim.target_equals(item):
+                    target_claims.append(claim)
+
+        if 'P31' in target.claims.keys():
+            for claim in target.claims['P31']:
+                if claim.snaktype != 'value':
+                    continue
+                if claim.target_equals(self.__dupe_item):
+                    for prop in ['P460', 'P642']:
+                        if prop in claim.qualifiers.keys():
+                            for snak in claim.qualifiers[prop]:
+                                if snak.snaktype != 'value':
+                                    continue
+                                if snak.target_equals(item):
+                                    target_claims.append(claim)
+                            break
+
+        if len(sitelinks) > 0:
+            self._save_page(item, self._save_entity, item.removeSitelinks, sitelinks)
+        if len(claims) > 0:
+            self._save_page(item, self._save_entity, item.removeClaims, claims)
+        if len(target_sitelinks) > 0:
+            self._save_page(item, self._save_entity, target.removeSitelinks, target_sitelinks)
+        if len(target_claims) > 0:
+            self._save_page(item, self._save_entity, target.removeClaims, target_claims)
+
+        data = {'descriptions': {}}
+        for lang in item.descriptions.keys():
+            if lang in target.descriptions.keys():
+                if item.descriptions[lang] != target.descriptions[lang]:
+                    data['descriptions'][lang] = ''
+        if len(data['descriptions']) > 0:
+            self._save_page(item, self._save_entity, item.editEntity, data,
+                            summary="Removing conflicting descriptions before merging")
+
+        self._save_page(item, self._save_entity, item.mergeInto, target,
+                        ignore_conflicts=("description"))
+
+    def redirectsTo(self, page, target):
+        return page.isRedirectPage() and page.getRedirectTarget().title() == target.title()
+
+def main(*args):
+    options = {}
+    for arg in pywikibot.handle_args(args):
+        if arg.startswith('-'):
+            arg, sep, value = arg.partition(':')
+            if value != '':
+                options[arg[1:]] = value if not value.isdigit() else int(value)
+            else:
+                options[arg[1:]] = True
+
+    QUERY = """SELECT DISTINCT ?item WHERE {
   ?item p:P31 ?statement .
   ?statement ps:P31 wd:Q17362920 .
   {
@@ -24,126 +155,12 @@ QUERY = """SELECT DISTINCT ?item WHERE {
   ?item schema:dateModified ?mod .
 } ORDER BY ?mod""".replace('\n', ' ')
 
-dupe_item = pywikibot.ItemPage(repo, 'Q17362920')
+    site = pywikibot.Site('wikidata', 'wikidata')
 
-def redirectsTo(page, target):
-    return page.isRedirectPage() and page.getRedirectTarget().title() == target.title()
+    options['generator'] = pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site)
 
-for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
-    if item.isRedirectPage():
-        pywikibot.output("%s is redirect" % item.getID())
-        continue
+    bot = DupesMergingBot(site, **options)
+    bot.run()
 
-    claims = []
-    target = None
-    item.get()
-    if 'P460' in item.claims.keys():
-        for claim in item.claims['P460']:
-            if claim.snaktype != "value":
-                continue
-            claims.append(claim)
-            if target is None:
-                target = claim.getTarget()
-            else:
-                if not claim.target_equals(target):
-                    target = False
-                    break
-
-    if target is not False and 'P31' in item.claims.keys():
-        for claim in item.claims['P31']:
-            if claim.snaktype != "value":
-                continue
-            if claim.target_equals(dupe_item):
-                claims.append(claim)
-                for prop in ['P460', 'P642']:
-                    if prop in claim.qualifiers.keys():
-                        for snak in claim.qualifiers[prop]:
-                            if target is False:
-                                break
-                            if snak.snaktype != "value":
-                                continue
-                            if target is None:
-                                target = snak.getTarget()
-                            if not snak.target_equals(target):
-                                target = False
-
-    if target is False:
-        pywikibot.output("Multiple targets found in %s" % item.getID())
-        continue
-    if target is None:
-        pywikibot.output("No target found in %s" % item.getID())
-        continue
-
-    sitelinks = []
-    target_sitelinks = []
-    if target.isRedirectPage(): # fixme
-        pywikibot.output("Target %s is redirect" % target.getID())
-        continue
-    target.get()
-    ok = True
-    for dbname in item.sitelinks.keys():
-        if dbname in target.sitelinks.keys():
-            apisite = pywikibot.site.APISite.fromDBName(dbname)
-            page = pywikibot.Page(apisite, item.sitelinks[dbname])
-            if not page.exists():
-                sitelinks.append(dbname)
-                continue
-            target_page = pywikibot.Page(apisite, target.sitelinks[dbname])
-            if not target_page.exists():
-                target_sitelinks.append(dbname)
-                continue
-            if redirectsTo(page, target_page) or redirectsTo(target_page, page):
-                continue
-            ok = False
-            break
-
-    if ok is False:
-        continue
-
-    target_claims = []
-    if 'P460' in target.claims.keys():
-        for claim in target.claims['P460']:
-            if claim.snaktype != "value":
-                continue
-            if claim.target_equals(item):
-                target_claims.append(claim)
-
-    if 'P31' in target.claims.keys():
-        for claim in target.claims['P31']:
-            if claim.snaktype != "value":
-                continue
-            if claim.target_equals(dupe_item):
-                for prop in ['P460', 'P642']:
-                    if prop in claim.qualifiers.keys():
-                        for snak in claim.qualifiers[prop]:
-                            if snak.snaktype != "value":
-                                continue
-                            if snak.target_equals(item):
-                                target_claims.append(claim)
-                        break
-
-    pywikibot.output(u"Merging %s into %s" % (item.getID(), target.getID()))
-    if len(sitelinks) > 0:
-        item.removeSitelinks(sitelinks)
-    if len(claims) > 0:
-        item.removeClaims(claims)
-    if len(target_sitelinks) > 0:
-        target.removeSitelinks(target_sitelinks)
-    if len(target_claims) > 0:
-        item.removeClaims(target_claims)
-
-    data = {'descriptions': {}}
-    for lang in item.descriptions.keys():
-        if lang in target.descriptions.keys():
-            if item.descriptions[lang] != target.descriptions[lang]:
-                data['descriptions'][lang] = ''
-    if len(data['descriptions']) > 0:
-        item.editEntity(data, summary="Removing conflicting descriptions before merging")
-    try:
-        item.mergeInto(target, ignore_conflicts="description")
-    except Exception as exc:
-        pywikibot.output("Error when merging %s into %s: %s" % (item.getID(), target.getID(), exc.message))
-
-end = datetime.datetime.now()
-
-pywikibot.output("Complete! Took %s seconds" % (end - start).total_seconds())
+if __name__ == "__main__":
+    main()

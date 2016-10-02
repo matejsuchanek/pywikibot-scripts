@@ -2,7 +2,7 @@
 import pywikibot
 
 from pywikibot.bot import (
-    SingleSiteBot, ExistingPageBot, NoRedirectPageBot, WikidataBot
+    SkipPageError, SingleSiteBot, ExistingPageBot, NoRedirectPageBot, WikidataBot
 )
 
 class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
@@ -26,7 +26,18 @@ class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         self.repo = site.data_repository()
 
     def init_page(self, item):
-        item.get()
+        try:
+            item.get()
+        except pywikibot.IsRedirectPage:
+            raise SkipPageError(
+                item,
+                "Redirect item"
+            )
+        except pywikibot.NoPage:
+            raise SkipPageError(
+                item,
+                "Item doesn't exist"
+            )
 
     def checkProperty(self, prop):
         if prop in self.good_cache:
