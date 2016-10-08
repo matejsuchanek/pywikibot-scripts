@@ -2,199 +2,220 @@
 import pywikibot
 import re
 
+from pywikibot import pagegenerators
+
+from pywikibot.bot import ExistingPageBot
+
+from scripts.checkwiki_errors import *
+from scripts.wikitext import WikitextFixingBot
+
+def deduplicate(array):
+    for index, member in enumerate(array, start=1):
+        while member in array[index:]:
+            array.pop(index + array[index:].index(member))
+
 class CheckWiki(object):
 
     '''Object to load errors from CheckWiki'''
 
+    errorMap = {
+        1: PrefixedTemplate,
+        2: BrokenHTMLTag,
+        7: LowHeadersLevel,
+        #8: MissingEquation, todo
+        17: DuplicateCategory,
+        21: EnglishCategory,
+        25: HeaderHierarchy,
+        32: MultiplePipes,
+        #34: MagicWords, todo
+        44: BoldHeader,
+        48: SelfLink,
+        54: ListWithBreak,
+        57: HeaderWithColon,
+        63: SmallInsideTags,
+        #75: BadListStructure, todo
+        81: DuplicateReferences,
+        101: Ordinals,
+        103: SuperfluousPipe,
+        104: ReferenceQuotes,
+    }
+
+    prio_map = {
+        '1': 'high',
+        '2': 'medium',
+        '3': 'low'
+    }
+
     def __init__(self, site, **kwargs):
         self.site = site
-        self.numberToClass = {
-            81: DuplicateReferences
+        self.cache = {}
+        self.loadSettings()
+        self.auto = kwargs.pop('auto', True)
+
+    def purge(self):
+        self.cache = {}
+
+    def loadSettings(self):
+        pywikibot.output('Loading CheckWiki settings')
+        self.settings = {
+            'priority': {
+                'high': [],
+                'medium': [],
+                'low': []
+            },
+            'whitelists': {},
+            #'special': {}
         }
+        repo = self.site.data_repository()
+        item = pywikibot.ItemPage(repo, 'Q10784379')
+        try:
+            sitelink = item.getSitelink(self.site)
+        except pywikibot.NoPage:
+            return
+        set_page = pywikibot.Page(self.site, sitelink)
+        text = set_page.get()
+        inside_setting = False
+        setting = None
+        setting_text = ''
+        parsed_settings = {}
+        for line in text.splitlines():
+            if inside_setting is False:
+                match = re.match(r' *([a-z0-9_]+) *=', line)
+                if match is not None:
+                    setting = match.group(1)
+                    setting_text = ''
+                    inside_setting = True
+                    line = line[match.end():]
 
-    def getClass(self, number):
-        return self.numberToClass[num](self.site)
+            if inside_setting is True:
+                if 'END' in line:
+                    setting_text += line[:line.index('END')].strip()
+                    inside_setting = False
+                    parsed_settings[setting] = setting_text
+                else:
+                    setting_text += line.strip() + '\n'
 
-    def loadError(self, number): # todo
-        pass
-
-    def errorGenerator(self, number): # todo
-        pass
-
-    def applyError(self, num, text, replaced=[]):
-        error = getClass(num)
-        return error.apply(text, replaced)
-
-    def applyErrors(self, text, replaced=[]):
-        for num in self.numberToClass.keys():
-            text = self.applyError(num, text, replaced)
-        return text
-
-class CheckWikiError(object):
-
-    '''Abstract class for each error to extend'''
-
-    def __init__(self, site, number, **kwargs):
-        self.site = site
-        self.number = number
-
-    def loadError(self):
-        pass
-
-    def apply(self):
-        pass # todo: abstract
-
-class DuplicateReferences(CheckWikiError):
-
-    def __init__(self, site, **kwargs):
-        super(DuplicateReferences, self).__init__(site, 81)
-
-    def apply(self, text, replaced):
-        ref_regex = re.compile(
-            '<ref(?= |>)(?P<params>[^>]*)(?: ?/|>(?P<content>(?:(?!</?ref).)+)</ref)>',
-            re.S | re.U)
-
-        param_regex = re.compile(
-            '(?P<param>[a-z]+) *= *'
-            '(?P<quote>[\'"])?'
-            r'(?P<content>(?(quote)(?!(?P=quote)|>).|\w)+)'
-            '(?(quote)(?P=quote)|)',
-            re.U)
-
-        named_contents = {}
-        duplicate_named_contents = {}
-        unnamed_contents = {}
-        duplicate_unnamed_contents = {}
-        names = {}
-        destroyed_names = {}
-        i = {}
-
-        def getParams(params):
-            name = ''
-            group = ''
-            for match in re.finditer(param_regex, params):
-                if match.group('param') == 'group':
-                    group = match.group('content').strip()
-                elif match.group('param') == 'name':
-                    name = match.group('content').strip()
-            return (name, group)
-
-        for match in re.finditer(ref_regex, text):
-            if match.group('content') is None:
+        i = 0
+        project = parsed_settings.pop('project', self.site.dbName())
+        for setting, text in parsed_settings.items():
+            split = setting.split('_')
+            if len(split) != 4:
                 continue
-            content = match.group('content').strip()
-            name, group = getParams(match.group('params'))
+            if split[0] != 'error':
+                continue
+            if split[-1] != project:
+                continue
+            if not split[1].isdigit():
+                continue
+            num = int(split[1])
+            if num > 500:
+                continue
+            if split[2] == 'prio':
+                if text in self.prio_map:
+                    self.settings['priority'][self.prio_map[text]].append(num)
+                    i += 1
+            elif split[2] == 'whitelistpage':
+                self.settings['whitelists'][num] = text
 
-            if group not in named_contents:
-                named_contents[group] = [] # the order is important!
-                duplicate_named_contents[group] = set()
-                unnamed_contents[group] = set()
-                duplicate_unnamed_contents[group] = set()
-                names[group] = set()
-                destroyed_names[group] = {}
-                i[group] = 1
+        self.settings['project'] = project
+        pywikibot.output(u'%s CheckWiki errors recognized' % i)
 
-            if name == '':
-                if content in unnamed_contents[group]:
-                    duplicate_unnamed_contents[group].add(content)
-                else:
-                    unnamed_contents[group].add(content)
-            else:
-                names[group].add(name)
-                if (name, content) not in named_contents[group]:
-                    named_contents[group].append(
-                        (name, content)
-                    )
+    def getError(self, number):
+        if number not in self.cache:
+            error = self.errorMap[number](self.site, self.settings,
+                                          auto=self.auto)
+            self.cache[number] = error
+        return self.cache[number]
 
-        def replaceRef(match):
-            if match.group('content') is None:
-                return match.group(0)
+    def iter_errors(self, numbers=[]):
+        for num in self.errorMap.keys():
+            if not numbers or num in numbers:
+                yield self.getError(num)
 
-            content = match.group('content').strip()
-            name, group = getParams(match.group('params'))
-            if name != '':
-                if name in destroyed_names[group]:
-                    return match.group(0) # do in the second round
+    def loadErrors(self, numbers=[], limit=None):
+        for error in self.iter_errors(numbers):
+            yield from error.loadError(limit=limit)
 
-                for ref_name, ref_content in duplicate_named_contents[group]:
-                    if ref_content == content:
-                        if ref_name != name:
-                            destroyed_names[group][name] = ref_name
-                        return u'<ref name="%s"%s />' % (
-                            ref_name, u' group="%s"' % group if group != '' else '')
+    def applyErrors(self, text, page, replaced=[], fixed=[], numbers=[]):
+        errors = set(self.errorMap.keys())
+        if len(numbers) > 0:
+            errors &= set(numbers)
+        errors = list(errors)
+        while len(errors) > 0:
+            num = errors.pop(0)
+            error = self.getError(num)
+            needsFirst = set(error.needsFirst())
+            i = 0
+            while len(needsFirst & set(errors[i:])) > 0:
+                i += 1
+            if i > 0:
+                errors.insert(i, num)
+                continue
+            new_text = error.apply(text, page)
+            if new_text != text:
+                text = new_text
+                summary = error.summary()
+                fixed.append(num)
+                if summary not in replaced:
+                    replaced.append(summary)
 
-                for ref_name, ref_content in named_contents[group]:
-                    if ref_content == content:
-                        if ref_name == name:
-                            named_contents[group].remove(
-                                (name, content)
-                            )
-                            duplicate_named_contents[group].add(
-                                (name, content)
-                            )
-                        else:
-                            destroyed_names[group][name] = ref_name
-                        return match.group(0)
-                    if ref_name == name:
-                        pass # this should not happen!
-
-            else:
-                for ref_name, ref_content in named_contents[group] + list(duplicate_named_contents[group]):
-                    if ref_content == content:
-                        return u'<ref name="%s"%s />' % (
-                            ref_name, u' group="%s"' % group if group != '' else '')
-
-                if content in duplicate_unnamed_contents[group]:
-                    new_name = 'rfr%s' % i[group]
-                    while new_name in names[group]:
-                        i[group] += 1
-                        new_name = 'rfr%s' % i[group]
-                    names[group].add(new_name)
-                    duplicate_named_contents[group].add(
-                        (new_name, content)
-                    )
-                    return u'<ref name="%s"%s>%s</ref>' % (
-                        new_name, u' group="%s"' % group if group != '' else '', content)
-
-            return match.group(0)
-
-        def repairNamesAndTidy(match):
-            content = match.group('content')
-            params = match.group('params')
-            name, group = getParams(params)
-            if name.isdigit() and name not in destroyed_names[group]:
-                new_name = 'rfr%s' % i[group]
-                while new_name in names[group]:
-                    i[group] += 1
-                    new_name = 'rfr%s' % i[group]
-                names[group].add(new_name)
-                destroyed_names[group][name] = new_name
-
-            if name in destroyed_names[group]:
-                if content is None:
-                    return u'<ref name="%s"%s />' % (
-                        destroyed_names[group][name],
-                        u' group="%s"' % group if group != '' else '')
-                else:
-                    return u'<ref name="%s"%s>%s</ref>' % (
-                        destroyed_names[group][name],
-                        u' group="%s"' % group if group != '' else '',
-                        content.strip())
-
-            ref = '<ref'
-            for param_match in re.finditer(param_regex, params):
-                param = param_match.group('param')
-                quote = param_match.group('quote') or '"'
-                param_content = param_match.group('content').strip()
-                ref += ' {param}={quote}{content}{quote}'.format(
-                    param=param, quote=quote, content=param_content)
-            if content is not None:
-                return ref + u'>%s</ref>' % content.strip()
-            else:
-                return ref + ' />'
-
-        new_text = re.sub(ref_regex, replaceRef, text)
-        if new_text != text:
-            text = re.sub(ref_regex, repairNamesAndTidy, new_text)
-            replaced.append(u'oprava referencí')
         return text
+
+    def markFixed(self, numbers, page):
+        for error in self.iter_errors(numbers):
+            error.markFixed(page)
+
+class CheckWikiBot(WikitextFixingBot, ExistingPageBot):
+
+    def __init__(self, site, numbers, **kwargs):
+        kwargs['cw'] = False
+        limit = kwargs.pop('limit', 100)
+        super(CheckWikiBot, self).__init__(site, **kwargs)
+        self.checkwiki = CheckWiki(site, **kwargs)
+        if self.generator is None:
+            self.generator = self.checkwiki.loadErrors(numbers, limit)
+
+    def init_page(self, page):
+        page.get()
+
+    def treat_page(self):
+        page = self.current_page
+        replaced = []
+        fixed = []
+        text = self.checkwiki.applyErrors(page.text, page, replaced, fixed)
+        if page.text == text:
+            return
+        summary = u'opravy dle [[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced)
+        if self.getOption('always') is not True:
+            pywikibot.showDiff(page.text, text)
+        page.text = text
+        self._save_page(page, self.fix_wikitext, page, summary=summary,
+                        callback=lambda *args: self.markAsFixedOnSuccess(fixed, *args))
+
+    def markAsFixedOnSuccess(self, numbers, page, exc=None):
+        if exc is None:
+            self.checkwiki.markFixed(numbers, page)
+
+def main(*args):
+    options = {}
+    local_args = pywikibot.handle_args(args)
+    genFactory = pagegenerators.GeneratorFactory()
+    numbers = []
+    for arg in local_args:
+        if not genFactory.handleArg(arg):
+            if arg.startswith('-'):
+                arg, sep, value = arg.partition(':')
+                if value != '':
+                    options[arg[1:]] = value if not value.isdigit() else int(value)
+                else:
+                    options[arg[1:]] = True
+            elif arg.isdigit():
+                numbers.append(int(arg))
+
+    site = pywikibot.Site()
+    bot = CheckWikiBot(site, numbers=numbers,
+                       generator=genFactory.getCombinedGenerator(), **options)
+    bot.run()
+
+if __name__ == "__main__":
+    main()

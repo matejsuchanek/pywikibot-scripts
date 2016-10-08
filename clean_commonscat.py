@@ -79,7 +79,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
                     pywikibot.showDiff(page.text, page_replaced_text)
                 page.text = page_replaced_text
                 self.doWithCallback(
-                    self._save_page, page, self._save_article, page,
+                    self._save_page, page, self.fix_wikitext, page,
                     summary=u'odstranění odkazu na neexistující kategorii na Commons')
         else:
             claim = pywikibot.Claim(self.repo, 'P373')

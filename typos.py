@@ -25,7 +25,7 @@ class IteratingTypoBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot):
             'quick': False,
         })
         kwargs['typos'] = False
-        kwargs['cw'] = True
+        #kwargs['cw'] = True
         super(IteratingTypoBot, self).__init__(site, **kwargs)
         self.rules = rules
         self.whitelist = whitelist
@@ -33,10 +33,11 @@ class IteratingTypoBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot):
 
     def exit(self):
         super(IteratingTypoBot, self).exit()
-        rules = sorted(self.rules, key=lambda rule: rule.longest, reverse=True)[:3]
-        pywikibot.output("\nSlowest rules:")
-        for i, rule in enumerate(rules):
-            pywikibot.output("%s. %s - %s" % (i+1, rule.find.pattern, rule.longest))
+        rules = sorted(filter(lambda rule: not rule.needsDecision(), self.rules),
+                       key=lambda rule: rule.longest, reverse=True)[:3]
+        pywikibot.output("\nSlowest autonomous rules:")
+        for i, rule in enumerate(rules, start=1):
+            pywikibot.output("%s. %s - %s" % (i, rule.find.pattern, rule.longest))
 
     def saveFalsePositive(self):
         title = self.current_page.title()
@@ -103,6 +104,7 @@ class SingleRuleTypoBot(IteratingTypoBot):
     def __init__(self, site, rule, rules, whitelist, fp_page, **kwargs):
         super(SingleRuleTypoBot, self).__init__(site, rules, whitelist, fp_page, **kwargs)
         self.rule = rule
+        self.rule.longest = 0
         self.processed = 0.0
         self.replaced = 0.0
 
@@ -146,6 +148,7 @@ class SingleRuleTypoBot(IteratingTypoBot):
         else:
             pywikibot.output(u'{}% accuracy of query {}'.format(
                 int((self.replaced / self.processed) * 100), self.rule.query))
+        pywikibot.output("Longest match: %ss" % self.rule.longest)
 
 class TypoBot(SingleSiteBot):
 
@@ -163,7 +166,7 @@ class TypoBot(SingleSiteBot):
     '''
 
     def __init__(self, site, genFactory, **kwargs):
-        self.availableOptions.update({
+        self.availableOptions.update({ # fixme: expose additional options to bots
             'allrules': False,
             'offset': 0,
             'quick': False,
@@ -190,10 +193,8 @@ class TypoBot(SingleSiteBot):
             bot.run()
             return
 
-        i = -1
         offset = self.getOption('offset')
-        for rule in self.typoRules:
-            i += 1
+        for i, rule in enumerate(self.typoRules):
             if offset > i:
                 continue
             if not rule.canSearch():

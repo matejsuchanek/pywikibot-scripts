@@ -54,8 +54,8 @@ class TypoRule(object):
         return pagegenerators.SearchPageGenerator(
             self.query, namespaces=[0], site=self.site)
 
-    @staticmethod
-    def newFromParameters(parameters, site):
+    @classmethod
+    def newFromParameters(cls, parameters, site):
         if '1' not in parameters:
             raise IncompleteTypoRuleException('Missing find expression')
 
@@ -68,15 +68,13 @@ class TypoRule(object):
         replacements = []
         for key in '23456':
             if key in parameters:
-                replacement = re.sub(
-                    r'\$([1-9])',
-                    r'\\\1',
-                    re.sub(
-                        r'</?nowiki>',
-                        '',
-                        parameters[key]
-                    )
-                )
+                replacement = re.sub(r'\$([1-9])',
+                                     r'\\\1',
+                                     re.sub(r'</?nowiki>',
+                                            '',
+                                            parameters[key]
+                                            )
+                                     )
                 replacements.append(replacement)
 
         if len(replacements) == 0:
@@ -97,12 +95,12 @@ class TypoRule(object):
 
         auto = 'auto' in parameters and parameters['auto'] == 'ano'
 
-        return TypoRule(find, replacements, site, auto, query)
+        return cls(find, replacements, site, auto, query)
 
     def matches(self, text):
         return re.search(self.find, text) is not None
 
-    def summary_hook(self, match, replaced, hook_time=0):
+    def summary_hook(self, match, replaced):
         def underscores(string):
             if string.startswith(' '):
                 string = '_' + string[1:]
@@ -110,16 +108,15 @@ class TypoRule(object):
                 string = string[:-1] + '_'
             return string
 
-        start = time.clock()
         new = old = match.group(0)
         if self.needsDecision():
             options = [('keep', 'k')]
             replacements = []
-            for i, repl in enumerate(self.replacements):
+            for i, repl in enumerate(self.replacements, start=1):
                 replacement = match.expand(repl)
                 replacements.append(replacement)
                 options.append(
-                    (u"%s %s" % (i + 1, underscores(replacement)), str(i + 1))
+                    (u"%s %s" % (i, underscores(replacement)), str(i))
                 )
             text = match.string
             pre = text[max(0, match.start() - 30):match.start()]
@@ -133,8 +130,6 @@ class TypoRule(object):
             choice = pywikibot.input_choice('Choose the best replacement',
                                             options, automatic_quit=False,
                                             default='k')
-            finish = time.clock()
-            hook_time = finish - start
             if choice != 'k':
                 new = replacements[int(choice) - 1]
         else:
@@ -149,14 +144,13 @@ class TypoRule(object):
         return new
 
     def apply(self, text, replaced=[]):
-        hook_time = 0
-        hook = lambda match: self.summary_hook(match, replaced, hook_time)
+        hook = lambda match: self.summary_hook(match, replaced)
         start = time.clock()
         text = textlib.replaceExcept(text, self.find, hook, self.exceptions,
                                      self.site)
         finish = time.clock()
-        delta = finish - start - hook_time # works?
-        self.longest = delta if delta > self.longest else self.longest
+        delta = finish - start
+        self.longest = max(delta, self.longest)
         return text
 
 class TyposLoader(object):
