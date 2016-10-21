@@ -8,7 +8,7 @@ from pywikibot import textlib
 start = datetime.datetime.now()
 
 do_only = []
-dont_do = []
+dont_do = ['ruwikiquote']
 
 tp_map = {
     u'cs|wikipedia': {
@@ -23,7 +23,7 @@ tp_map = {
                 'lang': 'commons',
                 'family': 'commons',
                 'pattern': 'Category:%s',
-                'namespaces': (14)
+                'namespaces': [14]
             },
         },
         u'wikicitáty': {
@@ -66,7 +66,7 @@ tp_map = {
                 'lang': 'commons',
                 'family': 'commons',
                 'pattern': 'Category:%s',
-                'namespaces': (14)
+                'namespaces': [14]
             },
         },
         'wikipedie': {
@@ -83,7 +83,7 @@ tp_map = {
                 'lang': 'commons',
                 'family': 'commons',
                 'pattern': 'Category:%s',
-                'namespaces': (14)
+                'namespaces': [14]
             },
         },
         'autorinfo': {
@@ -226,7 +226,7 @@ for project in tp_map.keys():
                         target_page = pywikibot.Page(target_site, title)
                         if not target_page.exists():
                             continue
-                        if target_page.isRedirectPage():
+                        while target_page.isRedirectPage():
                             target_page = target_page.getRedirectTarget()
                         if target_page.isDisambig():
                             continue
@@ -235,12 +235,15 @@ for project in tp_map.keys():
                             item.get()
                             if site.dbName() in item.sitelinks.keys():
                                 continue
-                            item.setSitelink(page, summary=u'Adding sitelink to [[%s:%s]]'
-                                             % (site.sitename(), page.title()))
+                            item.setSitelink(
+                                page, summary=u'Adding sitelink %s' % page.title(
+                                    asLink=True, forceInterwiki=True))
                             page.touch()
                             break
-                        except Exception as exc:
-                            pywikibot.output('%s: %s' % (page.title(), exc.message))
+                        except pywikibot.PageRelatedError as exc:
+                            pywikibot.output(exc)
+                        except pywikibot.data.api.APIError as exc:
+                            pywikibot.output(exc)
 
 end = datetime.datetime.now()
 

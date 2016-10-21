@@ -210,8 +210,8 @@ class TypoBot(SingleSiteBot):
 def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
-    local_args.append('-ns:0')
     genFactory = pagegenerators.GeneratorFactory()
+    genFactory.handleArg('-ns:0')
     for arg in local_args:
         if not genFactory.handleArg(arg):
             if arg.startswith('-'):

@@ -9,11 +9,6 @@ from pywikibot.bot import ExistingPageBot
 from scripts.checkwiki_errors import *
 from scripts.wikitext import WikitextFixingBot
 
-def deduplicate(array):
-    for index, member in enumerate(array, start=1):
-        while member in array[index:]:
-            array.pop(index + array[index:].index(member))
-
 class CheckWiki(object):
 
     '''Object to load errors from CheckWiki'''
@@ -22,19 +17,33 @@ class CheckWiki(object):
         1: PrefixedTemplate,
         2: BrokenHTMLTag,
         7: LowHeadersLevel,
-        #8: MissingEquation, todo
+        8: MissingEquation, #todo
+        9: SingleLineCategories,
+        10: NoEndSquareBrackets,
+        11: HTMLEntity,
+        16: InvisibleChars,
         17: DuplicateCategory,
+        18: LowerCaseCategory,
+        20: Dagger,
         21: EnglishCategory,
         25: HeaderHierarchy,
         32: MultiplePipes,
         #34: MagicWords, todo
+        #42: StrikedText, todo
         44: BoldHeader,
         48: SelfLink,
+        49: HTMLHeader,
+        50: EntitesAsDashes,
+        51: InterwikiBeforeHeader,
+        52: CategoriesBeforeHeader,
+        53: InterwikiBeforeCategory,
         54: ListWithBreak,
         57: HeaderWithColon,
         63: SmallInsideTags,
         #75: BadListStructure, todo
         81: DuplicateReferences,
+        88: DefaultsortSpace,
+        89: DefaultsortComma,
         101: Ordinals,
         103: SuperfluousPipe,
         104: ReferenceQuotes,
@@ -127,53 +136,60 @@ class CheckWiki(object):
             self.cache[number] = error
         return self.cache[number]
 
-    def iter_errors(self, numbers=[]):
+    def iter_errors(self, numbers=[], forFixes=False,
+                    instances=[], priorities=[], **kwargs):
         for num in self.errorMap.keys():
-            if not numbers or num in numbers:
-                yield self.getError(num)
+            if numbers and num not in numbers:
+                continue
 
-    def loadErrors(self, numbers=[], limit=None):
-        for error in self.iter_errors(numbers):
-            yield from error.loadError(limit=limit)
-
-    def applyErrors(self, text, page, replaced=[], fixed=[], numbers=[]):
-        errors = set(self.errorMap.keys())
-        if len(numbers) > 0:
-            errors &= set(numbers)
-        errors = list(errors)
-        while len(errors) > 0:
-            num = errors.pop(0)
+            #if instances and not ...:
             error = self.getError(num)
+            if forFixes and not error.isForFixes():
+                continue
+
+            #if priorities and not ...:
+            yield error
+
+    def loadErrors(self, limit=0, **kwargs):
+        for error in self.iter_errors(**kwargs):
+            yield from error.loadError(limit)
+
+    def applyErrors(self, text, page, replaced=[], fixed=[], **kwargs):
+        errors = list(self.iter_errors(**kwargs))
+        while len(errors) > 0:
+            error = errors.pop(0)
+            if error.needsDecision() or error.handledByCC():
+                continue
             needsFirst = set(error.needsFirst())
             i = 0
-            while len(needsFirst & set(errors[i:])) > 0:
+            while len(needsFirst & set(map(lambda e: e.number, errors[i:]))) > 0:
                 i += 1
             if i > 0:
-                errors.insert(i, num)
+                errors.insert(i, error)
                 continue
             new_text = error.apply(text, page)
             if new_text != text:
                 text = new_text
-                summary = error.summary()
-                fixed.append(num)
+                summary = error.summary
+                fixed.append(error.number)
                 if summary not in replaced:
                     replaced.append(summary)
 
         return text
 
     def markFixed(self, numbers, page):
-        for error in self.iter_errors(numbers):
+        for error in self.iter_errors(numbers=numbers):
             error.markFixed(page)
 
 class CheckWikiBot(WikitextFixingBot, ExistingPageBot):
 
     def __init__(self, site, numbers, **kwargs):
         kwargs['cw'] = False
-        limit = kwargs.pop('limit', 100)
+        limit = kwargs.pop('limit', 100) # todo: options?
         super(CheckWikiBot, self).__init__(site, **kwargs)
         self.checkwiki = CheckWiki(site, **kwargs)
         if self.generator is None:
-            self.generator = self.checkwiki.loadErrors(numbers, limit)
+            self.generator = self.checkwiki.loadErrors(limit, numbers=numbers)
 
     def init_page(self, page):
         page.get()

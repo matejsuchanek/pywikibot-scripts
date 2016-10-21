@@ -151,6 +151,8 @@ class TypoRule(object):
         finish = time.clock()
         delta = finish - start
         self.longest = max(delta, self.longest)
+        if delta > 3:
+            pywikibot.warning('Slow typo rule "%s"' % self.find.pattern)
         return text
 
 class TyposLoader(object):

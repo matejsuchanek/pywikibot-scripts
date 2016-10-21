@@ -15,11 +15,14 @@ class CaptionToImageBot(WikidataEntityBot):
     * -removeall - if a caption cannot be reused, remove it as well
     '''
 
+    caption_property = 'P2096'
+    image_property = 'P18'
+
     def __init__(self, site, **kwargs):
         self.availableOptions.update({
             'removeall': False
         })
-        kwargs['bad_cache'] = ['P2096']
+        kwargs['bad_cache'] = [self.caption_property]
         super(CaptionToImageBot, self).__init__(site, **kwargs)
 
     def filterProperty(self, prop_page):
@@ -27,19 +30,19 @@ class CaptionToImageBot(WikidataEntityBot):
 
     def init_page(self, item):
         super(CaptionToImageBot, self).init_page(item)
-        if 'P2096' not in item.claims.keys():
+        if self.caption_property not in item.claims.keys():
             raise SkipPageError(
                 item,
-                "Missing P2096 property"
+                "Missing %s property" % self.caption_property
             )
 
     def treat_page(self):
         item = self.current_page
-        our_prop = 'P18'
+        our_prop = self.image_property
         if our_prop not in item.claims.keys():
             our_prop = None
             for prop in item.claims.keys():
-                if checkProperty(prop):
+                if self.checkProperty(prop):
                     if our_prop is None:
                         our_prop = prop
                     else:
@@ -51,7 +54,7 @@ class CaptionToImageBot(WikidataEntityBot):
         if our_prop is None:
             pywikibot.output("No media property found")
             if remove_all:
-                remove_claims.extend(item.claims['P2096'])
+                remove_claims.extend(item.claims[self.caption_property])
                 self._save_page(item, self._save_entity, item.removeClaims,
                                 remove_claims, summary="removing redundant property")
             return
@@ -61,11 +64,11 @@ class CaptionToImageBot(WikidataEntityBot):
             pywikibot.output("Property %s has more than one value" % our_prop)
             return
 
-        for caption in item.claims['P2096']:
-            if 'P2096' in media_claim.qualifiers.keys():
+        for caption in item.claims[self.caption_property]:
+            if self.caption_property in media_claim.qualifiers.keys():
                 language = caption.getTarget().language
                 has_same_lang = False
-                for claim in media_claim.qualifiers['P2096']:
+                for claim in media_claim.qualifiers[self.caption_property]:
                     if claim.getTarget().language == language:
                         has_same_lang = True
                         break

@@ -44,67 +44,68 @@ class DupesMergingBot(WikidataEntityBot):
                                     pywikibot.output("Multiple targets found")
                                     return
 
-        if 'P460' in item.claims.keys():
-            for claim in item.claims['P460']:
-                if claim.snaktype != 'value':
-                    continue
-                claims.append(claim)
-                if target is None:
-                    target = claim.getTarget()
-                else:
-                    if not claim.target_equals(target):
-                        pywikibot.output("Multiple targets found")
-                        return
+        for claim in item.claims.get('P460', []):
+            if claim.snaktype != 'value':
+                continue
+            claims.append(claim)
+            if target is None:
+                target = claim.getTarget()
+            else:
+                if not claim.target_equals(target):
+                    pywikibot.output("Multiple targets found")
+                    return
 
         if target is None:
             pywikibot.output("No target found")
             return
 
-        sitelinks = []
-        target_sitelinks = []
         while target.isRedirectPage():
             pywikibot.warning("Target %s is redirect" % target.getID())
             target = target.getRedirectTarget()
 
         target.get()
-        for dbname, sitelink in item.sitelinks.items():
-            if dbname in target.sitelinks.keys():
-                apisite = pywikibot.site.APISite.fromDBName(dbname)
-                page = pywikibot.Page(apisite, sitelink)
-                if not page.exists():
-                    sitelinks.append(dbname)
-                    continue
-                target_page = pywikibot.Page(apisite, target.sitelinks[dbname])
-                if not target_page.exists():
-                    target_sitelinks.append(dbname)
-                    continue
-                if self.redirectsTo(page, target_page) or self.redirectsTo(target_page, page):
-                    continue
+        target_sitelinks = []
+        sitelinks = []
+        for page in item.iterlinks():
+            site = page.site
+            try:
+                target_link = target.getSitelink(site)
+            except pywikibot.NoPage:
+                continue
 
-                pywikibot.output("Target has a conflicting sitelink: %s" % dbname)
-                return
+            if not page.exists():
+                sitelinks.append(site)
+                continue
+
+            target_page = pywikibot.Page(site, target_link)
+            if not target_page.exists():
+                target_sitelinks.append(site)
+                continue
+            if self.redirectsTo(page, target_page) or self.redirectsTo(target_page, page):
+                continue
+
+            pywikibot.output("Target has a conflicting sitelink: %s" % site.dbName())
+            return
 
         target_claims = []
-        if 'P460' in target.claims.keys():
-            for claim in target.claims['P460']:
-                if claim.snaktype != 'value':
-                    continue
-                if claim.target_equals(item):
-                    target_claims.append(claim)
+        for claim in target.claims.get('P460', []):
+            if claim.snaktype != 'value':
+                continue
+            if claim.target_equals(item):
+                target_claims.append(claim)
 
-        if 'P31' in target.claims.keys():
-            for claim in target.claims['P31']:
-                if claim.snaktype != 'value':
-                    continue
-                if claim.target_equals(self.__dupe_item):
-                    for prop in ['P460', 'P642']:
-                        if prop in claim.qualifiers.keys():
-                            for snak in claim.qualifiers[prop]:
-                                if snak.snaktype != 'value':
-                                    continue
-                                if snak.target_equals(item):
-                                    target_claims.append(claim)
-                            break
+        for claim in target.claims.get('P31', []):
+            if claim.snaktype != 'value':
+                continue
+            if claim.target_equals(self.__dupe_item):
+                for prop in ['P460', 'P642']:
+                    if prop in claim.qualifiers.keys():
+                        for snak in claim.qualifiers[prop]:
+                            if snak.snaktype != 'value':
+                                continue
+                            if snak.target_equals(item):
+                                target_claims.append(claim)
+                        break
 
         if len(sitelinks) > 0:
             self._save_page(item, self._save_entity, item.removeSitelinks, sitelinks)
@@ -115,13 +116,14 @@ class DupesMergingBot(WikidataEntityBot):
         if len(target_claims) > 0:
             self._save_page(item, self._save_entity, target.removeClaims, target_claims)
 
-        data = {'descriptions': {}}
+        descriptions = {}
         for lang in item.descriptions.keys():
             if lang in target.descriptions.keys():
                 if item.descriptions[lang] != target.descriptions[lang]:
-                    data['descriptions'][lang] = ''
-        if len(data['descriptions']) > 0:
-            self._save_page(item, self._save_entity, item.editEntity, data,
+                    descriptions[lang] = ''
+
+        if len(descriptions) > 0:
+            self._save_page(item, self._save_entity, item.editDescriptions, data,
                             summary="Removing conflicting descriptions before merging")
 
         self._save_page(item, self._save_entity, item.mergeInto, target,

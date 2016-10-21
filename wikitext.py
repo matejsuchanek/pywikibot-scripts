@@ -23,7 +23,7 @@ class WikitextFixingBot(SingleSiteBot):
        in edit summary at most?
     * -cw - fixes Check Wikipedia errors
     ** -maxsummarycw
-    * -redirects - fixes commons redirects
+    * -redirects - fixes common redirects
     * -templates - fixes redirected templates
 
     Planned:
@@ -55,9 +55,16 @@ class WikitextFixingBot(SingleSiteBot):
                 self.hooks.append(hook)
 
     def fix_wikitext(self, page, *data, **kwargs):
+        summaries = [kwargs['summary']]
+        callbacks = []
         for hook in self.hooks:
-            kwargs['summary'] = hook(page, kwargs.pop('summary'))
-        return page.save(*data, **kwargs)
+            callback = hook(page, summaries)
+            if callback:
+                callbacks.append(callback)
+
+        kwargs['summary'] = '; '.join(summaries)
+        result = page.save(*data, **kwargs)
+        return result
 
     def initCheckWiki(self):
         self.availableOptions.update({
@@ -70,12 +77,13 @@ class WikitextFixingBot(SingleSiteBot):
         self.checkwiki = CheckWiki(self.site)
         return self.fixCheckWiki
 
-    def fixCheckWiki(self, page, summary):
+    def fixCheckWiki(self, page, summaries):
         replaced = []
-        page.text = self.checkwiki.applyErrors(page.text, page, replaced)
+        fixed = []
+        page.text = self.checkwiki.applyErrors(page.text, page, replaced, fixed)
         if len(replaced) > 0: # todo: maxsummarycw
-            summary += u'; [[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced)
-        return summary
+            summaries.append(u'[[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced))
+            return lambda: self.checkwiki.markFixed(fixed, page)
 
     def initTypos(self):
         self.availableOptions.update({
@@ -92,7 +100,7 @@ class WikitextFixingBot(SingleSiteBot):
         self.whitelist = loader.loadWhitelist()
         return self.fixTypos
 
-    def fixTypos(self, page, summary):
+    def fixTypos(self, page, summaries):
         if page.namespace() != 0: # todo: generalize
             return
         if page.title() in self.whitelist:
@@ -106,16 +114,16 @@ class WikitextFixingBot(SingleSiteBot):
         if count > 0: # todo: separate function
             if count > 1:
                 max_typos = self.getOption('maxsummarytypos')
-                summary += u'; oprava překlepů: %s' % ', '.join(replaced[:5])
+                summary = u'opravy překlepů: %s' % ', '.join(replaced[:5])
                 if count > max_typos:
-                    summary += u' a %s další' % (count - max_typos)
                     if count - max_typos > 1:
-                        summary += 'ch'
+                        summary += u' a %s dalších' % (count - max_typos)
                     else:
-                        summary += 'ho'
+                        summary += u' a jednoho dalšího'
             else:
-                summary += u'; oprava překlepu: %s' % replaced[0]
-        return summary
+                summary = u'oprava překlepu: %s' % replaced[0]
+
+            summaries.append(summary)
 
     def initRedirects(self, **kwargs):
         self.availableOptions.update({
@@ -126,8 +134,7 @@ class WikitextFixingBot(SingleSiteBot):
     def loadRedirects(self, **kwargs):
         self.redirects = []
         self.redirect_cache = {}
-        site = pywikibot.Site('cs', 'wikipedia')
-        page = pywikibot.Page(site, u'Wikipedista:PastoriBot/narovnaná_přesměrování')
+        page = pywikibot.Page(self.site, u'Wikipedista:PastoriBot/narovnaná_přesměrování')
         pywikibot.output('Loading redirects')
         text = page.get()
         text = text[text.index('{{SHORTTOC}}') + len('{{SHORTTOC}}'):]
@@ -141,13 +148,14 @@ class WikitextFixingBot(SingleSiteBot):
         pywikibot.output('%s redirects loaded' % len(self.redirects))
         return self.fixRedirects
 
-    def fixRedirects(self, page, summary):
+    def fixRedirects(self, page, summaries):
 
         def replace(match):
             split = match.group(1).split('|')
             if len(split) > 2:
                 return match.group()
-            if len(split) == 1 and self.getOption('onlypiped'):
+            if len(split) == 1 and\
+               self.getOption('onlypiped') or self.getOption('always'):
                 return match.group()
 
             page_title = split[0].replace('_', ' ').strip()
@@ -165,7 +173,7 @@ class WikitextFixingBot(SingleSiteBot):
 
                     target = link_page.getRedirectTarget()
                     title = target.title()
-                    if page_title[0] == page_title[0].lower():
+                    if page_title[0].islower():
                         self.redirect_cache[page_title] = title[0].lower() + title[1:]
                     else:
                         self.redirect_cache[page_title] = title
@@ -209,44 +217,48 @@ class WikitextFixingBot(SingleSiteBot):
         pattern = re.compile(r'\[\[([^[\]]+)\]\]')
         text = pattern.sub(replace, page.text)
         if page.text != text:
-            summary += u'; narovnání přesměrování'
+            summaries.append(u'narovnání přesměrování')
             page.text = text
-        return summary
 
     def loadTemplates(self, **kwargs):
         self.template_cache = {}
         return self.fixTemplates
 
-    def fixTemplates(self, page, summary):
+    def fixTemplates(self, page, summaries):
 
         def replace(match):
             template_name = match.group('template').replace('_', ' ').strip()
-            template_name = template_name[0].upper() + template_name[1:]
-            if template_name not in self.template_cache:
-                template = pywikibot.Page(self.site, template_name, ns=10)
+            if template_name.startswith('DEFAULTSORT:'):
+                return match.group()
+
+            template_name_norm = template_name[0].upper() + template_name[1:]
+            if template_name_norm not in self.template_cache:
+                template = pywikibot.Page(self.site, template_name_norm, ns=10)
                 if template.exists() and template.isRedirectPage():
                     target = template.getRedirectTarget()
-                    self.template_cache[template_name] = target.title(withNamespace=False)
+                    self.template_cache[template_name_norm] = target.title(withNamespace=False)
                 else:
-                    self.template_cache[template_name] = None
+                    self.template_cache[template_name_norm] = None
 
-            target = self.template_cache[template_name]
+            target = self.template_cache[template_name_norm]
             if not target:
                 return match.group()
 
-            return match.expand('\g<before>%s\g<after>' % target)
+            if template_name[0].islower():
+                target = target[0].lower() + target[1:]
 
-        pattern = re.compile(r'(?P<before>\{\{\s*)(?P<template>[^{|}]+?)(?P<after>\s*[|}])')
+            return match.group('before') + target + match.group('after')
+
+        pattern = re.compile(r'(?P<before>\{\{\s*)(?P<template>[^#{|}]+?)(?P<after>\s*[|}])')
         text = pattern.sub(replace, page.text)
         if page.text != text:
-            summary += u'; narovnání šablon'
+            summaries.append(u'narovnání šablon')
             page.text = text
-        return summary
 
 ##    def loadInterwiki(self, **kwargs):
 ##        return self.fixInterWiki
 ##
-##    def fixInterwiki(self, page, summary):
+##    def fixInterwiki(self, page, summaries):
 ##        iwlinks = page.interwiki()
 ##        if len(iwlinks) < 1:
 ##            return
