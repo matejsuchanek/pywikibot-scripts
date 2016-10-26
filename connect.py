@@ -8,7 +8,7 @@ from pywikibot import textlib
 start = datetime.datetime.now()
 
 do_only = []
-dont_do = ['ruwikiquote']
+dont_do = []
 
 tp_map = {
     u'cs|wikipedia': {

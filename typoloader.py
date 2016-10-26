@@ -34,7 +34,8 @@ class TypoRule(object):
                    re.compile('<[a-z]+ [^>]+>'), # HTML tag
                    re.compile(u'„[^“]+“'), # quotation marks
                    re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1).)+\1", # italics
-                              re.M | re.U)]
+                              re.M | re.U),
+                   re.compile(r'www\.[^\s]+')]
 
     def __init__(self, find, replacements, site, auto=False, query=None):
         self.find = find
@@ -59,7 +60,7 @@ class TypoRule(object):
         if '1' not in parameters:
             raise IncompleteTypoRuleException('Missing find expression')
 
-        find = re.sub(r'</?nowiki>', '', parameters['1'])
+        find = re.sub('</?nowiki>', '', parameters['1'])
         try:
             find = re.compile(find, re.U | re.M)
         except re.error as exc:
@@ -70,7 +71,7 @@ class TypoRule(object):
             if key in parameters:
                 replacement = re.sub(r'\$([1-9])',
                                      r'\\\1',
-                                     re.sub(r'</?nowiki>',
+                                     re.sub('</?nowiki>',
                                             '',
                                             parameters[key]
                                             )
@@ -183,7 +184,8 @@ class TyposLoader(object):
 
         content = typos_page.get()
         load_all = self.load_all is True
-        for template, fielddict in textlib.extract_templates_and_params(content, False, False):
+        for template, fielddict in textlib.extract_templates_and_params(
+            content, remove_disabled_parts=False, strip=False):
             if template.lower() == 'typo':
                 try:
                     rule = TypoRule.newFromParameters(fielddict, self.site)
@@ -191,9 +193,7 @@ class TyposLoader(object):
                     pywikibot.warning(exc.message)
                 except InvalidExpressionException as exc:
                     if 'fixed-width' not in exc.message:
-                        pywikibot.warning(u'Invalid %s %s: %s' % (exc.aspect, find, exc.message))
-                except:
-                    raise
+                        pywikibot.warning(u'Invalid %s %s: %s' % (exc.aspect, fielddict['1'], exc.message))
                 else:
                     if load_all or not rule.needsDecision():
                         self.typoRules.append(rule)

@@ -123,7 +123,7 @@ class DupesMergingBot(WikidataEntityBot):
                     descriptions[lang] = ''
 
         if len(descriptions) > 0:
-            self._save_page(item, self._save_entity, item.editDescriptions, data,
+            self._save_page(item, self._save_entity, item.editDescriptions, descriptions,
                             summary="Removing conflicting descriptions before merging")
 
         self._save_page(item, self._save_entity, item.mergeInto, target,

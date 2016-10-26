@@ -3,11 +3,12 @@ import pywikibot
 import re
 
 from pywikibot import pagegenerators
-from pywikibot import textlib
+#from pywikibot import textlib
 
 from pywikibot.bot import SingleSiteBot
 from pywikibot.tools.formatter import color_format
 
+from scripts.checkwiki_errors import deduplicate
 from scripts.typoloader import TyposLoader
 
 class WikitextFixingBot(SingleSiteBot):
@@ -24,31 +25,43 @@ class WikitextFixingBot(SingleSiteBot):
     * -cw - fixes Check Wikipedia errors
     ** -maxsummarycw
     * -redirects - fixes common redirects
+    ** -onlypiped - only fix links which include "|"
     * -templates - fixes redirected templates
+    * -adata - adds authority control to articles
+    ** -minprops - minimal amount of properties the item
+       should have to include authority control
 
     Planned:
+    * commonscat
+    * manual of style
     * interwiki
     * and more...
     '''
 
+    FILE_LINK_REGEX = r'\[\[\s*(?:%s)\s*:\s*[^]|[]+(?:\|(?:[^]|[]|\[\[[^]]+\]\])+)+\]\]'
+
     def __init__(self, site, **kwargs):
+        pywikibot.output("Please help fix [[phab:T148959]] for better wikisyntax parsing")
         self.availableHooks = {
+            'adata': self.initAdata(),
+            #'commonscat': self.loadCommonscat,
             'cw': self.initCheckWiki(),
+            'files': self.loadFiles,
             #'interwiki': self.loadInterwiki,
             'redirects': self.initRedirects(),
             'templates': self.loadTemplates,
             'typos': self.initTypos()
         }
-        do_all = kwargs.pop('all', False)
+        do_all = kwargs.pop('all', False) is True
         self.availableOptions.update(dict(zip(
             self.availableHooks.keys(),
             [do_all for i in range(0, len(self.availableHooks))]
         )))
         super(WikitextFixingBot, self).__init__(site, **kwargs)
-        self.hooks = []
         self.initHooks(**kwargs)
 
     def initHooks(self, **kwargs):
+        self.hooks = []
         for opt, callback in self.availableHooks.items():
             if self.getOption(opt) is True:
                 hook = callback(**kwargs)
@@ -59,12 +72,12 @@ class WikitextFixingBot(SingleSiteBot):
         callbacks = []
         for hook in self.hooks:
             callback = hook(page, summaries)
-            if callback:
+            if callable(callback):
                 callbacks.append(callback)
 
         kwargs['summary'] = '; '.join(summaries)
-        result = page.save(*data, **kwargs)
-        return result
+        kwargs['callback'] = lambda _, exc: [cb() for cb in callbacks if not exc]
+        page.save(*data, **kwargs)
 
     def initCheckWiki(self):
         self.availableOptions.update({
@@ -74,7 +87,7 @@ class WikitextFixingBot(SingleSiteBot):
 
     def loadCheckWiki(self, **kwargs):
         from scripts.checkwiki import CheckWiki
-        self.checkwiki = CheckWiki(self.site)
+        self.checkwiki = CheckWiki(self.site) #**kwargs
         return self.fixCheckWiki
 
     def fixCheckWiki(self, page, summaries):
@@ -114,7 +127,7 @@ class WikitextFixingBot(SingleSiteBot):
         if count > 0: # todo: separate function
             if count > 1:
                 max_typos = self.getOption('maxsummarytypos')
-                summary = u'opravy překlepů: %s' % ', '.join(replaced[:5])
+                summary = u'oprava překlepů: %s' % ', '.join(replaced[:5])
                 if count > max_typos:
                     if count - max_typos > 1:
                         summary += u' a %s dalších' % (count - max_typos)
@@ -137,7 +150,7 @@ class WikitextFixingBot(SingleSiteBot):
         page = pywikibot.Page(self.site, u'Wikipedista:PastoriBot/narovnaná_přesměrování')
         pywikibot.output('Loading redirects')
         text = page.get()
-        text = text[text.index('{{SHORTTOC}}') + len('{{SHORTTOC}}'):]
+        _, __, text = text.partition('{{SHORTTOC}}')
         for line in text.splitlines():
             if line.strip() == '':
                 continue
@@ -155,7 +168,9 @@ class WikitextFixingBot(SingleSiteBot):
             if len(split) > 2:
                 return match.group()
             if len(split) == 1 and\
-               self.getOption('onlypiped') or self.getOption('always'):
+               (self.getOption('onlypiped') or self.getOption('always')):
+                return match.group()
+            if split[0].startswith('Kategorie:'):
                 return match.group()
 
             page_title = split[0].replace('_', ' ').strip()
@@ -214,7 +229,7 @@ class WikitextFixingBot(SingleSiteBot):
 
             return match.group()
 
-        pattern = re.compile(r'\[\[([^[\]]+)\]\]')
+        pattern = re.compile(r'\[\[([^][]+)\]\]')
         text = pattern.sub(replace, page.text)
         if page.text != text:
             summaries.append(u'narovnání přesměrování')
@@ -254,6 +269,118 @@ class WikitextFixingBot(SingleSiteBot):
         if page.text != text:
             summaries.append(u'narovnání šablon')
             page.text = text
+
+    def initAdata(self):
+        self.availableOptions.update({
+            'minprops': 2
+        })
+        return self.loadAdata
+
+    def loadAdata(self, **kwargs):
+        self.props = set(['P213', 'P214', 'P227', 'P244', 'P245', 'P496', 'P691', 'P1051'])
+        self.repo = self.site.data_repository()
+        return self.addAdata
+
+    def addAdata(self, page, summaries):
+        text = page.text
+        adata = u'{{Autoritní data}}'
+        if adata.lower() in text.lower():
+            return
+
+        try:
+            item = page.data_item()
+        except pywikibot.NoPage:
+            return
+
+        item.get()
+        human_item = pywikibot.ItemPage(self.repo, 'Q5')
+        if not any(st.target_equals(human_item) for st in item.claims.get('P31', [])):
+            return
+
+        if len(self.props & set(item.claims.keys())) < self.getOption('minprops'):
+            return
+
+        new_text = re.sub(r'(\{\{[Pp]ortály\|)', r'%s\n\1' % adata, text, count=1)
+        if new_text == text:
+            new_text = re.sub(r'(\{\{DEFAULTSORT:)', r'%s\n\n\1' % adata, text, count=1)
+        if new_text == text:
+            new_text = re.sub(r'(\[\[Kategorie:)', r'%s\n\n\1' % adata, text, count=1)
+        if new_text != text:
+            summaries.append(u'doplnění autoritních dat')
+            page.text = new_text
+        else:
+            pywikibot.output('Failed to add authority control')
+
+    def loadCommonscat(self, **kwargs):
+        return self.addCommonscat
+
+    def addCommonscat(self, page, summaries):
+        text = page.text
+
+    def loadFiles(self, **kwargs):
+##        self.file_regex = re.compile(
+##            textlib.FILE_LINK_REGEX % '|'.join(self.site.namespaces[6]),
+##            re.VERBOSE)
+        self.file_regex = re.compile(
+            self.FILE_LINK_REGEX % '|'.join(self.site.namespaces[6]))
+        return self.fixFiles
+
+    def fixFiles(self, page, summaries):
+        magic_map = {
+            'border': 'okraj',
+            'center': u'střed',
+            'frame': u'rám',
+            'framed': u'rám',
+            'frameless': u'bezrámu',
+            'left': 'vlevo',
+            'none': u'žádné',
+            'right': 'vpravo',
+            'thumb': u'náhled',
+            'thumbnail': u'náhled',
+        }
+        def handleFile(match):
+            if self.file_regex.search(match.group()[2:-2]):
+                return match.group() # todo
+##
+##            if match.group().count('[[') != match.group().count(']]'):
+##                return match.group()
+
+            split = [x.strip() for x in match.group()[2:-2].split('|')]
+
+            split[0] = split[0].replace('_', ' ').strip()
+            i = 1
+            while i < len(split):
+                while split[i].count('[[') != split[i].count(']]'):
+                    split[i] += '|' + split[i+1]
+                    del split[i+1]
+
+                if split[i] in magic_map:
+                    split[i] = magic_map[split[i]]
+
+                elif split[i].startswith('alt='):
+                    pass
+                elif split[i].startswith('jazyk=') or split[i].startswith('lang='):
+                    pass
+                elif split[i].startswith('link='):
+                    pass
+                elif split[i].startswith('upright'):
+                    pass
+                elif re.match(r'\d+px$', split[i][0]):
+                    pass
+                else:
+                    if split[i].endswith('.'):
+                        pass
+
+                i += 1
+
+            deduplicate(split)
+
+            return '[[' + '|'.join(split) + ']]'
+
+        new_text = self.file_regex.sub(handleFile, page.text)
+        if new_text != page.text:
+            page.text = new_text
+            #summaries.append()
 
 ##    def loadInterwiki(self, **kwargs):
 ##        return self.fixInterWiki

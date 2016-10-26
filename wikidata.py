@@ -11,8 +11,8 @@ class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
     Bot editing Wikidata entities
     Features:
     * Works around [[phab:T86074]]
-    * Caches properties so that iterating claims is faster
-    * Hacks into WikidataBot and gets sources
+    * Caches properties so that iterating claims can be faster
+    * Hacks into WikidataBot and fetches sources
 
     Planned:
     * Item cleanup like missing and wrong labels etc.

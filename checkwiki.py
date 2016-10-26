@@ -11,13 +11,13 @@ from scripts.wikitext import WikitextFixingBot
 
 class CheckWiki(object):
 
-    '''Object to load errors from CheckWiki'''
+    '''Singleton class representing the Check Wikipedia project'''
 
     errorMap = {
         1: PrefixedTemplate,
         2: BrokenHTMLTag,
         7: LowHeadersLevel,
-        8: MissingEquation, #todo
+        #8: MissingEquation, todo
         9: SingleLineCategories,
         10: NoEndSquareBrackets,
         11: HTMLEntity,
@@ -26,9 +26,12 @@ class CheckWiki(object):
         18: LowerCaseCategory,
         20: Dagger,
         21: EnglishCategory,
+        22: CategoryWithSpace,
         25: HeaderHierarchy,
+        26: Bold,
         32: MultiplePipes,
-        #34: MagicWords, todo
+        34: MagicWords,
+        38: Italics,
         #42: StrikedText, todo
         44: BoldHeader,
         48: SelfLink,
@@ -39,6 +42,7 @@ class CheckWiki(object):
         53: InterwikiBeforeCategory,
         54: ListWithBreak,
         57: HeaderWithColon,
+        59: ParameterWithBreak,
         63: SmallInsideTags,
         #75: BadListStructure, todo
         81: DuplicateReferences,
@@ -89,7 +93,7 @@ class CheckWiki(object):
         parsed_settings = {}
         for line in text.splitlines():
             if inside_setting is False:
-                match = re.match(r' *([a-z0-9_]+) *=', line)
+                match = re.match(' *([a-z0-9_]+) *=', line)
                 if match is not None:
                     setting = match.group(1)
                     setting_text = ''
@@ -158,12 +162,12 @@ class CheckWiki(object):
         errors = list(self.iter_errors(**kwargs))
         while len(errors) > 0:
             error = errors.pop(0)
-            if error.needsDecision() or error.handledByCC():
+            if error.needsDecision() or error.handledByCC(): # todo
                 continue
-            needsFirst = set(error.needsFirst())
-            i = 0
-            while len(needsFirst & set(map(lambda e: e.number, errors[i:]))) > 0:
-                i += 1
+
+            numbers = list(map(lambda e: e.number, errors))
+            needsFirst = error.needsFirst()
+            i = max([numbers.index(num) for num in needsFirst if num in numbers] + [0])
             if i > 0:
                 errors.insert(i, error)
                 continue

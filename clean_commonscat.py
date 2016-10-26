@@ -23,7 +23,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
 
     def treat_page(self):
         page = self.current_page
-        item = pywikibot.ItemPage.fromPage(page)
+        item = page.data_item()
         item.get()
         if 'P373' in item.claims.keys():
             self.addCallback(page.touch, botflag=True)
@@ -54,7 +54,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
         if not exists:
             if not commons_cat.isEmptyCategory():
                 if self.getOption('createnew') is True:
-                    commons_cat.text = u'{{Uncategorized}}'
+                    commons_cat.text = '{{Uncategorized}}'
                     exists = self.doWithCallback(
                         self._save_page, commons_cat, commons_cat.save,
                         summary=u'odstranění odkazu na neexistující kategorii na Commons')
@@ -119,9 +119,7 @@ def main(*args):
     gen_combined = pagegenerators.CombinedPageGenerator([gen_articles, gen_subcats])
     gen_filtered = pagegenerators.WikibaseItemFilterPageGenerator(gen_combined)
 
-    options['generator'] = gen_filtered
-
-    bot = CommonscatCleaningBot(site, **options)
+    bot = CommonscatCleaningBot(site, generator=gen_filtered, **options)
     bot.run()
 
 if __name__ == "__main__":
