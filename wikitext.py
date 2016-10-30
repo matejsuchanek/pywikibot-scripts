@@ -2,8 +2,7 @@
 import pywikibot
 import re
 
-from pywikibot import pagegenerators
-#from pywikibot import textlib
+from pywikibot import pagegenerators, textlib
 
 from pywikibot.bot import SingleSiteBot
 from pywikibot.tools.formatter import color_format
@@ -11,7 +10,7 @@ from pywikibot.tools.formatter import color_format
 from scripts.checkwiki_errors import deduplicate
 from scripts.typoloader import TyposLoader
 
-class WikitextFixingBot(SingleSiteBot):
+class WikitextFixingBot(SingleSiteBot): # todo: Existing?
 
     '''
     Class for bots that save wikitext. Applies regular expressions
@@ -25,29 +24,31 @@ class WikitextFixingBot(SingleSiteBot):
     * -cw - fixes Check Wikipedia errors
     ** -maxsummarycw
     * -redirects - fixes common redirects
-    ** -onlypiped - only fix links which include "|"
+    ** -onlypiped - only fix links which include "|" (overriden
+       by -always)
     * -templates - fixes redirected templates
     * -adata - adds authority control to articles
-    ** -minprops - minimal amount of properties the item
-       should have to include authority control
+    ** -minprops - minimal amount of supported properties
+       the item should have to include authority control
+    * -interwiki - removes interwiki which is on Wikidata
 
     Planned:
     * commonscat
     * manual of style
-    * interwiki
     * and more...
     '''
 
     FILE_LINK_REGEX = r'\[\[\s*(?:%s)\s*:\s*[^]|[]+(?:\|(?:[^]|[]|\[\[[^]]+\]\])+)+\]\]'
 
-    def __init__(self, site, **kwargs):
+    def __init__(self, **kwargs):
         pywikibot.output("Please help fix [[phab:T148959]] for better wikisyntax parsing")
         self.availableHooks = {
             'adata': self.initAdata(),
             #'commonscat': self.loadCommonscat,
             'cw': self.initCheckWiki(),
             'files': self.loadFiles,
-            #'interwiki': self.loadInterwiki,
+            #'mos': lambda **kwargs: self.fixStyle,
+            'interwiki': self.loadInterwiki,
             'redirects': self.initRedirects(),
             'templates': self.loadTemplates,
             'typos': self.initTypos()
@@ -55,9 +56,9 @@ class WikitextFixingBot(SingleSiteBot):
         do_all = kwargs.pop('all', False) is True
         self.availableOptions.update(dict(zip(
             self.availableHooks.keys(),
-            [do_all for i in range(0, len(self.availableHooks))]
+            (do_all for i in range(0, len(self.availableHooks)))
         )))
-        super(WikitextFixingBot, self).__init__(site, **kwargs)
+        super(WikitextFixingBot, self).__init__(**kwargs)
         self.initHooks(**kwargs)
 
     def initHooks(self, **kwargs):
@@ -66,6 +67,10 @@ class WikitextFixingBot(SingleSiteBot):
             if self.getOption(opt) is True:
                 hook = callback(**kwargs)
                 self.hooks.append(hook)
+
+    def init_page(self, page):
+        super(WikitextFixingBot, self).init_page(page)
+        page.get()
 
     def fix_wikitext(self, page, *data, **kwargs):
         summaries = [kwargs['summary']]
@@ -116,11 +121,14 @@ class WikitextFixingBot(SingleSiteBot):
     def fixTypos(self, page, summaries):
         if page.namespace() != 0: # todo: generalize
             return
-        if page.title() in self.whitelist:
+        title = page.title()
+        if title in self.whitelist:
             return
         text = page.text
         replaced = []
         for rule in self.typoRules:
+            if rule.matches(title):
+                continue
             text = rule.apply(text, replaced)
         page.text = text
         count = len(replaced)
@@ -162,6 +170,8 @@ class WikitextFixingBot(SingleSiteBot):
         return self.fixRedirects
 
     def fixRedirects(self, page, summaries):
+        if page.isDisambig():
+            return
 
         def replace(match):
             split = match.group(1).split('|')
@@ -277,7 +287,7 @@ class WikitextFixingBot(SingleSiteBot):
         return self.loadAdata
 
     def loadAdata(self, **kwargs):
-        self.props = set(['P213', 'P214', 'P227', 'P244', 'P245', 'P496', 'P691', 'P1051'])
+        self.props = frozenset(['P213', 'P214', 'P227', 'P244', 'P245', 'P496', 'P691', 'P1051'])
         self.repo = self.site.data_repository()
         return self.addAdata
 
@@ -350,6 +360,10 @@ class WikitextFixingBot(SingleSiteBot):
             split[0] = split[0].replace('_', ' ').strip()
             i = 1
             while i < len(split):
+                if split[i].strip() == '':
+                    del split[i]
+                    continue
+
                 while split[i].count('[[') != split[i].count(']]'):
                     split[i] += '|' + split[i+1]
                     del split[i+1]
@@ -365,7 +379,7 @@ class WikitextFixingBot(SingleSiteBot):
                     pass
                 elif split[i].startswith('upright'):
                     pass
-                elif re.match(r'\d+px$', split[i][0]):
+                elif re.match(r'\d*x?\d+px$', split[i]):
                     pass
                 else:
                     if split[i].endswith('.'):
@@ -382,16 +396,102 @@ class WikitextFixingBot(SingleSiteBot):
             page.text = new_text
             #summaries.append()
 
-##    def loadInterwiki(self, **kwargs):
-##        return self.fixInterWiki
-##
-##    def fixInterwiki(self, page, summaries):
-##        iwlinks = page.interwiki()
-##        if len(iwlinks) < 1:
-##            return
-##        try:
-##            item = pywikibot.ItemPage.fromPage(page)
-##            sitelinks = item.get().sitelinks
-##            #for site in iwlinks:
-##        except pywikibot.NoPage:
-##            return
+    def loadInterwiki(self, **kwargs):
+        return self.fixInterwiki
+
+    def fixInterwiki(self, page, summaries):
+        iw_links = textlib.getLanguageLinks(page.text, page.site)
+        if len(iw_links) == 0:
+            return
+
+        try:
+            item = page.data_item()
+            item.get()
+        except pywikibot.NoPage:
+            return
+
+        sitelinks = item.iterlinks(family=page.site.family)
+        new_sites = set(iw_links.keys()) - set(page.site for page in sitelinks)
+        if len(new_sites) == len(iw_links):
+            return
+
+        new_links = {}
+        for site in new_sites:
+            new_links[site] = iw_links[site]
+
+        page.text = textlib.replaceLanguageLinks(page.text, new_links, page.site)
+        summaries.append(u'odstranění interwiki')
+
+    def _sortCategories(self, cat):
+        split = cat.title(withNamespace=False, insite=cat.site).split()
+        if any(x.isdigit() for x in split): # year
+            return 2
+        elif u'století' in split: # century
+            return 2
+        elif 'v' in split or 've' in split: # place
+            return 3
+        elif any(x.rstrip('.').isdigit() for x in split): # date
+            return 1
+        return 4
+
+    def sortCategories(self, cat):
+        result = self._sortCategories(cat)
+        print(cat, result)
+        return result
+
+    def fixStyle(self, page, summaries):
+        # sort categories
+        categories = textlib.getCategoryLinks(page.text, site=page.site)
+        defaultsort = page.defaultsort()
+        category_men = pywikibot.Category(page.site, u'Muži')
+        category_women = pywikibot.Category(page.site, u'Ženy')
+        category_living = pywikibot.Category(page.site, u'Žijící lidé')
+        if any(x in categories for x in (category_men, category_women,
+                                         category_living)):
+            main_category = None
+            birth_categories = []
+            death_categories = []
+            maint_categories = []
+            for cat in categories:
+                if defaultsort == cat.sortKey:
+                    cat.sortKey = None
+                title = cat.title(withNamespace=False, insite=page.site)
+                if title.startswith(u'Narození '):
+                    birth_categories.append(cat)
+                elif title.startswith(u'Úmrtí '):
+                    death_categories.append(cat)
+                elif title.startswith(u'Údržba:'):
+                    maint_categories.append(cat)
+                elif cat.sortKey == ' ':
+                    main_category = cat
+                else:
+                    continue
+                categories.remove(cat)
+
+            is_man = category_men in categories
+            is_woman = category_women in categories
+            is_alive = category_living in categories
+            if is_man:
+                categories.remove(category_men)
+            if is_woman:
+                categories.remove(category_women)
+            if is_alive:
+                categories.remove(category_living)
+
+            birth_categories.sort(key=self.sortCategories)
+            death_categories.sort(key=self.sortCategories)
+
+            if main_category:
+                categories.insert(0, main_category)
+            categories.extend(birth_categories)
+            categories.extend(death_categories)
+            categories.extend(maint_categories)
+            if is_alive and len(death_categories) == 0:
+                categories.append(category_living)
+            if is_man:
+                categories.append(category_men)
+            if is_woman:
+                categories.append(category_women)
+
+            page.text = textlib.replaceCategoryLinks(
+                page.text, categories, page.site)

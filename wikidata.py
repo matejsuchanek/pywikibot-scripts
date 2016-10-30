@@ -18,14 +18,14 @@ class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
     * Item cleanup like missing and wrong labels etc.
     '''
 
-    def __init__(self, site, **kwargs):
+    def __init__(self, **kwargs):
         pywikibot.output("Please help fix [[phab:T86074]] to make Wikidata scripts simpler")
         self.bad_cache = kwargs.pop('bad_cache', [])
         self.good_cache = kwargs.pop('good_cache', [])
-        super(WikidataEntityBot, self).__init__(site, **kwargs)
-        self.repo = site.data_repository()
+        super(WikidataEntityBot, self).__init__(**kwargs)
+        self.repo = self.site.data_repository()
 
-    def init_page(self, item):
+    def init_page(self, item): # fixme: neccessary (cf. superclasses)?
         try:
             item.get()
         except pywikibot.IsRedirectPage:

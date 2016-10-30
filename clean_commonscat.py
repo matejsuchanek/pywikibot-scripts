@@ -2,8 +2,7 @@
 import pywikibot
 import re
 
-from pywikibot import pagegenerators
-from pywikibot import textlib
+from pywikibot import pagegenerators, textlib
 
 from scripts.deferred import DeferredCallbacksBot
 from scripts.wikidata import WikidataEntityBot
@@ -11,15 +10,12 @@ from scripts.wikitext import WikitextFixingBot
 
 class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallbacksBot):
 
-    def __init__(self, site, **kwargs):
+    def __init__(self, **kwargs):
         self.availableOptions.update({
             'createnew': False,
         })
-        super(CommonscatCleaningBot, self).__init__(site, **kwargs)
+        super(CommonscatCleaningBot, self).__init__(**kwargs)
         self.commons = pywikibot.Site('commons', 'commons')
-
-    def init_page(self, page):
-        page.get()
 
     def treat_page(self):
         page = self.current_page
@@ -119,7 +115,7 @@ def main(*args):
     gen_combined = pagegenerators.CombinedPageGenerator([gen_articles, gen_subcats])
     gen_filtered = pagegenerators.WikibaseItemFilterPageGenerator(gen_combined)
 
-    bot = CommonscatCleaningBot(site, generator=gen_filtered, **options)
+    bot = CommonscatCleaningBot(site=site, generator=gen_filtered, **options)
     bot.run()
 
 if __name__ == "__main__":

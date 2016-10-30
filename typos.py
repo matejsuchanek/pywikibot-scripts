@@ -18,15 +18,14 @@ class IteratingTypoBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot):
 
     '''Bot to iterate and fix typos in a given set of pages'''
 
-    def __init__(self, site, rules, whitelist, fp_page, **kwargs):
+    def __init__(self, rules, whitelist, fp_page, **kwargs):
         self.availableOptions.update({
             'allrules': False,
             'threshold': 10,
             'quick': False,
         })
         kwargs['typos'] = False
-        #kwargs['cw'] = True
-        super(IteratingTypoBot, self).__init__(site, **kwargs)
+        super(IteratingTypoBot, self).__init__(**kwargs)
         self.rules = rules
         self.whitelist = whitelist
         self.fp_page = fp_page
@@ -49,8 +48,9 @@ class IteratingTypoBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot):
         if page.title() in self.whitelist:
             raise SkipPageError(page, 'Page is whitelisted')
 
+        super(IteratingTypoBot, self).init_page(page)
+
         self.done_replacements = []
-        page.get()
 
     def treat_page(self):
         page = self.current_page
@@ -99,10 +99,13 @@ class IteratingTypoBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot):
 
 class SingleRuleTypoBot(IteratingTypoBot):
 
-    '''Bot to iterate one typo rule over pages where it may apply. Factored by TypoBot'''
+    '''
+    Bot to iterate one typo rule over pages where it may apply.
+    Factored by TypoBot.
+    '''
 
-    def __init__(self, site, rule, rules, whitelist, fp_page, **kwargs):
-        super(SingleRuleTypoBot, self).__init__(site, rules, whitelist, fp_page, **kwargs)
+    def __init__(self, rule, rules, whitelist, fp_page, **kwargs):
+        super(SingleRuleTypoBot, self).__init__(rules, whitelist, fp_page, **kwargs)
         self.rule = rule
         self.rule.longest = 0
         self.processed = 0.0
@@ -165,7 +168,7 @@ class TypoBot(SingleSiteBot):
     * -whitelistpage: - what page holds pages which should be skipped
     '''
 
-    def __init__(self, site, genFactory, **kwargs):
+    def __init__(self, genFactory, **kwargs):
         self.availableOptions.update({ # fixme: expose additional options to bots
             'allrules': False,
             'offset': 0,
@@ -174,8 +177,8 @@ class TypoBot(SingleSiteBot):
             'typospage': None,
             'whitelistpage': None,
         })
-        super(TypoBot, self).__init__(site, **kwargs)
-        loader = TyposLoader(site, **kwargs)
+        super(TypoBot, self).__init__(**kwargs)
+        loader = TyposLoader(self.site, **kwargs)
         self.typoRules = loader.loadTypos()
         self.fp_page = loader.getWhitelistPage()
         self.whitelist = loader.loadWhitelist()
@@ -185,11 +188,13 @@ class TypoBot(SingleSiteBot):
         opts = dict(allrules=self.getOption('allrules'),
                     always=self.getOption('always'),
                     quick=self.getOption('quick'),
-                    threshold=self.getOption('threshold'))
+                    site=self.site,
+                    threshold=self.getOption('threshold'),
+                    )
         if self.generator:
             opts['generator'] = self.generator
-            bot = IteratingTypoBot(self.site, self.typoRules[:],
-                                   self.whitelist, self.fp_page, **opts)
+            bot = IteratingTypoBot(self.typoRules[:], self.whitelist,
+                                   self.fp_page, **opts)
             bot.run()
             return
 
@@ -202,8 +207,8 @@ class TypoBot(SingleSiteBot):
 
             pywikibot.output(u'Doing %s' % rule.query)
             opts['generator'] = rule.querySearch()
-            bot = SingleRuleTypoBot(self.site, rule, self.typoRules[:],
-                                    self.whitelist, self.fp_page, **opts)
+            bot = SingleRuleTypoBot(rule, self.typoRules[:], self.whitelist,
+                                    self.fp_page, **opts)
             self._save_counter += bot.run()
             time.sleep(3) # fixme: raise exception from the bot
 
@@ -221,8 +226,7 @@ def main(*args):
                 else:
                     options[arg[1:]] = True
 
-    site = pywikibot.Site()
-    bot = TypoBot(site, genFactory, **options)
+    bot = TypoBot(genFactory, **options)
     bot.run()
 
 if __name__ == "__main__":

@@ -3,8 +3,7 @@ import pywikibot
 import random
 import re
 
-from pywikibot import pagegenerators
-from pywikibot import textlib
+from pywikibot import pagegenerators, textlib
 
 from pywikibot.bot import (
     ExistingPageBot, NoRedirectPageBot
@@ -12,13 +11,27 @@ from pywikibot.bot import (
 
 from scripts.wikitext import WikitextFixingBot
 
-class DeprecatedParamException(Exception):
+class OldParamException(Exception):
+    pass
+
+class RemoveParamException(Exception):
     pass
 
 class UnknownParamException(Exception):
     pass
 
 class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot):
+
+    '''
+    Bot to rename an infobox and its parameters
+
+    Features:
+    * renames or removes parameters
+    * marks old/unknown parameters and removes those that are empty
+    * provides access to all parameters and allows addding/changing/removing them
+    * sorts parameters
+    * fixes whitespace "| param = value"
+    '''
 
     caption_param = 'popisek'
     image_param = u'obrázek'
@@ -34,8 +47,6 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
         u'jmenující', u'spoluvládce', u'nastupující za', u'zástupce', u'protivník',
         u'úřadující', u'předchůdce', u'nástupce', u'volební obvod', u'většina',
         u'pořadí#',
-
-        'soud', u'období soudce', u'soud#',
 
         'strana', u'těleso', u'kandidující za', u'těleso#',
 
@@ -58,11 +69,12 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
         u'webová stránka': 'web',
     }
     old_params = ('width', 'height', u'malý obrázek', 'poslanec', 'velvyslanec')
+    remove_params = ('soud', u'období soudce')
 
-    def __init__(self, site, **kwargs):
+    def __init__(self, **kwargs):
         self.template = self.normalize(kwargs.pop('template'))
         self.new_template = self.normalize(kwargs.pop('new_template'))
-        super(InfoboxMigratingBot, self).__init__(site, **kwargs)
+        super(InfoboxMigratingBot, self).__init__(**kwargs)
 
     def normalize(self, template):
         tmp, _, __ = template.replace('_', ' ').partition('<!--')
@@ -74,14 +86,17 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
         text = page.text
 
         new_params = []
-        deprecated_params = []
+        old_params = []
         unknown_params = []
+        removed_params = []
         changed = self.template != self.new_template
         for template, fielddict in textlib.extract_templates_and_params(
-            text, remove_disabled_parts=False, strip=False):
+            text, remove_disabled_parts=False, strip=False): # todo: support multiple boxes
             if self.normalize(template) == self.template:
                 start_match = re.search(
-                    r'\{\{\s*%s\s*' % re.escape(template), text) # todo: prefix
+                    r'\{\{\s*((%s)\s*:\s*)?%s\s*' % (
+                        '|'.join(self.site.namespaces[10]),
+                        re.escape(template)), text)
                 if not start_match:
                     pywikibot.warning('Couldn\'t find the template')
                     return
@@ -93,23 +108,26 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
                     end = text.index('}}', start)
 
                 for name, value in fielddict.items():
-                    end += len('=|') + len(value)
-                    if not name.isdigit():
-                        end += len(name)
+                    end += len(u'|%s=%s' % (name, value))
 
                     name = name.strip()
                     value = value.strip()
+
                     try:
                         new_name = self.handleParam(name)
-                    except DeprecatedParamException:
-                        if value != '' and not (\
-                            value.startswith('<!--') and value.endswith('-->')):
-                            deprecated_params.append(
+                    except OldParamException:
+                        if textlib.removeDisabledParts(value, ['comments']).strip() != '':
+                            old_params.append(
+                                (name, value)
+                            )
+                    except RemoveParamException:
+                        changed = True
+                        if textlib.removeDisabledParts(value, ['comments']).strip() != '':
+                            removed_params.append(
                                 (name, value)
                             )
                     except UnknownParamException:
-                        if value != '' and not (\
-                            value.startswith('<!--') and value.endswith('-->')):
+                        if textlib.removeDisabledParts(value, ['comments']).strip() != '':
                             unknown_params.append(
                                 (name, value)
                             )
@@ -124,16 +142,22 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
                             changed = True
 
                 end += len('}}')
-                if not text[start:end].endswith('}}'):
-                    if text[start:end].count('{{') == text[start:end].count('}}'):
-                        end = text[:end].rindex('}}') + len('}}')
-                    else:
-                        while text[start:end].count('{{') > text[start:end].count('}}'):
-                            end = text.index('}}', start) + len('}}')
-                        while text[start:end].count('{{') < text[start:end].count('}}'):
-                            end = text[:end].rindex('}}') + len('}}')
 
-                assert text[start:end].endswith('}}')
+                if text[start:end].count('{{') != text[start:end].count('}}'):
+                    while text[start:end].count('{{') > text[start:end].count('}}'):
+                        end = text[:end].rindex('{{')
+                        end = text[:end].rindex('}}') + len('}}')
+                    while text[start:end].count('{{') < text[start:end].count('}}'):
+                        end = text[:end].rindex('}}') + len('}}')
+
+                else:
+                    if not text[start:end].endswith('}}'):
+                        end = text[:end].rindex('}}') + len('}}')
+
+                if (end < start or not text[start:end].endswith('}}') or
+                    text[start:end].count('{{') != text[start:end].count('}}')):
+                    pywikibot.warning('Couldn\'t parse the template')
+                    return
                 break
 
         else:
@@ -150,12 +174,12 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
         space_before = ''
         lines = []
         for line in text[start:end].splitlines():
-            if re.match(' *\|', line):
+            if re.match(' *\|', line): # fixme: nested templates
                 lines.append(line)
         if len(lines) and random.choice(lines).startswith(' '):
             space_before = ' '
 
-        self.handleParams(new_params)
+        self.handleParams(new_params, old_params, removed_params, unknown_params)
         new_params.sort(key=self.keyForSort)
 
         new_template = u'{{%s' % self.new_template
@@ -164,9 +188,9 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
             for param, value in new_params:
                 new_template += u'%s| %s = %s\n' % (space_before, param, value)
 
-        if len(deprecated_params) > 0:
+        if len(old_params) > 0:
             new_template += u'<!-- Zastaralé parametry -->\n'
-            for param, value in deprecated_params:
+            for param, value in old_params:
                 new_template += u'%s| %s = %s\n' % (space_before, param, value)
 
         if len(unknown_params) > 0:
@@ -208,13 +232,11 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
         return len(self.all_params)
 
     def endsWithDigit(self, text):
-        digits = '0123456789'
-        return text not in digits and any(text.endswith(x) for x in digits)
+        return not text.isdigit() and text[-1].isdigit()
 
     def stripDigit(self, text):
         assert self.endsWithDigit(text)
-        match = re.match('([^0-9]+)([0-9]+)$', text)
-        return match.group(1), match.group(2)
+        return re.match('(.+?)([0-9]+)$', text).groups()
 
     def handleParam(self, name):
         name = name.replace('_', ' ')
@@ -222,85 +244,118 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
             name = self.rename_params[name]
             assert name in self.all_params
 
-        if name in self.old_params:
-            raise DeprecatedParamException
-
         if name in self.all_params:
             return name
+
+        if name in self.remove_params:
+            raise RemoveParamException
+
+        if name in self.old_params:
+            raise OldParamException
 
         new_name = name
         if self.endsWithDigit(name):
             new_name, digit = self.stripDigit(name)
-            if int(digit) > 10:
-                raise UnknownParamException
             if new_name in self.all_params:
+                top_index = index = self.all_params.index(new_name)
+                while not self.all_params[top_index].endswith('#'):
+                    top_index += 1
+                    if len(self.all_params) == top_index:
+                        raise UnknownParamException
+
+                top_name = self.all_params[top_index][:-1]
+                assert top_name in self.all_params
+                if self.all_params.index(top_name) > index:
+                    raise UnknownParamException
+
                 return name
 
-        if new_name in self.old_params:
-            raise DeprecatedParamException
+        if new_name in self.remove_params:
+            raise RemoveParamException
+        elif new_name in self.old_params:
+            raise OldParamException
         else:
             raise UnknownParamException
 
-    def handleParams(self, params):
-        pairs = {} # fixme: better
-        for key, value in params:
-            pairs[key] = value
+    def handleParams(self, new, old, removed, unknown):
+        # fixme: list of tuples is too complicated
+        params = {}
+        for key, value in new + old + removed + unknown:
+            #if key in params: ...
+            params[key] = value
 
         if self.size_param in params:
-            if 'width' in pairs:
-                params.remove(
-                    ('width', pairs['width'])
+            if 'width' in params:
+                old.remove(
+                    ('width', params['width'])
                 )
-            if 'heigth' in pairs:
-                params.remove(
-                    ('heigth', pairs['heigth'])
+            if 'heigth' in params:
+                old.remove(
+                    ('heigth', params['heigth'])
                 )
         else:
-            if 'width' in pairs or 'heigth' in pairs:
-                width = pairs['width'] if 'width' in pairs else '225'
-                height = pairs['heigth'] if 'heigth' in pairs else '250px'
-                params.append(
-                    (self.size_param, width + 'x' + height)
+            if 'width' in params or 'heigth' in params:
+                width = params['width'] if 'width' in params else '225'
+                height = params['heigth'] if 'heigth' in params else '250px'
+                new.append(
+                    (self.size_param, u'%sx%s' % (width, height))
                 )
 
-        if self.image_param in pairs:
-            if self.caption_param not in pairs:
-                params.append(
+        if self.image_param in params:
+            if self.caption_param not in params:
+                new.append(
                     (self.caption_param, '')
                 )
-            if '_' in pairs[self.image_param]:
-                params.remove(
-                    (self.image_param, pairs[self.image_param])
+            if '_' in params[self.image_param]:
+                new.remove(
+                    (self.image_param, params[self.image_param])
                 )
-                params.append(
-                    (self.image_param, pairs[self.image_param].replace('_', ' '))
+                new.append(
+                    (self.image_param, params[self.image_param].replace('_', ' '))
                 )
 
-        if 'strana' in pairs and u'těleso' not in pairs and\
-           any(x in pairs['strana'] for x in [
-               u'nestraník', u'nezávislý', u'bezpartijní']):
-            params.extend(
+        if any(x in params for x in (
+            'soud', 'soud1', u'období soudce', u'období soudce1')):
+            if 'profese' in params:
+                if 'soudce' not in params['profese'].lower():
+                    before, conj, after = params['profese'].rpartition(' a ')
+                    new.remove(
+                        ('profese', params['profese'])
+                    )
+                    if conj:
+                        new.append(
+                            ('profese', u'%s, %s a [[soudce]]' % (before, after))
+                        )
+                    else:
+                        new.append(
+                            ('profese', u'%s a [[soudce]]' % before)
+                        )
+
+        if 'strana' in params and u'těleso' not in params and\
+           any(x in params['strana'] for x in [
+               u'nestraník', u'nezávislý', u'bezpartijní', u'bez politické']):
+            new.extend(
                 [(u'těleso', ''), (u'kandidující za', '')]
             )
 
-##        if u'jméno' in pairs:
-##            before, title, after = pairs[u'jméno'].partition(self.current_page.title())
+##        if u'jméno' in params:
+##            before, title, after = params[u'jméno'].partition(self.current_page.title())
 ##            if after:
-##                params.remove(
-##                    (u'jméno', pairs[u'jméno'])
+##                new.remove(
+##                    (u'jméno', params[u'jméno'])
 ##                )
-##                params.append(
+##                new.append(
 ##                    (u'jméno', title + after)
 ##                )
-##                if u'titul před' in pairs:
-##                    params.remove(
-##                        (u'titul před', pairs[u'titul před'])
+##                if u'titul před' in params:
+##                    new.remove(
+##                        (u'titul před', params[u'titul před'])
 ##                    )
-##                    params.append(
-##                        (u'titul před', pairs[u'titul před'] + ' ' + before.strip())
+##                    new.append(
+##                        (u'titul před', params[u'titul před'] + ' ' + before.strip())
 ##                    )
 ##                else:
-##                    params.append(
+##                    new.append(
 ##                        (u'titul před', before.strip())
 ##                    )
 
@@ -308,7 +363,6 @@ def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
     genFactory = pagegenerators.GeneratorFactory()
-    numbers = []
     for arg in local_args:
         if not genFactory.handleArg(arg):
             if arg.startswith('-'):
@@ -326,11 +380,10 @@ def main(*args):
 
     generator = genFactory.getCombinedGenerator()
     if not generator:
-        genFactory.handleArg('-transcludes:%s' % options['template'])
+        genFactory.handleArg(u'-transcludes:%s' % options['template'])
         generator = genFactory.getCombinedGenerator()
 
-    site = pywikibot.Site()
-    bot = InfoboxMigratingBot(site, generator=generator, **options)
+    bot = InfoboxMigratingBot(generator=generator, **options)
     bot.run()
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ import requests
 
 from pywikibot import textlib
 
-def deduplicate(array):
+def deduplicate(array): # todo: move elsewhere
     for index, member in enumerate(array, start=1):
         while member in array[index:]:
             array.pop(array.index(member, index))
@@ -14,17 +14,22 @@ class CheckWikiError(object):
 
     '''Abstract class for each error to extend'''
 
-    exceptions = ['comment', 'math', 'nowiki', 'pre', 'source', 'startspace']
+    exceptions = ['ce', 'comment', 'graph', 'hiero', 'math', 'nowiki',
+                  'pre', 'score', 'source', 'startspace']
+    url = 'https://tools.wmflabs.org/checkwiki/cgi-bin/checkwiki_bots.cgi'
 
     def __init__(self, site, settings, **kwargs):
         self.site = site
         self.settings = settings
-        self.auto = kwargs.pop('auto', True)
+        #self.auto = kwargs.pop('auto', True)
 
-    def loadError(self, limit=0):
+    def __repr__(self):
+        return u'%s(%r, %s)' % (self.__class__.__name__, self.site, self.priority)
+
+    def loadError(self, limit=100):
         pywikibot.output('Loading pages with error #%s' % self.number)
-        url = 'https://tools.wmflabs.org/checkwiki/cgi-bin/checkwiki_bots.cgi?action=list&project=%s&id=%s' % (
-            self.settings['project'], self.number)
+        url = '%s?action=list&project=%s&id=%s&limit=%s' % (
+            self.url, self.settings['project'], self.number, limit)
         for line in requests.get(url).iter_lines():
             page = pywikibot.Page(self.site, line.decode().replace('title=', '')) # fixme: b/c
             if not page.exists():
@@ -32,55 +37,46 @@ class CheckWikiError(object):
                 continue
 
             yield page
-            limit = limit - 1
-            if limit == 0:
-                raise StopIteration
 
     def markFixed(self, page):
-        url = 'https://tools.wmflabs.org/checkwiki/cgi-bin/checkwiki_bots.cgi'
         data = {
             'action': 'mark',
             'id': self.number,
             'project': self.settings['project'],
             'title': page.title()
         }
-        requests.post(url, data)
+        requests.post(self.url, data)
 
     def apply(self, text, page):
         return textlib.replaceExcept(text, self.pattern(), self.replacement,
                                      self.exceptions, page.site)
 
-    def isForFixes(self):
+    def isForFixes(self): # todo: per subclass
         return hasattr(self, 'pattern') and hasattr(self, 'replacement')
 
     def toTuple(self):
+        assert self.isForFixes()
         return (self.pattern().pattern, self.replacement)
 
+    # todo: static?
     def needsFirst(self):
         return []
 
     @property
     def priority(self):
-        if not hasattr(self, 'priority'):
+        if not hasattr(self, '_priority'):
             for prio, errors in self.settings['priority'].items():
                 if self.number in errors:
-                    self.priority = prio # number?
+                    self._priority = prio # number?
                     break
 
-        return self.priority
+        return self._priority
 
-    def needsDecision(self):
+    def needsDecision(self): # todo: per subclass
         return False
 
-    def handledByCC(self):
+    def handledByCC(self): # todo: per subclass
         return False
-
-    @classmethod
-    def getSite(cls):
-        if not hasattr(cls, 'site'):
-            return pywikibot.Site()
-        else:
-            return cls.site
 
 class HeaderError(CheckWikiError):
 
@@ -107,7 +103,8 @@ class DefaultsortError(CheckWikiError):
     summary = 'oprava DEFAULTSORTu'
 
     def pattern(self):
-        return re.compile(r'\{\{DEFAULTSORT:(?P<key>[^}]+)\}\}')
+        magic = self.site.getmagicwords('defaultsort')
+        return re.compile(r'\{\{ *(?P<magic>%s)(?P<key>[^}]+)\}\}' % '|'.join(magic))
 
 class PrefixedTemplate(CheckWikiError):
 
@@ -149,9 +146,7 @@ class BrokenHTMLTag(CheckWikiError):
             if match.group('params') is not None:
                 params = []
                 for p in param_regex.finditer(match.group('params')):
-                    params.append(
-                        (p.group('param'), p.group('content'))
-                    )
+                    params.append(p.group('param', 'content'))
                 if len(params) == 1:
                     if params[0][0] == 'id':
                         return u'{{Kotva|%s}}' % params[0][1]
@@ -192,8 +187,7 @@ class LowHeadersLevel(HeaderError):
         regex = self.pattern()
         min_level = 8
         for match in regex.finditer(text):
-            start = match.group('start')
-            end = match.group('end')
+            start, end = match.group('start', 'end')
             if len(start) == len(end):
                 min_level = min(min_level, len(start))
             else:
@@ -211,7 +205,7 @@ class LowHeadersLevel(HeaderError):
     def needsFirst(self):
         return [8]
 
-class MissingEquation(CheckWikiError): # TODO
+class MissingEquation(CheckWikiError):
 
     number = 8
     summary = u'oprava úrovně nadpisů'
@@ -220,14 +214,19 @@ class MissingEquation(CheckWikiError): # TODO
         return True
 
     def pattern(self):
-        return re.compile('(?m)^(?P<start>=+)'
-                          '(?P<content>((?!==|= *$).)+?)(?!(?P=start) *$)'
-                          '(?P<end>=+) *$')
+        return re.compile(
+            '(?m)^(?P<start>=+)(?P<content>.+?)(?P<end>(?: *=+)*) *$')
 
     def replacement(self, match):
-        start = match.group('start')
-        end = match.group('end')
-        # todo
+        start, content, end = match.group('start', 'content', 'end')
+        if start == end:
+            return match.group()
+
+        if not all(x == '=' for x in end):
+            end = end.replace(' ', '')
+            if start == end:
+                return u'%s %s %s' % (start, content.strip(), end)
+
         return match.group()
 
 class SingleLineCategories(CheckWikiError):
@@ -237,20 +236,23 @@ class SingleLineCategories(CheckWikiError):
     def handledByCC(self):
         return True
 
-class NoEndSquareBrackets(CheckWikiError):
+class NoEndSquareBrackets(CheckWikiError): # fixme
 
     exceptions = list(set(CheckWikiError.exceptions) - set('startspace'))
     number = 10
     summary = 'oprava syntaxe odkazu'
+    tags = ('pre', 'ref')
 
     def pattern(self):
-        return re.compile(
-            r'(?i)\[\[(?P<inside>(?:(?!(?:%s):|\[\[|\]\]|<ref[ >]).)*)'
-            r'(?P<after>\[\[|\]\])?' % '|'.join(self.site.namespaces[6]))
+        return re.compile(r'(?i)\[\[(?P<inside>(?:(?!\[\[|\]\]|<(?:%s)[ >]).)*)'
+                          r'(?P<after>\[\[|\]\])?' % '|'.join(self.tags))
 
     def replacement(self, match):
-        inside = match.group('inside')
-        after = match.group('after')
+        inside, after = match.group('inside', 'after')
+        if any(inside.lstrip().lower().startswith(
+            u'%s:' % x) for x in list(self.site.namespaces[6])):
+            return match.group()
+
         if after == ']]':
             if match.string[match.end():].startswith(']') and '[' in inside:
                 return match.group()
@@ -368,6 +370,20 @@ class LowerCaseCategory(CheckWikiError):
     def handledByCC(self):
         return True
 
+class SingleEquationHeader(HeaderError):
+
+    number = 19
+    summary = u'oprava úrovně nadpisu'
+
+    def pattern(self):
+        return re.compile(r'(?m)^=([^\n=]+)=$')
+
+    def replacement(self, match):
+        return u'== %s ==' % match.group(1).strip()
+
+    def needsFirst(self):
+        return [8]
+
 class Dagger(EntityReplacement):
 
     entity_map = {
@@ -437,9 +453,7 @@ class HeaderHierarchy(HeaderError):
 
         count = len(levels)
         i = 0
-        while True:
-            if count in [i, i + 1]:
-                break
+        while count not in (i, i + 1):
             level = levels[i]
             index = i + 1
             while levels[i+1] - level > 1:
@@ -477,7 +491,7 @@ class Bold(CheckWikiError):
 
     def handledByCC(self):
         return True
-    
+
 class MultiplePipes(CheckWikiError):
 
     number = 32
@@ -496,8 +510,7 @@ class MultiplePipes(CheckWikiError):
                 split.remove('')
                 return u'[[%s]]' % '|'.join(split)
 
-            dedup = set(split)
-            if len(split) > len(dedup):
+            if len(set(split)) == 2:
                 deduplicate(split)
                 return u'[[%s]]' % '|'.join(split)
 
@@ -508,17 +521,17 @@ class MultiplePipes(CheckWikiError):
 
 class MagicWords(CheckWikiError):
 
+    exceptions = CheckWikiError.exceptions[:] + ['gallery', 'ref'] # todo: etc.
     magic_templates = ('PAGENAME')
     number = 34
     summary = u'odstranění kouzelných slov'
 
     def pattern(self):
-        return textlib.NESTED_TEMPLATE_REGEX
-        #return re.compile(r'(?:\{\{([^}|]+)\}\}|\{\{\{[^}]+\}\}\})')
+        return re.compile(r'(?:\{\{([^}|]+)\}\}|\{\{\{[^}]+\}\}\})')
 
     def replacement(self, match):
         if match.group().startswith('{{{'):
-            param, sep, value = match.group().strip('{}').partition('|')
+            _, __, value = match.group().strip('{}').partition('|')
             return value
         else:
             template, sep, value = match.group().strip('{}').partition(':')
@@ -679,6 +692,72 @@ class ParameterWithBreak(CheckWikiError):
     def apply(self, text, page):
         return textlib.NESTED_TEMPLATE_REGEX.sub(self.replacement, text)
 
+class RefBeforePunctuation(CheckWikiError):
+
+    number = 61
+    punct = '.,:;'
+    summary = 'oprava interpunkce'
+
+    # note that this is in general very controversial "error"
+    # this algorithm only fixes punctuation when it's both before and after reference
+    def apply(self, text, page):
+        ref_regex = re.compile('[%s]+ *(?:<ref(?= |>)[^>]*'
+                               '(?: ?/|>(?:(?!</?ref).)+</ref)>[%s ]*)+' % (
+                                   self.punct, self.punct),
+                               re.S)
+        return ref_regex.sub(self.replacement, text)
+
+    def replacement(self, match):
+        if match.group().startswith(';') and match.string[match.start()-1] == '\n':
+            return match.group()
+
+        regex = re.compile('[%s ]+$' % self.punct)
+        positions = []
+        all_punct = []
+        for ref in re.finditer('<ref', match.group()):
+            prev_end = start = ref.start()
+            before = regex.search(ref.string[:start])
+            if before:
+                all_punct.append(before.group().strip())
+                prev_end -= len(before.group())
+            positions.extend([prev_end, start])
+
+        after = regex.search(match.group())
+        end = match.end()
+        if after:
+            all_punct.append(after.group().strip())
+            end = after.start()
+
+        positions.append(end)
+        positions.pop(0)
+        assert len(positions) % 2 == 0
+
+        if '' in all_punct:
+            all_punct.remove('')
+
+        if len(all_punct) == 1\
+           and match.group().lstrip().startswith(all_punct[0]):
+            return match.group()
+
+        distinct = set(''.join(all_punct))
+        if len(distinct) == 1:
+            init = distinct.pop()
+        elif any(x.endswith(':') for x in all_punct):
+            if '.' in all_punct[0]:
+                init = '.:'
+            else:
+                init = ':'
+        elif any('.' in x for x in all_punct):
+            init = '.'
+        elif any(';' in x for x in all_punct):
+            init = ';'
+        else:
+            return match.group()
+
+        space_after = ' ' if match.group().endswith(' ') else ''
+        return init + ''.join(match.group()[start:end] for start, end in zip(
+            positions[::2], positions[1::2])) + space_after
+
 class SmallInsideTags(CheckWikiError):
 
     number = 63
@@ -736,6 +815,28 @@ class BadListStructure(CheckWikiError): # TODO
             lines[i] = level + line[len(level):]
 
         return '\n'.join(lines)
+
+class BrokenExternalLink(CheckWikiError): # todo
+
+    number = 80
+    summary = u'oprava externího odkazu'
+
+    def pattern(self):
+        return re.compile(r'\[(?P<link>https?://[^][\n<]+)'
+                          r'(?P<stop>\]|</?ref|\n|\[)')
+
+    def replacement(self, match):
+        link, stop = match.group('link', 'stop')
+        if stop == ']':
+            return match.group()
+
+        if ' ' not in link:
+            return match.expand(r'[\g<link>]\g<stop>')
+
+        if stop in ('<ref', '</ref'):
+            return match.expand(r'[\g<link>]\g<stop>')
+
+        return match.group()
 
 class DuplicateReferences(CheckWikiError):
 
@@ -852,8 +953,7 @@ class DuplicateReferences(CheckWikiError):
             return match.group()
 
         def repairNamesAndTidy(match):
-            content = match.group('content')
-            params = match.group('params')
+            content, params = match.group('content', 'params')
             name, group = getParams(params)
             if name.isdigit() and name not in destroyed_names[group]:
                 new_name = 'rfr%s' % i[group]
@@ -894,14 +994,35 @@ class DuplicateReferences(CheckWikiError):
     def needsFirst(self):
         return [104]
 
+class EmptyTag(CheckWikiError):
+
+    number = 85
+    summary = u'odstranění prázdného tagu'
+    tags = ('center', 'code', 'gallery', 'includeonly', 'noinclude',
+            'onlyinclude', 'pre', 'ref', 'span')
+
+    def pattern(self):
+        return re.compile(r'<(%s)>(\s*)</\1>' % '|'.join(self.tags))
+
+    def replacement(self, match):
+        return match.expand(r'\2')
+
+class ExternalLinkLikeInternal(CheckWikiError):
+
+    number = 86
+    summary = u'oprava syntaxe odkazu'
+
+    def handledByCC(self):
+        return True
+
 class DefaultsortSpace(DefaultsortError):
 
     number = 88
 
     def replacement(self, match):
-        key = match.group('key')
+        magic, key = match.group('magic', 'key')
         if key.startswith(' '):
-            return '{{DEFAULTSORT:%s}}' % key.strip()
+            return '{{%s%s}}' % (magic, key.strip())
 
         return match.group()
 
@@ -910,10 +1031,10 @@ class DefaultsortComma(DefaultsortError):
     number = 89
 
     def replacement(self, match):
-        key = match.group('key')
+        magic, key = match.group('magic', 'key')
         if ',' in key and ', ' not in key:
             split = key.split(',')
-            return '{{DEFAULTSORT:%s}}' % ', '.join(x.strip() for x in split)
+            return '{{%s%s}}' % (magic, ', '.join(x.strip() for x in split))
 
         return match.group()
 

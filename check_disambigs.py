@@ -3,111 +3,166 @@ import datetime
 import pywikibot
 
 from pywikibot import pagegenerators
+from pywikibot.bot import (
+    BaseBot, ExistingPageBot, NoRedirectPageBot, SingleSiteBot, SkipPageError
+)
 
-start = datetime.datetime.now()
+class ErrorReportingBot(BaseBot):
 
-site = pywikibot.Site('wikidata', 'wikidata')
-repo = site.data_repository()
+    def __init__(self, **kwargs):
+        pywikibot.output("constructing bot")
+        self.availableOptions.update({
+            'interval': 5 * 60
+        })
+        file_name = kwargs.pop('file_name')
+        page_pattern = kwargs.pop('page_pattern')
+        super(ErrorReportingBot, self).__init__(**kwargs)
+        self.availableOptions.update({
+            'always': True
+        })
+        self.openFile(file_name)
+        self.loadPage(page_pattern)
+        self.saveFile()
+        self.updateTimestamp()
 
-# hack: dummy clause to create the file if it doesn't exist
-with open('..\log_disambigs.txt', 'w') as f:
-    skip = ['enwiki', 'mkwiki', 'mznwiki', 'specieswiki', 'towiki']
+    def openFile(self, file_name):
+        pywikibot.output("opening file")
+        try:
+            file = open('..\%s' % file_name, 'x')
+            file.close()
+        except OSError:
+            pass
 
-save_rate = 5 * 60 # how often to save (seconds)
+        self.file = open('..\%s' % file_name, 'r+')
 
-log_page = pywikibot.Page(site, u'User:%s/Disambig_errors' % site.username())
-try:
-    log_page.get()
-except pywikibot.NoPage:
-    log_page.text = ''
+    def loadPage(self, pattern):
+        pywikibot.output("loading page")
+        self.log_page = pywikibot.Page(self.site, pattern % self.site.username())
+        try:
+            self.log_page.get()
+        except pywikibot.NoPage:
+            self.log_page.text = ''
 
-disambig_item = pywikibot.ItemPage(repo, 'Q4167410')
+    def addToFile(self, text):
+        pywikibot.output("adding to file")
+        for line in text.splitlines():
+            self.file.write(line)
 
-QUERY = """SELECT DISTINCT ?item {
-  ?item wdt:P31 wd:Q4167410;
-        schema:dateModified ?date .
-} ORDER BY ?date LIMIT 10000""".replace('\n', ' ')
-
-def save_file(log_page, last_saved):
-    with open('..\log_disambigs.txt', 'r+') as log_file:
-        read = ''.join([line.decode('utf8') for line in log_file.readlines()])
+    def saveFile(self):
+        read = ''.join(self.file.readlines())
         if len(read) > 1:
             read = read[0:] # fixme: some invisible character
-            log_page.get(force=True)
-            log_page.text += read
-            log_page.save('update', async=True)
-            log_file.seek(0)
-            log_file.truncate()
-            return datetime.datetime.now()
-    return last_saved
+            self.log_page.get(force=True)
+            self.log_page.text += read
+            self.log_page.save('update', async=True)
+            self.log_file.seek(0)
+            self.log_file.truncate()
+            self.updateTimestamp()
 
-# clean the file in case there was a failure last time
-last_saved = save_file(log_page, datetime.datetime.now())
+    def checkSave(self):
+        if (datetime.datetime.now() - self.timestamp).total_seconds() > self.getOption('interval'):
+            self.saveFile()
 
-for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
-    item_id = item.title()
-    if item.isRedirectPage():
-        pywikibot.output('%s is redirect' % item_id)
-        continue
+    def updateTimestamp(self):
+        self.timestamp = datetime.datetime.now()
 
-    if '* [[%s]]' % item_id in log_page.text:
-        continue
+    def exit(self):
+        self.file.close()
+        super(ErrorReportingBot, self).exit()
 
-    item.get()
-    if 'P31' not in item.claims.keys():
-        continue
+class DisambigsCheckingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot, ErrorReportingBot):
 
-    for claim in item.claims['P31']:
-        if claim.target_equals(disambig_item):
-            break
-    else:
-        continue
+    skip = ['enwiki', 'mkwiki', 'mznwiki', 'specieswiki', 'towiki']
 
-    count = len(item.sitelinks)
-    if count == 0:
-        append_text += '\n** no sitelinks'
+    def __init__(self, **kwargs):
+        kwargs['page_pattern'] = u'User:%s/Disambig_errors'
+        kwargs['file_name'] = 'log_disambigs.txt'
+        super(DisambigsCheckingBot, self).__init__(**kwargs)
+        self.repo = self.site.data_repository()
+        self.__disambig_item = pywikibot.ItemPage(self.repo, 'Q4167410')
 
-    append_text = ''
-    for dbname in item.sitelinks.keys():
-        if dbname in skip:
-            continue
-        apisite = pywikibot.site.APISite.fromDBName(dbname)
-        page = pywikibot.Page(apisite, item.sitelinks[dbname])
-        if not page.exists():
-            args = [dbname, apisite.sitename(), page.title()]
-            append_text += u"\n** {} – [[{}:{}]] – doesn't exist".format(*args)
-            continue
-        if page.isRedirectPage():
-            target = page.getRedirectTarget()
-            try:
-                target_item = target.data_item()
-                target_id = '[[%s]]' % target_item.title()
-            except pywikibot.NoPage:
-                target_id = "''no item''"
-            if not target.isDisambig():
-                target_id += ', not a disambiguation'
-            sitename = apisite.sitename()
-            args = [dbname, sitename, page.title(), sitename, target.title(), target_id]
-            append_text += u"\n** {} – [[{}:{}]] – redirects to [[{}:{}]] ({})".format(*args)
-            continue
-        if not page.isDisambig():
-            args = [dbname, apisite.sitename(), page.title()]
-            append_text += u"\n** {} – [[{}:{}]] – not a disambiguation".format(*args)
+    def init_page(self, item):
+        item.get()
+        if '[[%s]]' % item.title() in self.log_page.text:
+            raise SkipPageError(
+                item,
+                "Already reported page"
+            )
 
-    if append_text != '':
-        with open('..\log_disambigs.txt', 'a') as log_file:
-            prep = '\n* [[%s]]' % item_id
+        for prop in item.claims:
+            if prop == 'P31':
+                for claim in item.claims[prop]:
+                    if claim.target_equals(self.__disambig_item):
+                        return
+
+        raise SkipPageError(
+            item,
+            "Item is not a disambiguation"
+        )
+
+    def treat_page(self):
+        item = self.current_page
+        append_text = ''
+        count = len(item.sitelinks)
+        if count == 0:
+            append_text += '\n** no sitelinks'
+        for dbname in item.sitelinks.keys():
+            if dbname in self.skip:
+                continue
+            apisite = pywikibot.site.APISite.fromDBName(dbname)
+            page = pywikibot.Page(apisite, item.sitelinks[dbname])
+            if not page.exists():
+                args = []
+                append_text += u"\n** {} – [[{}:{}]] – doesn't exist".format(
+                    dbname, apisite.sitename(), page.title())
+                continue
+            if page.isRedirectPage():
+                target = page.getRedirectTarget()
+                try:
+                    target_item = target.data_item()
+                    target_id = '[[%s]]' % target_item.title()
+                except pywikibot.NoPage:
+                    target_id = "''no item''"
+                if not target.isDisambig():
+                    target_id += ', not a disambiguation'
+                sitename = apisite.sitename()
+                append_text += u"\n** {} – [[{}:{}]] – redirects to [[{}:{}]] ({})".format(
+                    dbname, sitename, page.title(), sitename, target.title(), target_id)
+                continue
+            if not page.isDisambig():
+                append_text += u"\n** {} – [[{}:{}]] – not a disambiguation".format(
+                    dbname, apisite.sitename(), page.title())
+
+        if append_text != '':
+            prep = '\n* [[%s]]' % item.title()
             if count > 0:
                 prep += ' (%s sitelink%s)' % (count, 's' if count > 1 else '')
             append_text = prep + append_text
-            pywikibot.output(append_text)
-            log_file.write(append_text.encode('utf8'))
+            self.addToFile(append_text)
 
-    if (datetime.datetime.now() - last_saved).total_seconds() > save_rate:
-        last_saved = save_file(log_page, last_saved)
+        self.checkSave()
 
-save_file(log_page, last_saved)
+def main(*args):
+    options = {}
+    for arg in pywikibot.handle_args(args):
+        if arg.startswith('-'):
+            arg, sep, value = arg.partition(':')
+            if value != '':
+                options[arg[1:]] = value if not value.isdigit() else int(value)
+            else:
+                options[arg[1:]] = True
 
-end = datetime.datetime.now()
+    QUERY = """SELECT DISTINCT ?item {
+  ?item wdt:P31 wd:Q4167410;
+        schema:dateModified ?date .
+} ORDER BY ?date LIMIT 1000""".replace('\n', ' ')
 
-pywikibot.output("Complete! Took %s seconds" % (end - start).total_seconds())
+    site = pywikibot.Site('wikidata', 'wikidata')
+
+    generator = pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site)
+
+    bot = DisambigsCheckingBot(site=site, generator=generator, **options)
+    bot.run()
+
+if __name__ == "__main__":
+    main()

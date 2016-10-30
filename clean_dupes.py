@@ -9,8 +9,8 @@ from scripts.wikidata import WikidataEntityBot
 
 class DupesMergingBot(WikidataEntityBot):
 
-    def __init__(self, site, **kwargs):
-        super(DupesMergingBot, self).__init__(site, **kwargs)
+    def __init__(self, **kwargs):
+        super(DupesMergingBot, self).__init__(**kwargs)
         self.__dupe_item = pywikibot.ItemPage(self.repo, 'Q17362920')
 
     def init_page(self, item):
@@ -159,9 +159,9 @@ def main(*args):
 
     site = pywikibot.Site('wikidata', 'wikidata')
 
-    options['generator'] = pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site)
+    generator = pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site)
 
-    bot = DupesMergingBot(site, **options)
+    bot = DupesMergingBot(site=site, generator=generator, **options)
     bot.run()
 
 if __name__ == "__main__":

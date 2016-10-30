@@ -1,15 +1,95 @@
 # -*- coding: utf-8  -*-
-import datetime
 import pywikibot
 
 from pywikibot import pagegenerators
 
-start = datetime.datetime.now()
+from scripts.captiontoimage import WikidataEntityBot
 
-site = pywikibot.Site('wikidata', 'wikidata')
-repo = site.data_repository()
+class UnitsFixingBot(WikidataEntityBot):
 
-QUERY = """SELECT DISTINCT ?item WHERE {
+    def __init__(self, **kwargs):
+        #self.availableOptions.update({})
+        super(UnitsFixingBot, self).__init__(**kwargs)
+        self.__good_item = pywikibot.ItemPage(self.repo, 'Q21027105')
+
+    def filterProperty(self, prop_page):
+        if prop_page.type != "quantity":
+            return False
+        prop_page.get()
+        if 'P2237' not in prop_page.claims.keys():
+            return False
+        for claim in prop_page.claims['P2237']:
+            if claim.snaktype == "novalue":
+                continue
+            if claim.snaktype == "value" and claim.target_equals(self.__good_item):
+                continue
+            return False
+        return True
+
+    def treat_page(self):
+        item = self.current_page
+        for prop, claims in item.claims.items():
+            for claim in claims:
+                if claim.type == "quantity":
+                    if self.checkProperty(prop):
+                        target = claim.getTarget()
+                        if self.changeTarget(target):
+                            pywikibot.output("Removing unit in %s for property %s" % (item.getID(), prop))
+                            self._save_page(item, self._save_entity, claim.changeTarget,
+                                            target, summary="removing invalid unit, see [[P:%s#P2237|property's page]]" % prop)
+                else:
+                    if prop not in self.bad_cache:
+                        self.bad_cache.append(prop)
+
+                data = {"claims":[claim.toJSON()]}
+                changed = False
+                for qprop, snaks in claim.qualifiers.items():
+                    if not self.checkProperty(qprop):
+                        continue
+                    data['claims'][0]['qualifiers'][qprop] = self.handleSnaks(snaks, changed)
+                    #pywikibot.output("Removing unit in %s for qualifier %s of %s" % (item.getID(), qprop, prop))
+
+                for i, source in enumerate(claim.sources):
+                    for ref_prop, snaks in source.items():
+                        if not self.checkProperty(ref_prop):
+                            continue
+                        data['claims'][0]['references'][i]['snaks'][ref_prop] = self.handleSnaks(snaks, changed)
+                        #pywikibot.output("Removing unit in %s for reference %s of %s" % (item.getID(), ref_prop, prop))
+
+                if changed is True:
+                    self._save_page(item, self._save_entity, item.editEntity,
+                                    data, summary="removing invalid unit(s)")
+
+    def changeTarget(self, target):
+        if target is None or target.unit == "1":
+            return False
+
+        target.unit = "1"
+        return True
+
+    def handleSnaks(self, snaks, changed):
+        data = []
+        for snak in snaks:
+            changed_target = False
+            target = snak.getTarget()
+            changed_target = self.changeTarget(target)
+            if changed_target is True:
+                snak.setTarget(target)
+                changed = True
+            data.append(snak.toJSON())
+        return data
+
+def main(*args):
+    options = {}
+    for arg in pywikibot.handle_args(args):
+        if arg.startswith('-'):
+            arg, sep, value = arg.partition(':')
+            if value != '':
+                options[arg[1:]] = value if not value.isdigit() else int(value)
+            else:
+                options[arg[1:]] = True
+
+    QUERY = """SELECT DISTINCT ?item WHERE {
   {
     ?pst rdf:type wdno:P2237 .
   } UNION {
@@ -38,103 +118,12 @@ QUERY = """SELECT DISTINCT ?item WHERE {
   FILTER(?unit != wd:Q199) .
 }""".replace('\n', ' ')
 
-bad_cache = []
-good_cache = []
-good_item = pywikibot.ItemPage(repo, 'Q21027105')
+    site = pywikibot.Site('wikidata', 'wikidata')
 
-def checkProp(prop):
-    prop_data = pywikibot.PropertyPage(repo, prop)
-    prop_data.get()
-    if prop_data.type != "quantity":
-        return False
-    if 'P2237' not in prop_data.claims.keys():
-        return False
-    for claim in prop_data.claims['P2237']:
-        if claim.snaktype == "novalue":
-            continue
-        if claim.snaktype == "value" and claim.target_equals(good_item):
-            continue
-        return False
-    return True
+    generator = pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site)
 
-for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
-    item.get()
-    for prop in item.claims.keys():
-        for claim in item.claims[prop]:
-            if claim.type != "quantity":
-                bad_cache.append(prop)
-            if prop not in bad_cache:
-                if prop not in good_cache:
-                    if checkProp(prop):
-                        good_cache.append(prop)
-                    else:
-                        bad_cache.append(prop)
+    bot = UnitsFixingBot(site=site, generator=generator, **options)
+    bot.run()
 
-                if prop in good_cache:
-                    target = claim.getTarget()
-                    if target is None:
-                        continue
-                    if target.unit == "1":
-                        continue
-                    target.unit = "1"
-                    pywikibot.output("Removing unit in %s for property %s" % (item.getID(), prop))
-                    claim.changeTarget(target, summary="removing invalid unit, see [[P:%s#P2237|property's page]]" % prop)
-
-            data = {"claims":[claim.toJSON()]}
-            changed = False
-            for qprop in claim.qualifiers.keys():
-                if qprop in bad_cache:
-                    continue
-                if qprop not in good_cache:
-                    if checkProp(qprop):
-                        good_cache.append(qprop)
-                    else:
-                        bad_cache.append(qprop)
-                        continue
-                i = -1
-                for snak in claim.qualifiers[qprop]:
-                    i += 1
-                    target = snak.getTarget()
-                    if target is None:
-                        continue
-                    if target.unit == "1":
-                        continue
-                    target.unit = "1"
-                    snak.setTarget(target)
-                    pywikibot.output("Removing unit in %s for qualifier %s of %s" % (item.getID(), qprop, prop))
-                    data['claims'][0]['qualifiers'][qprop][i] = snak.toJSON()
-                    changed = True
-
-            i = -1
-            for source in claim.sources:
-                i += 1
-                for ref_prop in source.keys():
-                    if ref_prop in bad_cache:
-                        continue
-                    if ref_prop not in good_cache:
-                        if checkProp(qprop):
-                            good_cache.append(qprop)
-                        else:
-                            bad_cache.append(qprop)
-                            continue
-
-                    j = -1
-                    for snak in source[ref_prop]:
-                        j += 1
-                        target = snak.getTarget()
-                        if target is None:
-                            continue
-                        if target.unit == "1":
-                            continue
-                        target.unit = "1"
-                        snak.setTarget(target)
-                        pywikibot.output("Removing unit in %s for reference %s of %s" % (item.getID(), ref_prop, prop))
-                        data['claims'][0]['references'][i]['snaks'][ref_prop][j] = snak.toJSON()
-                        changed = True
-
-            if changed is True:
-                item.editEntity(data, summary="removing invalid unit(s)")
-
-end = datetime.datetime.now()
-
-pywikibot.output("Complete! Took %s seconds" % (end - start).total_seconds())
+if __name__ == "__main__":
+    main()

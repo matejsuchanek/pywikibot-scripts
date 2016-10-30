@@ -85,7 +85,7 @@ def subject_item(item, textvalue):
                         "datavalue":{
                             "value":{
                                 u'entity-type':u'property',
-                                u'numeric-id':item.getID()[1:]
+                                u'numeric-id':item.getID(numeric=True)
                             },
                             "type":u"wikibase-entityid"
                         }
@@ -212,11 +212,11 @@ def example(item, textvalue):
                 imagelink = pywikibot.Link(qual_target, source=commons,
                                            defaultNamespace=6)
                 qual_target = pywikibot.FilePage(imagelink)
-                while qual_target.isRedirectPage():
-                    qual_target = pywikibot.FilePage(qual_target.getRedirectTarget())
                 if not qual_target.exists():
                     pywikibot.output(u'"%s" doesn\'t exist' % qual_target.title())
                     break
+                while qual_target.isRedirectPage():
+                    qual_target = pywikibot.FilePage(qual_target.getRedirectTarget())
             elif item.type == "quantity":
                 num = float(qual_target.replace(',', ''))
                 if num.is_integer():
@@ -280,7 +280,7 @@ for i in range(start, end + 1): # fixme: pagegenerators?
                 for param, value in fielddict.items():
                     if param == 'pattern':
                         regex = textlib.removeDisabledParts(value, include=['nowiki'])
-                        regex = re.sub(r'<\/?nowiki>', '', regex)
+                        regex = re.sub('</?nowiki>', '', regex)
                         claim = pywikibot.Claim(repo, 'P1793')
                         claim.setTarget(regex.strip())
                         try:

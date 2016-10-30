@@ -18,12 +18,12 @@ class CaptionToImageBot(WikidataEntityBot):
     caption_property = 'P2096'
     image_property = 'P18'
 
-    def __init__(self, site, **kwargs):
+    def __init__(self, **kwargs):
         self.availableOptions.update({
             'removeall': False
         })
         kwargs['bad_cache'] = [self.caption_property]
-        super(CaptionToImageBot, self).__init__(site, **kwargs)
+        super(CaptionToImageBot, self).__init__(**kwargs)
 
     def filterProperty(self, prop_page):
         return prop_page.type == "commonsMedia"
@@ -101,9 +101,9 @@ def main(*args):
 
     site = pywikibot.Site('wikidata', 'wikidata')
 
-    options['generator'] = pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site)
+    generator = pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site)
 
-    bot = CaptionToImageBot(site, **options)
+    bot = CaptionToImageBot(site=site, generator=generator, **options)
     bot.run()
 
 if __name__ == "__main__":

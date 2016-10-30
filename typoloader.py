@@ -99,7 +99,7 @@ class TypoRule(object):
         return cls(find, replacements, site, auto, query)
 
     def matches(self, text):
-        return re.search(self.find, text) is not None
+        return self.find.search(text) is not None
 
     def summary_hook(self, match, replaced):
         def underscores(string):

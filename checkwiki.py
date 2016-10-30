@@ -17,9 +17,9 @@ class CheckWiki(object):
         1: PrefixedTemplate,
         2: BrokenHTMLTag,
         7: LowHeadersLevel,
-        #8: MissingEquation, todo
+        8: MissingEquation,
         9: SingleLineCategories,
-        10: NoEndSquareBrackets,
+        #10: NoEndSquareBrackets,
         11: HTMLEntity,
         16: InvisibleChars,
         17: DuplicateCategory,
@@ -43,9 +43,13 @@ class CheckWiki(object):
         54: ListWithBreak,
         57: HeaderWithColon,
         59: ParameterWithBreak,
+        61: RefBeforePunctuation,
         63: SmallInsideTags,
         #75: BadListStructure, todo
+        80: BrokenExternalLink,
         81: DuplicateReferences,
+        85: EmptyTag,
+        86: ExternalLinkLikeInternal,
         88: DefaultsortSpace,
         89: DefaultsortComma,
         101: Ordinals,
@@ -140,8 +144,8 @@ class CheckWiki(object):
             self.cache[number] = error
         return self.cache[number]
 
-    def iter_errors(self, numbers=[], forFixes=False,
-                    instances=[], priorities=[], **kwargs):
+    def iter_errors(self, numbers=[], forFixes=False, instances=[],
+                    priorities=['*'], **kwargs):
         for num in self.errorMap.keys():
             if numbers and num not in numbers:
                 continue
@@ -171,6 +175,7 @@ class CheckWiki(object):
             if i > 0:
                 errors.insert(i, error)
                 continue
+
             new_text = error.apply(text, page)
             if new_text != text:
                 text = new_text
@@ -187,16 +192,13 @@ class CheckWiki(object):
 
 class CheckWikiBot(WikitextFixingBot, ExistingPageBot):
 
-    def __init__(self, site, numbers, **kwargs):
+    def __init__(self, numbers, **kwargs):
         kwargs['cw'] = False
-        limit = kwargs.pop('limit', 100) # todo: options?
-        super(CheckWikiBot, self).__init__(site, **kwargs)
-        self.checkwiki = CheckWiki(site, **kwargs)
+        limit = kwargs.pop('limit', 100) # fixme: options
+        super(CheckWikiBot, self).__init__(**kwargs)
+        self.checkwiki = CheckWiki(self.site, **kwargs)
         if self.generator is None:
             self.generator = self.checkwiki.loadErrors(limit, numbers=numbers)
-
-    def init_page(self, page):
-        page.get()
 
     def treat_page(self):
         page = self.current_page
@@ -232,9 +234,9 @@ def main(*args):
             elif arg.isdigit():
                 numbers.append(int(arg))
 
-    site = pywikibot.Site()
-    bot = CheckWikiBot(site, numbers=numbers,
-                       generator=genFactory.getCombinedGenerator(), **options)
+    generator = genFactory.getCombinedGenerator()
+
+    bot = CheckWikiBot(numbers, generator=generator, **options)
     bot.run()
 
 if __name__ == "__main__":
