@@ -5,9 +5,7 @@ import re
 
 from pywikibot import pagegenerators, textlib
 
-from pywikibot.bot import (
-    ExistingPageBot, NoRedirectPageBot
-)
+from pywikibot.bot import NoRedirectPageBot
 
 from scripts.wikitext import WikitextFixingBot
 
@@ -20,7 +18,7 @@ class RemoveParamException(Exception):
 class UnknownParamException(Exception):
     pass
 
-class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot):
+class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
 
     '''
     Bot to rename an infobox and its parameters
@@ -37,39 +35,11 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
     image_param = u'obrázek'
     size_param = u'velikost obrázku'
     all_params = [
-        u'titul před', u'jméno', 'titul za', image_param, size_param,
-        caption_param,
-
-        u'pořadí', u'úřad', 'od', 'do', 'spolu s', u'nastupující za',
-        'prezident', u'předsedkyně vlády', u'předseda vlády', u'kancléř',
-        u'předseda', u'guvernér', 'panovnice', u'panovník', u'generální guvernér',
-        'viceprezident', u'místopředseda vlády', 'poslanec', u'náměstek',
-        u'jmenující', u'spoluvládce', u'nastupující za', u'zástupce', u'protivník',
-        u'úřadující', u'předchůdce', u'nástupce', u'volební obvod', u'většina',
-        u'pořadí#',
-
-        'strana', u'těleso', u'kandidující za', u'těleso#',
-
-        u'datum narození', u'místo narození', u'datum úmrtí', u'místo úmrtí',
-        u'národnost', u'země', u'občanství', 'titul', 'kneset', u'choť',
-        'partner', 'partnerka', 'vztahy', u'rodiče', u'děti', u'příbuzní',
-        u'sídlo', 'alma mater', u'zaměstnání', 'profese', u'náboženství',
-        'podpis', 'popisek podpisu', 'web', u'ocenění',
-
-        u'přezdívka', u'sloužil', u'složka', u'doba služby', 'hodnost',
-        'jednotka', 'velel', 'bitvy', u'vyznamenání',
-
-        'commons', u'poznámky'
+        u'', image_param, size_param, caption_param,
     ]
-    rename_params = {
-        u'čestný titul': u'titul před',
-        u'čestný sufix': 'titul za',
-        u'manžel/ka': u'choť',
-        'website': 'web',
-        u'webová stránka': 'web',
-    }
-    old_params = ('width', 'height', u'malý obrázek', 'poslanec', 'velvyslanec')
-    remove_params = ('soud', u'období soudce')
+    rename_params = {}
+    old_params = ()
+    remove_params = ()
 
     def __init__(self, **kwargs):
         self.template = self.normalize(kwargs.pop('template'))
@@ -77,8 +47,7 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
         super(InfoboxMigratingBot, self).__init__(**kwargs)
 
     def normalize(self, template):
-        tmp, _, __ = template.replace('_', ' ').partition('<!--')
-        tmp = tmp.strip()
+        tmp = template.replace('_', ' ').partition('<!--')[0].strip()
         return tmp[0].upper() + tmp[1:]
 
     def treat_page(self):
@@ -98,7 +67,7 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
                         '|'.join(self.site.namespaces[10]),
                         re.escape(template)), text)
                 if not start_match:
-                    pywikibot.warning('Couldn\'t find the template')
+                    pywikibot.error('Couldn\'t find the template')
                     return
 
                 start = start_match.start()
@@ -111,28 +80,32 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
                     end += len(u'|%s=%s' % (name, value))
 
                     name = name.strip()
-                    value = value.strip()
+                    value = value.strip() #fixme: remove comments about old params
 
                     try:
                         new_name = self.handleParam(name)
                     except OldParamException:
-                        if textlib.removeDisabledParts(value, ['comments']).strip() != '':
+                        if textlib.removeDisabledParts(
+                            value, ['comments']).strip() != '':
                             old_params.append(
                                 (name, value)
                             )
                     except RemoveParamException:
                         changed = True
-                        if textlib.removeDisabledParts(value, ['comments']).strip() != '':
+                        if textlib.removeDisabledParts(
+                            value, ['comments']).strip() != '':
                             removed_params.append(
                                 (name, value)
                             )
                     except UnknownParamException:
-                        if textlib.removeDisabledParts(value, ['comments']).strip() != '':
+                        if textlib.removeDisabledParts(
+                            value, ['comments']).strip() != '':
                             unknown_params.append(
                                 (name, value)
                             )
                     except AssertionError:
-                        pywikibot.warning('Error during handling parameter "%s"' % name)
+                        pywikibot.warning('Error during handling '
+                                          'parameter "%s"' % name)
                         return
                     else:
                         new_params.append(
@@ -143,32 +116,40 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
 
                 end += len('}}')
 
-                if text[start:end].count('{{') != text[start:end].count('}}'):
-                    while text[start:end].count('{{') > text[start:end].count('}}'):
-                        end = text[:end].rindex('{{')
-                        end = text[:end].rindex('}}') + len('}}')
-                    while text[start:end].count('{{') < text[start:end].count('}}'):
-                        end = text[:end].rindex('}}') + len('}}')
+                while text[start:end].count('{{') < text[start:end].count('}}'):
+                    end = text[:end].rindex('}}') + len('}}')
 
-                else:
-                    if not text[start:end].endswith('}}'):
-                        end = text[:end].rindex('}}') + len('}}')
+                if text[start:end].count('{{') > text[start:end].count('}}'):
+                    ballance = 1
+                    index = start + len('{{')
+                    while ballance > 0:
+                        next_open = text.index('{{', index)
+                        next_close = text.index('}}', index)
+                        if next_open < next_close:
+                            ballance += 1
+                        else:
+                            ballance -= 1
+                        index = min(next_open, next_close) + len('{}')
+                    end = index + len('}}')
+
+                if not text[start:end].endswith('}}'):
+                    end = text[:end].rindex('}}') + len('}}')
 
                 if (end < start or not text[start:end].endswith('}}') or
                     text[start:end].count('{{') != text[start:end].count('}}')):
-                    pywikibot.warning('Couldn\'t parse the template')
+                    pywikibot.error('Couldn\'t parse the template')
                     return
                 break
 
         else:
-            pywikibot.warning('Couldn\'t parse the template')
+            pywikibot.error('Couldn\'t parse the template')
             return
 
         if not changed:
             pywikibot.output('No parameters changed')
             return
 
-        while text[end].isspace():
+        while end < len(text) and text[end].isspace():
             end += 1
 
         space_before = ''
@@ -176,7 +157,7 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
         for line in text[start:end].splitlines():
             if re.match(' *\|', line): # fixme: nested templates
                 lines.append(line)
-        if len(lines) and random.choice(lines).startswith(' '):
+        if len(lines) > 0 and random.choice(lines).startswith(' '):
             space_before = ' '
 
         self.handleParams(new_params, old_params, removed_params, unknown_params)
@@ -239,6 +220,9 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
         return re.match('(.+?)([0-9]+)$', text).groups()
 
     def handleParam(self, name):
+        if name == '':
+            raise UnknownParamException
+
         name = name.replace('_', ' ')
         if name in self.rename_params:
             name = self.rename_params[name]
@@ -284,80 +268,21 @@ class InfoboxMigratingBot(WikitextFixingBot, ExistingPageBot, NoRedirectPageBot)
             #if key in params: ...
             params[key] = value
 
-        if self.size_param in params:
-            if 'width' in params:
-                old.remove(
-                    ('width', params['width'])
-                )
-            if 'heigth' in params:
-                old.remove(
-                    ('heigth', params['heigth'])
-                )
-        else:
-            if 'width' in params or 'heigth' in params:
-                width = params['width'] if 'width' in params else '225'
-                height = params['heigth'] if 'heigth' in params else '250px'
-                new.append(
-                    (self.size_param, u'%sx%s' % (width, height))
-                )
-
         if self.image_param in params:
             if self.caption_param not in params:
                 new.append(
                     (self.caption_param, '')
                 )
-            if '_' in params[self.image_param]:
-                new.remove(
-                    (self.image_param, params[self.image_param])
-                )
-                new.append(
-                    (self.image_param, params[self.image_param].replace('_', ' '))
-                )
 
-        if any(x in params for x in (
-            'soud', 'soud1', u'období soudce', u'období soudce1')):
-            if 'profese' in params:
-                if 'soudce' not in params['profese'].lower():
-                    before, conj, after = params['profese'].rpartition(' a ')
-                    new.remove(
-                        ('profese', params['profese'])
-                    )
-                    if conj:
-                        new.append(
-                            ('profese', u'%s, %s a [[soudce]]' % (before, after))
-                        )
-                    else:
-                        new.append(
-                            ('profese', u'%s a [[soudce]]' % before)
-                        )
-
-        if 'strana' in params and u'těleso' not in params and\
-           any(x in params['strana'] for x in [
-               u'nestraník', u'nezávislý', u'bezpartijní', u'bez politické']):
-            new.extend(
-                [(u'těleso', ''), (u'kandidující za', '')]
+            new.remove(
+                (self.image_param, params[self.image_param])
             )
-
-##        if u'jméno' in params:
-##            before, title, after = params[u'jméno'].partition(self.current_page.title())
-##            if after:
-##                new.remove(
-##                    (u'jméno', params[u'jméno'])
-##                )
-##                new.append(
-##                    (u'jméno', title + after)
-##                )
-##                if u'titul před' in params:
-##                    new.remove(
-##                        (u'titul před', params[u'titul před'])
-##                    )
-##                    new.append(
-##                        (u'titul před', params[u'titul před'] + ' ' + before.strip())
-##                    )
-##                else:
-##                    new.append(
-##                        (u'titul před', before.strip())
-##                    )
+            image = pywikibot.page.url2unicode(params[self.image_param])
+            image = re.sub('_+', ' ', image)
+            image = re.sub(' +', ' ', image).strip()
+            new.append(
+                (self.image_param, image)
+            )
 
 def main(*args):
     options = {}
@@ -376,7 +301,10 @@ def main(*args):
         options['template'] = pywikibot.input(
             'Type the template you would like to work on:')
         options['new_template'] = pywikibot.input(
-            'Type the template to replace the previous one:') or options['template']
+            'Type the template to replace the previous one:')
+
+    if not options.get('new_template', None):
+        options['new_template'] = options['template']
 
     generator = genFactory.getCombinedGenerator()
     if not generator:

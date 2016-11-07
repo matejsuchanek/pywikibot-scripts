@@ -9,11 +9,13 @@ from scripts.wikidata import WikidataEntityBot
 
 class DupesMergingBot(WikidataEntityBot):
 
-    def __init__(self, **kwargs):
+    def __init__(self, offset=0, **kwargs):
         super(DupesMergingBot, self).__init__(**kwargs)
         self.__dupe_item = pywikibot.ItemPage(self.repo, 'Q17362920')
+        self.offset = offset
 
     def init_page(self, item):
+        self.offset += 1
         super(DupesMergingBot, self).init_page(item)
         if 'P31' not in item.claims:
             raise SkipPageError(
@@ -128,9 +130,14 @@ class DupesMergingBot(WikidataEntityBot):
 
         self._save_page(item, self._save_entity, item.mergeInto, target,
                         ignore_conflicts=("description"))
+        self.offset -= 1
 
     def redirectsTo(self, page, target):
-        return page.isRedirectPage() and page.getRedirectTarget().title() == target.title()
+        return page.isRedirectPage() and page.getRedirectTarget() == target
+
+    def exit(self):
+        super(DupesMergingBot, self).exit()
+        pywikibot.output("\nCurrent offset: %s\n" % self.offset)
 
 def main(*args):
     options = {}
@@ -155,7 +162,7 @@ def main(*args):
     ?target wdt:P31/wdt:P279* wd:Q16521 .
   } .
   ?item schema:dateModified ?mod .
-} ORDER BY ?mod""".replace('\n', ' ')
+} ORDER BY ?mod OFFSET %s""".replace('\n', ' ') % options.get('offset', 0)
 
     site = pywikibot.Site('wikidata', 'wikidata')
 

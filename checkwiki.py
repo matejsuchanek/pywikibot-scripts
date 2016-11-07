@@ -4,8 +4,6 @@ import re
 
 from pywikibot import pagegenerators
 
-from pywikibot.bot import ExistingPageBot
-
 from scripts.checkwiki_errors import *
 from scripts.wikitext import WikitextFixingBot
 
@@ -24,15 +22,17 @@ class CheckWiki(object):
         16: InvisibleChars,
         17: DuplicateCategory,
         18: LowerCaseCategory,
+        19: SingleEquationHeader,
         20: Dagger,
         21: EnglishCategory,
         22: CategoryWithSpace,
         25: HeaderHierarchy,
         26: Bold,
+        #27: Unicode,
         32: MultiplePipes,
         34: MagicWords,
         38: Italics,
-        #42: StrikedText, todo
+        42: StrikedText,
         44: BoldHeader,
         48: SelfLink,
         49: HTMLHeader,
@@ -45,7 +45,8 @@ class CheckWiki(object):
         59: ParameterWithBreak,
         61: RefBeforePunctuation,
         63: SmallInsideTags,
-        #75: BadListStructure, todo
+        #75: BadListStructure,
+        #76: NoSpace,
         80: BrokenExternalLink,
         81: DuplicateReferences,
         85: EmptyTag,
@@ -65,16 +66,22 @@ class CheckWiki(object):
 
     def __init__(self, site, **kwargs):
         self.site = site
-        self.cache = {}
-        self.loadSettings()
+        self.__cache = {}
         self.auto = kwargs.pop('auto', True)
+        self.loadSettings() # todo: remove when unneccessary
 
     def purge(self):
-        self.cache = {}
+        self.__cache = {}
+
+    @property
+    def settings(self):
+        if not hasattr(self, '_settings'):
+            self.loadSettings()
+        return self._settings
 
     def loadSettings(self):
         pywikibot.output('Loading CheckWiki settings')
-        self.settings = {
+        self._settings = {
             'priority': {
                 'high': [],
                 'medium': [],
@@ -129,20 +136,19 @@ class CheckWiki(object):
                 continue
             if split[2] == 'prio':
                 if text in self.prio_map:
-                    self.settings['priority'][self.prio_map[text]].append(num)
+                    self._settings['priority'][self.prio_map[text]].append(num)
                     i += 1
             elif split[2] == 'whitelistpage':
-                self.settings['whitelists'][num] = text
+                self._settings['whitelists'][num] = text
 
-        self.settings['project'] = project
+        self._settings['project'] = project
         pywikibot.output(u'%s CheckWiki errors recognized' % i)
 
     def getError(self, number):
-        if number not in self.cache:
-            error = self.errorMap[number](self.site, self.settings,
-                                          auto=self.auto)
-            self.cache[number] = error
-        return self.cache[number]
+        if number not in self.__cache:
+            error = self.errorMap[number](self)
+            self.__cache[number] = error
+        return self.__cache[number]
 
     def iter_errors(self, numbers=[], forFixes=False, instances=[],
                     priorities=['*'], **kwargs):
@@ -170,8 +176,8 @@ class CheckWiki(object):
                 continue
 
             numbers = list(map(lambda e: e.number, errors))
-            needsFirst = error.needsFirst()
-            i = max([numbers.index(num) for num in needsFirst if num in numbers] + [0])
+            i = max([numbers.index(num) for num in error.needsFirst
+                     if num in numbers] + [0])
             if i > 0:
                 errors.insert(i, error)
                 continue
@@ -190,7 +196,7 @@ class CheckWiki(object):
         for error in self.iter_errors(numbers=numbers):
             error.markFixed(page)
 
-class CheckWikiBot(WikitextFixingBot, ExistingPageBot):
+class CheckWikiBot(WikitextFixingBot):
 
     def __init__(self, numbers, **kwargs):
         kwargs['cw'] = False

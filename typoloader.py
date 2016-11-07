@@ -3,8 +3,7 @@ import pywikibot
 import re
 import time
 
-from pywikibot import pagegenerators
-from pywikibot import textlib
+from pywikibot import pagegenerators, textlib
 
 from pywikibot.tools.formatter import color_format
 
@@ -35,7 +34,7 @@ class TypoRule(object):
                    re.compile(u'„[^“]+“'), # quotation marks
                    re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1).)+\1", # italics
                               re.M | re.U),
-                   re.compile(r'www\.[^\s]+')]
+                   re.compile(r'\b[A-za-z]+\.[a-z]{2}')] # url fragment
 
     def __init__(self, find, replacements, site, auto=False, query=None):
         self.find = find
@@ -44,6 +43,10 @@ class TypoRule(object):
         self.auto = auto
         self.query = query
         self.longest = 0
+
+## TODO
+##    def __repr__(self):
+##        pass
 
     def needsDecision(self):
         return not self.auto or len(self.replacements) > 1
@@ -109,7 +112,7 @@ class TypoRule(object):
                 string = string[:-1] + '_'
             return string
 
-        new = old = match.group(0)
+        new = old = match.group()
         if self.needsDecision():
             options = [('keep', 'k')]
             replacements = []
@@ -122,8 +125,8 @@ class TypoRule(object):
             text = match.string
             pre = text[max(0, match.start() - 30):match.start()]
             post = text[match.end():match.end() + 30]
-            while "\n" in pre:
-                pre = pre[pre.index("\n") + 1:]
+            if "\n" in pre:
+                pre = pre[pre.rindex("\n") + 1:]
             if "\n" in post:
                 post = post[:post.index("\n")]
             pywikibot.output(
@@ -139,7 +142,8 @@ class TypoRule(object):
                 pywikibot.warning(u'No replacement done in string "%s"' % old)
 
         if old != new:
-            fragment = u' → '.join([underscores(re.sub('\n', r'\\n', i)) for i in [old, new]])
+            fragment = u' → '.join([underscores(re.sub('\n', r'\\n', i))
+                                    for i in [old, new]])
             if fragment.lower() not in [i.lower() for i in replaced]:
                 replaced.append(fragment)
         return new
@@ -147,12 +151,12 @@ class TypoRule(object):
     def apply(self, text, replaced=[]):
         hook = lambda match: self.summary_hook(match, replaced)
         start = time.clock()
-        text = textlib.replaceExcept(text, self.find, hook, self.exceptions,
-                                     self.site)
+        text = textlib.replaceExcept(
+            text, self.find, hook, self.exceptions, self.site)
         finish = time.clock()
         delta = finish - start
         self.longest = max(delta, self.longest)
-        if delta > 3:
+        if delta > 5:
             pywikibot.warning('Slow typo rule "%s"' % self.find.pattern)
         return text
 
@@ -160,11 +164,11 @@ class TyposLoader(object):
 
     '''Class loading and holding typo rules'''
 
-    def __init__(self, site, **kwargs):
+    def __init__(self, site, allrules=False, **kwargs):
         self.site = site
         self.typos_page_name = kwargs.pop('typospage', None)
         self.whitelist_page_name = kwargs.pop('whitelistpage', None)
-        self.load_all = kwargs.pop('allrules', False)
+        self.load_all = allrules
 
     def getWhitelistPage(self):
         if self.whitelist_page_name is None:
@@ -180,6 +184,7 @@ class TyposLoader(object):
             self.typos_page_name = u'Wikipedie:WPCleaner/Typo'
         typos_page = pywikibot.Page(self.site, self.typos_page_name)
         if not typos_page.exists():
+            # todo: feedback
             return
 
         content = typos_page.get()
@@ -193,7 +198,8 @@ class TyposLoader(object):
                     pywikibot.warning(exc.message)
                 except InvalidExpressionException as exc:
                     if 'fixed-width' not in exc.message:
-                        pywikibot.warning(u'Invalid %s %s: %s' % (exc.aspect, fielddict['1'], exc.message))
+                        pywikibot.warning(u'Invalid %s %s: %s' % (
+                            exc.aspect, fielddict['1'], exc.message))
                 else:
                     if load_all or not rule.needsDecision():
                         self.typoRules.append(rule)
