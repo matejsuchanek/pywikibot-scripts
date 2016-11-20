@@ -28,27 +28,38 @@ class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
     * marks old/unknown parameters and removes those that are empty
     * provides access to all parameters and allows addding/changing/removing them
     * sorts parameters
-    * fixes whitespace "| param = value"
+    * fixes whitespace to "| param = value"
     '''
 
+    alt_param = 'alt'
     caption_param = 'popisek'
     image_param = u'obrázek'
-    size_param = u'velikost obrázku'
-    all_params = [
-        u'', image_param, size_param, caption_param,
-    ]
+    image_size_param = u'velikost obrázku'
+    latitude = u'zeměpisná šířka'
+    longitude = u'zeměpisná délka'
+
+    summary = u'sjednocení infoboxu'
+
+    all_params = []
     rename_params = {}
     old_params = ()
     remove_params = ()
 
-    def __init__(self, **kwargs):
-        self.template = self.normalize(kwargs.pop('template'))
-        self.new_template = self.normalize(kwargs.pop('new_template'))
+    def __init__(self, template, new_template, offset=0, **kwargs):
+        self.template = self.normalize(template)
+        self.new_template = self.normalize(new_template)
+        self.start_offset = offset
+        self.offset = 0
         super(InfoboxMigratingBot, self).__init__(**kwargs)
 
     def normalize(self, template):
         tmp = template.replace('_', ' ').partition('<!--')[0].strip()
         return tmp[0].upper() + tmp[1:]
+
+    def treat(self, page):
+        self.offset += 1
+        if self.offset > self.start_offset:
+            super(InfoboxMigratingBot, self).treat(page)
 
     def treat_page(self):
         page = self.current_page
@@ -58,88 +69,88 @@ class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
         old_params = []
         unknown_params = []
         removed_params = []
-        changed = self.template != self.new_template
+        changed = False
         for template, fielddict in textlib.extract_templates_and_params(
             text, remove_disabled_parts=False, strip=False): # todo: support multiple boxes
-            if self.normalize(template) == self.template:
-                start_match = re.search(
-                    r'\{\{\s*((%s)\s*:\s*)?%s\s*' % (
-                        '|'.join(self.site.namespaces[10]),
-                        re.escape(template)), text)
-                if not start_match:
-                    pywikibot.error('Couldn\'t find the template')
-                    return
+            if self.normalize(template) not in [self.template,
+                                                self.new_template]:
+                continue
 
-                start = start_match.start()
-                if len(fielddict) > 0:
-                    end = text.index('|', start)
-                else:
-                    end = text.index('}}', start)
+            changed = self.normalize(template) != self.new_template
+            start_match = re.search(r'\{\{\s*((%s)\s*:\s*)?%s\s*' % (
+                '|'.join(self.site.namespaces[10]), re.escape(template)), text)
+            if not start_match:
+                pywikibot.error('Couldn\'t find the template')
+                return
 
-                for name, value in fielddict.items():
-                    end += len(u'|%s=%s' % (name, value))
+            start = start_match.start()
+            if len(fielddict) > 0:
+                end = text.index('|', start)
+            else:
+                end = text.index('}}', start)
 
-                    name = name.strip()
-                    value = value.strip() #fixme: remove comments about old params
+            for name, value in fielddict.items():
+                end += len(u'|%s=%s' % (name, value))
 
-                    try:
-                        new_name = self.handleParam(name)
-                    except OldParamException:
-                        if textlib.removeDisabledParts(
-                            value, ['comments']).strip() != '':
-                            old_params.append(
-                                (name, value)
-                            )
-                    except RemoveParamException:
-                        changed = True
-                        if textlib.removeDisabledParts(
-                            value, ['comments']).strip() != '':
-                            removed_params.append(
-                                (name, value)
-                            )
-                    except UnknownParamException:
-                        if textlib.removeDisabledParts(
-                            value, ['comments']).strip() != '':
-                            unknown_params.append(
-                                (name, value)
-                            )
-                    except AssertionError:
-                        pywikibot.warning('Error during handling '
-                                          'parameter "%s"' % name)
-                        return
-                    else:
-                        new_params.append(
-                            (new_name, value)
+                name = name.strip()
+                value = (value
+                         .replace(u'\n<!-- Zastaralé parametry -->', '')
+                         .replace(u'\n<!-- Neznámé parametry -->', '')
+                         .strip())
+
+                try:
+                    new_name = self.handleParam(name)
+                except OldParamException:
+                    if textlib.removeDisabledParts(
+                        value, ['comments']).strip() != '':
+                        old_params.append(
+                            (name, value)
                         )
-                        if new_name != name:
-                            changed = True
-
-                end += len('}}')
-
-                while text[start:end].count('{{') < text[start:end].count('}}'):
-                    end = text[:end].rindex('}}') + len('}}')
-
-                if text[start:end].count('{{') > text[start:end].count('}}'):
-                    ballance = 1
-                    index = start + len('{{')
-                    while ballance > 0:
-                        next_open = text.index('{{', index)
-                        next_close = text.index('}}', index)
-                        if next_open < next_close:
-                            ballance += 1
-                        else:
-                            ballance -= 1
-                        index = min(next_open, next_close) + len('{}')
-                    end = index + len('}}')
-
-                if not text[start:end].endswith('}}'):
-                    end = text[:end].rindex('}}') + len('}}')
-
-                if (end < start or not text[start:end].endswith('}}') or
-                    text[start:end].count('{{') != text[start:end].count('}}')):
-                    pywikibot.error('Couldn\'t parse the template')
+                except RemoveParamException:
+                    changed = True
+                    if textlib.removeDisabledParts(
+                        value, ['comments']).strip() != '':
+                        removed_params.append(
+                            (name, value)
+                        )
+                except UnknownParamException:
+                    if textlib.removeDisabledParts(
+                        value, ['comments']).strip() != '':
+                        unknown_params.append(
+                            (name, value)
+                        )
+                except AssertionError:
+                    pywikibot.error(
+                        'Couldn\'t handle parameter "%s"' % name)
                     return
-                break
+                else:
+                    new_params.append(
+                        (new_name, value)
+                    )
+                    if new_name != name:
+                        changed = True
+
+            end += len('}}')
+
+            while text[start:end].count('{{') < text[start:end].count('}}'):
+                end = text[:end].rindex('}}') + len('}}')
+
+            if text[start:end].count('{{') > text[start:end].count('}}'):
+                ballance = 1
+                end = start
+                while ballance > 0:
+                    next_close = text.index('}}', end)
+                    ballance += text[end:next_close].count('{{') - 1
+                    end = next_close + len('}}')
+
+            if not text[start:end].endswith('}}'): # elif?
+                end = text[:end].rindex('}}') + len('}}')
+
+            if (end < start or not text[start:end].endswith('}}') or
+                text[start:end].count('{{') != text[start:end].count('}}')):
+                pywikibot.error('Couldn\'t parse the template')
+                return
+            break
 
         else:
             pywikibot.error('Couldn\'t parse the template')
@@ -149,14 +160,12 @@ class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
             pywikibot.output('No parameters changed')
             return
 
-        while end < len(text) and text[end].isspace():
+        while end < len(text) and text[end].isspace(): # todo: before
             end += 1
 
         space_before = ''
-        lines = []
-        for line in text[start:end].splitlines():
-            if re.match(' *\|', line): # fixme: nested templates
-                lines.append(line)
+        lines = [line for line in text[start:end].splitlines()
+                 if re.match(' *\|', line)] # fixme: nested templates
         if len(lines) > 0 and random.choice(lines).startswith(' '):
             space_before = ' '
 
@@ -184,8 +193,7 @@ class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
         page.text = text[:start] + new_template + text[end:]
         if self.getOption('always') is not True:
             pywikibot.showDiff(text, page.text)
-        self._save_page(page, self.fix_wikitext, page,
-                        summary=u'sjednocení infoboxu')
+        self._save_page(page, self.fix_wikitext, page, summary=self.summary)
 
     def keyForSort(self, value):
         name = value[0]
@@ -226,7 +234,7 @@ class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
         name = name.replace('_', ' ')
         if name in self.rename_params:
             name = self.rename_params[name]
-            assert name in self.all_params
+            #fixme: assert name in self.all_params
 
         if name in self.all_params:
             return name
@@ -264,38 +272,45 @@ class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
     def handleParams(self, new, old, removed, unknown):
         # fixme: list of tuples is too complicated
         params = {}
-        for key, value in new + old + removed + unknown:
-            #if key in params: ...
+        for key, value in new:# old + removed + unknown:
+            # todo: if key in params: ...
             params[key] = value
 
-        if self.image_param in params:
+        if self.image_param in params: # todo: decompose from link
             if self.caption_param not in params:
                 new.append(
                     (self.caption_param, '')
                 )
+                params[self.caption_param] = ''
 
             new.remove(
                 (self.image_param, params[self.image_param])
             )
             image = pywikibot.page.url2unicode(params[self.image_param])
-            image = re.sub('_+', ' ', image)
-            image = re.sub(' +', ' ', image).strip()
+            image = re.sub('[ _]+', ' ', image).strip()
             new.append(
                 (self.image_param, image)
             )
+            params[self.image_param] = image
 
-def main(*args):
+    def exit(self):
+        super(InfoboxMigratingBot, self).exit()
+        pywikibot.output("Current offset: %s" % self.offset)
+
+# TODO: prepare for extending
+def main(*args): # bot_class=InfoboxMigratingBot
     options = {}
     local_args = pywikibot.handle_args(args)
     genFactory = pagegenerators.GeneratorFactory()
     for arg in local_args:
-        if not genFactory.handleArg(arg):
-            if arg.startswith('-'):
-                arg, sep, value = arg.partition(':')
-                if value != '':
-                    options[arg[1:]] = value if not value.isdigit() else int(value)
-                else:
-                    options[arg[1:]] = True
+        if genFactory.handleArg(arg):
+            continue
+        if arg.startswith('-'):
+            arg, sep, value = arg.partition(':')
+            if value != '':
+                options[arg[1:]] = value if not value.isdigit() else int(value)
+            else:
+                options[arg[1:]] = True
 
     while not options.get('template', None):
         options['template'] = pywikibot.input(
@@ -311,7 +326,7 @@ def main(*args):
         genFactory.handleArg(u'-transcludes:%s' % options['template'])
         generator = genFactory.getCombinedGenerator()
 
-    bot = InfoboxMigratingBot(generator=generator, **options)
+    bot = InfoboxMigratingBot(generator=generator, **options) # bot_class
     bot.run()
 
 if __name__ == "__main__":

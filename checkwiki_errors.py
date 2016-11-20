@@ -56,7 +56,7 @@ class CheckWikiError(object):
 
     def apply(self, text, page):
         return textlib.replaceExcept(text, self.pattern(), self.replacement,
-                                     self.exceptions, page.site)
+                                     self.exceptions, site=page.site)
 
     def isForFixes(self): # todo: per subclass
         return hasattr(self, 'pattern') and hasattr(self, 'replacement')
@@ -631,7 +631,7 @@ class SelfLink(CheckWikiError):
         title = page.title()
         return textlib.replaceExcept(
             text, r"(?P<before>''')?\[\[(?P<inside>[^]]+)\]\](?P<after>''')?",
-            lambda m: self.replacement(m, title), exceptions, page.site)
+            lambda m: self.replacement(m, title), exceptions, site=page.site)
 
 class HTMLHeader(CCHandledError):
 
@@ -806,42 +806,58 @@ class SmallInsideTags(CheckWikiError):
             tag=match.group('tag'), content=content,
             params=match.group('params') or '')
 
-class BadListStructure(CheckWikiError): # TODO
+class BadListStructure(CheckWikiError): # todo
 
     list_chars = ':*#'
     number = 75
     summary = u'oprava odsazení seznamu'
 
+    def replace(self, match, levels):
+        line = match.group()
+        if not any(line.startswith(char) for char in self.list_chars):
+            levels[:] = ['']
+            return line
+
+        this, rest = re.match('([%s]+)(.*)$' % self.list_chars, line).groups()
+
+        for old, new in levels[1:]:
+            if this.startswith(old):
+                this = new + this[len(old):]
+
+        for pair in set(levels[1:]): # move above?
+            if len(this) < len(pair[1]):
+                levels.remove(pair)
+
+        prev = levels[0]
+        if len(this) >= len(prev): # this needs todo
+            if not this.startswith(prev):
+                if len(this) == len(prev):
+                    levels.append(
+                        (this, prev + this[-1])
+                    )
+                    this = prev + this[-1]
+                else:
+                    levels.append(
+                        (this, prev + this[len(prev):])
+                    )
+                    this = prev + this[len(prev):]
+
+            if len(this) - len(prev) > 1:
+                levels.append(
+                    (this, prev + this[-1])
+                )
+                this = prev + this[-1]
+
+        levels[0] = this
+
+        return this + rest
+
     def apply(self, text, page):
-        step = ''
-        prep = ''
-        trunc = 0
-        lines = text.splitlines()
-        for i, line in enumerate(lines):
-            if not any(line.startswith(char) for char in self.list_chars):
-                step = ''
-                prep = ''
-                to_left = 0
-                continue
-
-            level = re.match('[%s]+' % self.list_chars, line).group()
-            if trunc > len(level):
-                pass
-            elif len(level) - len(step) > 1:
-                trunc = len(level) - len(step) - 1
-
-            if len(level) > len(step):
-                step = level = step + level[-1]
-                to_left = 0
-            elif len(level) == len(step):
-                level = step
-            else:
-                step = level = step[:len(level)]
-                to_left = 0
-
-            lines[i] = level + line[len(level):]
-
-        return '\n'.join(lines)
+        levels = ['']
+        regex = re.compile('^.*$', re.M)
+        return textlib.replaceExcept(
+            text, regex, lambda match: self.replace(match, levels),
+            self.exceptions[:], site=self.site)
 
 class NoSpace(CheckWikiError): # todo
 
@@ -871,6 +887,8 @@ class BrokenExternalLink(CheckWikiError): # todo
 
 class DuplicateReferences(CheckWikiError):
 
+    # fixme: we don't know what this could cause
+    exceptions = CheckWikiError.exceptions[:] + ['references']
     needsFirst = [104]
     number = 81
     summary = u'oprava duplicitních referencí'
@@ -1067,6 +1085,18 @@ class DefaultsortComma(DefaultsortError):
             return '{{%s%s}}' % (magic, ', '.join(x.strip() for x in split))
 
         return match.group()
+
+class DoubleHttp(CheckWikiError):
+
+    exceptions = list(set(CheckWikiError.exceptions) - set(['startspace']))
+    number = 93
+    summary = u'oprava externího odkazu'
+
+    def pattern(self):
+        return re.compile('(?:https?:*/*){2,}')
+
+    def replacement(self, match):
+        return match.group()[match.group().rfind('http'):]
 
 class Ordinals(CheckWikiError):
 

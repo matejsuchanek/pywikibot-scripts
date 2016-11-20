@@ -181,13 +181,14 @@ def main(*args):
     genFactory = pagegenerators.GeneratorFactory()
     genFactory.handleArg('-ns:0')
     for arg in local_args:
-        if not genFactory.handleArg(arg):
-            if arg.startswith('-'):
-                arg, sep, value = arg.partition(':')
-                if value != '':
-                    options[arg[1:]] = value if not value.isdigit() else int(value)
-                else:
-                    options[arg[1:]] = True
+        if genFactory.handleArg(arg):
+            continue
+        if arg.startswith('-'):
+            arg, sep, value = arg.partition(':')
+            if value != '':
+                options[arg[1:]] = value if not value.isdigit() else int(value)
+            else:
+                options[arg[1:]] = True
 
     bot = TypoBot(genFactory, **options)
     bot.run()

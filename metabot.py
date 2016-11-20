@@ -76,29 +76,10 @@ def subject_item(item, textvalue):
         item.get(True)
 
         rev_id = item.latest_revision_id
-        data = { # FIXME: T113174
-            "claims":[
-                {
-                    "mainsnak":{
-                        "snaktype":"value",
-                        "property":"P1687",
-                        "datavalue":{
-                            "value":{
-                                u'entity-type':u'property',
-                                u'numeric-id':item.getID(numeric=True)
-                            },
-                            "type":u"wikibase-entityid"
-                        }
-                    },
-                    "type":"statement",
-                    "rank":"normal"
-                }
-            ]
-        }
-        #inverse_claim = pywikibot.Claim(repo, u'P1687')
-        #target = pywikibot.PropertyPage(repo, item.title())
-        #inverse_claim.setTarget(target)
-        target.editEntity(data, summary=u"Adding inverse to an [[Special:Diff/%s#P1629|imported claim]]" % rev_id)
+        inverse_claim = pywikibot.Claim(repo, 'P1687')
+        inverse_claim.setTarget(item)
+        target.addClaim(inverse_claim, summary=u"Adding inverse to an "
+                        "[[Special:Diff/%s#P1629|imported claim]]" % rev_id)
 
 def source(item, textvalue):
     for match in re.split(regexes['split'], textvalue):

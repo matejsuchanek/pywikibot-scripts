@@ -24,7 +24,7 @@ class TypoRule(object):
 
     exceptions = ['category', 'comment', 'gallery', 'header', 'hyperlink',
                   'interwiki', 'invoke', 'pre', 'property', 'source',
-                  'startspace', 'template']
+                  'startspace', 'template'] # todo: remove 'template' or 'startspace'
     # tags
     exceptions += ['ce', 'code', 'graph', 'imagemap', 'mapframe', 'maplink',
                    'math', 'nowiki', 'poem', 'score', 'section', 'timeline']
@@ -152,12 +152,13 @@ class TypoRule(object):
         hook = lambda match: self.summary_hook(match, replaced)
         start = time.clock()
         text = textlib.replaceExcept(
-            text, self.find, hook, self.exceptions, self.site)
+            text, self.find, hook, self.exceptions, site=self.site)
         finish = time.clock()
         delta = finish - start
         self.longest = max(delta, self.longest)
         if delta > 5:
-            pywikibot.warning('Slow typo rule "%s"' % self.find.pattern)
+            pywikibot.warning(u'Slow typo rule "%s" (%s)' % (
+                self.find.pattern, delta))
         return text
 
 class TyposLoader(object):

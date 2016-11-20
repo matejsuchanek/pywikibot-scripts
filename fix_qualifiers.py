@@ -1,23 +1,100 @@
 # -*- coding: utf-8  -*-
-import datetime
 import pywikibot
 
 from pywikibot import pagegenerators
 
-start = datetime.datetime.now()
+from scripts.wikidata import WikidataEntityBot
 
-site = pywikibot.Site('wikidata', 'wikidata')
-repo = site.data_repository()
+class QualifiersFixingBot(WikidataEntityBot):
 
-bad_cache = ['P143', 'P248', 'P405', 'P459', 'P518', 'P574', 'P577', 'P805', 'P972', 'P1135', 'P1480', 'P1545', 'P1932', 'P2701']
-good_cache = ['P17', 'P21', 'P155', 'P156', 'P281', 'P580', 'P582', 'P585', 'P669', 'P969', 'P1355', 'P1356']
+    blacklist = set(['P143', 'P248', 'P459', 'P518', 'P577', 'P805', 'P972',
+                     'P1065', 'P1135', 'P1480', 'P1545', 'P1932', 'P2315',
+                     'P2701', ])
+    whitelist = set(['P17', 'P21', 'P155', 'P156', 'P281', 'P580', 'P582',
+                     'P585', 'P669', 'P708', 'P969', 'P1355', 'P1356', ])
+    good_item_id = 'Q15720608'
 
-good_item = pywikibot.ItemPage(repo, 'Q15720608')
+    def __init__(self, **kwargs):
+        kwargs.update({
+            'bad_cache': kwargs.get('bad_cache', []) + list(self.blacklist),
+            'good_cache': kwargs.get('good_cache', []) + list(self.whitelist),
+        })
+        super(QualifiersFixingBot, self).__init__(**kwargs)
+        self.__good_item = pywikibot.ItemPage(self.repo, self.good_item_id)
 
-QUERY = """SELECT DISTINCT ?item WHERE {
+    def filterProperty(self, prop_page):
+        if prop_page.type == "external-id":
+            return False
+
+        prop_page.get()
+        if 'P31' not in prop_page.claims.keys():
+            pywikibot.warning("%s is not classified" % prop_page.getID())
+            return False
+
+        for claim in prop_page.claims['P31']:
+            if claim.target_equals(self.__good_item):
+                return True
+
+        return False
+
+    def treat_page(self):
+        item = self.current_page
+        for prop in item.claims.keys():
+            for claim in item.claims[prop]:
+                moved = set()
+                json = claim.toJSON()
+                i = -1
+                for source in claim.sources:
+                    i += 1
+                    for ref_prop in source.keys():
+                        if not self.checkProperty(ref_prop):
+                            continue
+
+                        for snak in source[ref_prop]:
+                            json['qualifiers'] = json.get('qualifiers', {})
+                            json['qualifiers'][ref_prop] = json['qualifiers'].get(ref_prop, [])
+                            for qual in (pywikibot.Claim.qualifierFromJSON(self.repo, q)
+                                         for q in json['qualifiers'][ref_prop]):
+                                if qual.target_equals(snak.getTarget()):
+                                    break
+                            else:
+                                snak.isReference = False
+                                snak.isQualifier = True
+                                json['qualifiers'][ref_prop].append(snak.toJSON())
+                            json['references'][i]['snaks'][ref_prop].pop(0)
+                            if len(json['references'][i]['snaks'][ref_prop]) == 0:
+                                json['references'][i]['snaks'].pop(ref_prop)
+                                if len(json['references'][i]['snaks']) == 0:
+                                    json['references'].pop(i)
+                                    i -= 1
+                            moved.add(ref_prop)
+
+                if len(moved) > 0:
+                    data = {'claims': [json]}
+                    self._save_page(item, self._save_entity, item.editEntity,
+                                    data, summary=self.makeSummary(prop, moved))
+
+    def makeSummary(self, prop, props):
+        props = list(map(lambda x: '[[Property:P%s]]' % x,
+                         sorted(map(lambda x: int(x[1:]), props))))
+        return "[[Property:%s]]: moving misplaced reference%s %s to qualifiers" % (
+            prop, 's' if len(props) > 1 else '', '%s and %s' % (
+                ', '.join(props[:-1]), props[-1]) if len(props) > 1 else props[0])
+
+def main(*args):
+    options = {}
+    for arg in pywikibot.handle_args(args):
+        if arg.startswith('-'):
+            arg, sep, value = arg.partition(':')
+            if value != '':
+                options[arg[1:]] = value if not value.isdigit() else int(value)
+            else:
+                options[arg[1:]] = True
+
+    QUERY = """SELECT DISTINCT ?item WHERE {
   ?prop wikibase:propertyType [] .
   {
-    ?prop p:P31/ps:P31 wd:Q15720608 .
+    ?prop p:P31/ps:P31 wd:%s .
     MINUS { ?prop wikibase:propertyType wikibase:ExternalId } .
   } UNION {
     FILTER( ?prop IN ( wd:%s ) ) .
@@ -29,68 +106,17 @@ QUERY = """SELECT DISTINCT ?item WHERE {
   ?statement prov:wasDerivedFrom ?ref .
   ?item ?p ?statement .
   [] wikibase:claim ?p .
-} ORDER BY ?item""".replace('\n', ' ') % (', wd:'.join(good_cache), ', wd:'.join(bad_cache))
+}""".replace('\n', ' ') % (
+    QualifiersFixingBot.good_item_id,
+    ', wd:'.join(QualifiersFixingBot.whitelist),
+    ', wd:'.join(QualifiersFixingBot.blacklist)
+)
 
-for item in pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site):
-    item.get()
-    for prop in item.claims.keys():
-        for claim in item.claims[prop]:
-            changed = False
-            moved = []
-            try:
-                data = {"claims":[claim.toJSON()]}
-            except Exception as exc:
-                pywikibot.output("%s: %s" % (item.getID(), exc.message))
-                break
-            i = -1
-            for source in claim.sources:
-                i += 1
-                for ref_prop in source.keys():
-                    if ref_prop in bad_cache:
-                        continue
-                    if ref_prop not in good_cache:
-                        prop_data = pywikibot.PropertyPage(repo, ref_prop)
-                        prop_data.get()
-                        if 'P31' not in prop_data.claims.keys():
-                            pywikibot.output("%s is not classified" % ref_prop)
-                            bad_cache.append(ref_prop)
-                            continue
+    site = pywikibot.Site('wikidata', 'wikidata')
 
-                        for prop_claim in prop_data.claims['P31']:
-                            if prop_claim.target_equals(good_item):
-                                break
-                        else:
-                            bad_cache.append(ref_prop)
-                            continue
+    generator = pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site)
+    bot = QualifiersFixingBot(site=site, generator=generator, **options)
+    bot.run()
 
-                        good_cache.append(ref_prop)
-
-                    for snak in source[ref_prop]:
-                        if 'qualifiers' not in data['claims'][0].keys():
-                            data['claims'][0]['qualifiers'] = {}
-                        if ref_prop not in data['claims'][0]['qualifiers'].keys():
-                            data['claims'][0]['qualifiers'][ref_prop] = []
-                        snak.isReference = False
-                        snak.isQualifier = True
-                        data['claims'][0]['qualifiers'][ref_prop].append(snak.toJSON())
-                        del data['claims'][0]['references'][i]['snaks'][ref_prop][0]
-                        if len(data['claims'][0]['references'][i]['snaks'][ref_prop]) == 0:
-                            del data['claims'][0]['references'][i]['snaks'][ref_prop]
-                            if len(data['claims'][0]['references'][i]['snaks']) == 0:
-                                del data['claims'][0]['references'][i]
-                                i = i - 1
-                        changed = True
-                        if ref_prop not in moved:
-                            moved.append(ref_prop)
-
-            if changed is True:
-                pywikibot.output("Fixing %s claim in %s" % (prop, item.getID()))
-                moved = list(map(lambda x: '[[Property:P%s]]' % x, sorted(map(lambda x: int(x[1:]), moved))))
-                summary = "[[Property:%s]]: moving misplaced reference%s %s to qualifiers" % (
-                    prop, 's' if len(moved) > 1 else '', '%s and %s' % (
-                        ', '.join(moved[:-1]), moved[-1]) if len(moved) > 1 else moved[0])
-                item.editEntity(data, summary=summary)
-
-end = datetime.datetime.now()
-
-pywikibot.output("Complete! Took %s seconds" % (end - start).total_seconds())
+if __name__ == "__main__":
+    main()

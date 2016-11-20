@@ -25,7 +25,8 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
         self.fixes = []
         for fix, cls in all_fixes.items():
             in_args = fix in kwargs
-            demand = do_all and not (in_args and not kwargs[fix])
+            demand = ((in_args and not do_all) or
+                      (do_all and not (in_args and kwargs[fix] is False)))
             if in_args:
                 kwargs.pop(fix)
             if demand:
@@ -78,13 +79,14 @@ def main(*args):
     local_args = pywikibot.handle_args(args)
     genFactory = pagegenerators.GeneratorFactory()
     for arg in local_args:
-        if not genFactory.handleArg(arg):
-            if arg.startswith('-'):
-                arg, sep, value = arg.partition(':')
-                if value != '':
-                    options[arg[1:]] = value if not value.isdigit() else int(value)
-                else:
-                    options[arg[1:]] = True
+        if genFactory.handleArg(arg):
+            continue
+        if arg.startswith('-'):
+            arg, sep, value = arg.partition(':')
+            if value != '':
+                options[arg[1:]] = value if not value.isdigit() else int(value)
+            else:
+                options[arg[1:]] = True
 
     generator = genFactory.getCombinedGenerator()
     if generator:

@@ -2,7 +2,11 @@
 import pywikibot
 
 from pywikibot.bot import (
-    SkipPageError, SingleSiteBot, ExistingPageBot, NoRedirectPageBot, WikidataBot
+    ExistingPageBot,
+    NoRedirectPageBot,
+    SkipPageError,
+    SingleSiteBot,
+    WikidataBot,
 )
 
 class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
@@ -20,8 +24,8 @@ class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
     def __init__(self, **kwargs):
         pywikibot.output("Please help fix [[phab:T86074]] to make Wikidata scripts simpler")
-        self.bad_cache = kwargs.pop('bad_cache', [])
-        self.good_cache = kwargs.pop('good_cache', [])
+        self.bad_cache = set(kwargs.pop('bad_cache', []))
+        self.good_cache = set(kwargs.pop('good_cache', []))
         super(WikidataEntityBot, self).__init__(**kwargs)
         self.repo = self.site.data_repository()
 
@@ -51,9 +55,9 @@ class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
     def cacheProperty(self, prop):
         prop_page = pywikibot.PropertyPage(self.repo, prop)
         if self.filterProperty(prop_page):
-            self.good_cache.append(prop)
+            self.good_cache.add(prop)
         else:
-            self.bad_cache.append(prop)
+            self.bad_cache.add(prop)
 
     def filterProperty(self, prop_page):
         raise NotImplementedError(
@@ -67,6 +71,5 @@ class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
     def getSource(self):
         if not hasattr(self, 'source'):
-            wd_bot = WikidataBot()
-            self.source = wd_bot.getSource(self.site)
+            self.source = WikidataBot().getSource(self.site)
         return self.source

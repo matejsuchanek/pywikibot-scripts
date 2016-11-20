@@ -14,8 +14,10 @@ import pywikibot
 import re
 
 from pywikibot import textlib
+from pywikibot.tools import first_lower, first_upper
 from pywikibot.tools.formatter import color_format
 
+# fixme: these should rather be some dependencies
 from scripts.checkwiki_errors import CheckWikiError, deduplicate
 from scripts.typoloader import TypoRule, TyposLoader
 
@@ -31,8 +33,8 @@ class FixGenerator(object):
         self.len = 0
         self.fix.site = pywikibot.Site()
         for repl in self.fix.replacements():
-            yield repl
             self.len += 1
+            yield repl
 
     def __len__(self):
         return self.len
@@ -55,7 +57,7 @@ class Fix(object):
     @property
     def site(self):
         if not hasattr(self, '_site'):
-            pass # todo: stop
+            self._site = pywikibot.Site() # todo: is this okay? should load?
         return self._site
 
     @site.setter
@@ -80,7 +82,7 @@ class Fix(object):
         return textlib.replaceExcept(
             text, find, replace,
             exceptions.get('inside', []) + exceptions.get('inside-tags', []),
-            self.site)
+            site=self.site)
 
     @property
     def exceptions(self):
@@ -161,7 +163,8 @@ class AdataFix(Fix):
             return
 
         item.get()
-        if not any(st.target_equals(self.human_item) for st in item.claims.get('P31', [])):
+        if not any(st.target_equals(self.human_item)
+                   for st in item.claims.get('P31', [])):
             return
 
         if len(self.props & set(item.claims.keys())) < self.minprops:
@@ -204,7 +207,7 @@ class FilesFix(LazyFix):
             for word in words:
                 self.wordtokey[word] = magic
 
-    def apply(self, page, summaries=[], callbacks=[]):
+    def apply(self, page, *args):
         for find, replace in self.replacements():
             page.text = self.safeSub(page.text, find, replace)
 
@@ -379,61 +382,89 @@ class RedirectFix(LazyFix):
             return match.group()
 
         page_title = split[0].replace('_', ' ').strip()
-        if page_title in self.redirects:
-            if page_title not in self.cache:
-                page = pywikibot.Page(self.site, page_title)
-                if not page.exists():
-                    pywikibot.warning('%s does not exist' % page.title())
-                    self.redirects.remove(page_title) # fixme: both cases
-                    return match.group()
-                if not page.isRedirectPage():
-                    pywikibot.warning('%s is not a redirect' % page.title())
-                    self.redirects.remove(page_title) # fixme: both cases
-                    return match.group()
+        if page_title not in self.redirects:
+            return match.group()
 
-                target = page.getRedirectTarget()
-                title = target.title()
-                if page_title[0].islower():
-                    self.cache[page_title] = title[0].lower() + title[1:]
-                else:
-                    self.cache[page_title] = title
+        if page_title not in self.cache:
+            page = pywikibot.Page(self.site, page_title)
+            if not page.exists():
+                pywikibot.warning('%s does not exist' % page.title())
+                self.redirects.remove(page_title) # fixme: both cases
+                return match.group()
+            if not page.isRedirectPage():
+                pywikibot.warning('%s is not a redirect' % page.title())
+                self.redirects.remove(page_title) # fixme: both cases
+                return match.group()
 
-            if len(split) == 1:
-                options = []
-                options_list = [
-                    '[[%s]]' % page_title,
-                    '[[%s]]' % self.cache[page_title],
-                    '[[%s|%s]]' % (self.cache[page_title], page_title)
-                ]
-                for i, opt in enumerate(options_list, start=1):
-                    options.append(
-                        ('%s %s' % (i, opt), str(i))
-                    )
+            target = page.getRedirectTarget()
+            title = target.title()
+            if page_title == first_lower(page_title):
+                self.cache[page_title] = first_lower(title)
+            else:
+                self.cache[page_title] = title
+
+        if len(split) == 1:
+            options = []
+            options_list = [
+                '[[%s]]' % page_title,
+                '[[%s]]' % self.cache[page_title],
+                '[[%s|%s]]' % (self.cache[page_title], page_title)
+            ]
+            for i, opt in enumerate(options_list, start=1):
                 options.append(
-                    ('Do not replace unpiped links', 'n')
+                    ('%s %s' % (i, opt), str(i))
                 )
+            options.append(
+                ('Do not replace unpiped links', 'n')
+            )
 
-                pre = match.string[max(0, match.start() - 30):match.start()]
-                post = match.string[match.end():match.end() + 30]
-                pywikibot.output(pre + color_format(u'{lightred}{0}{default}',
-                                                    match.group()) + post)
-                choice = pywikibot.input_choice('Replace this link?',
-                                                options, default='1')
-                if choice == 'n':
-                    self.onlypiped = True
-                    return match.group()
-                else:
-                    return options_list[int(choice)-1]
+            pre = match.string[max(0, match.start() - 30):match.start()]
+            post = match.string[match.end():match.end() + 30]
+            pywikibot.output(pre + color_format(u'{lightred}{0}{default}',
+                                                match.group()) + post)
+            choice = pywikibot.input_choice('Replace this link?',
+                                            options, default='1')
+            if choice == 'n':
+                self.onlypiped = True
+                return match.group()
+            else:
+                return options_list[int(choice)-1]
 
-            return '[[%s|%s]]' % (self.cache[page_title], split[-1])
-
-        return match.group()
+        # fixme: let CC decide about whitespace
+        return '[[%s|%s]]' % (self.cache[page_title], split[-1])
 
 class StyleFix(Fix):
 
     key = 'mos' # style?
+    order = 2 # after CheckWiki
 
-    def sortCategories(self, cat):
+    def load(self):
+        self.regex_single = re.compile(
+            '<ref(?:(?: name *=([^/=>]+))?>(?:(?!</ref>).)+</ref|'
+            ' name *=([^/=>]+)/)>', re.S)
+        self.regex_adjacent = re.compile(
+            r'(?:\s*<ref(?:(?: name *=[^/=>]+)?>(?:(?!</ref>).)+</ref|'
+            ' name *=[^/=>]+/)>){2,}', re.S)
+
+    def sortRef(self, ref, all_names, start):
+        name = ref.group(1) or ref.group(2)
+        if name:
+            name = name.strip('" \'')
+            for i, (j, s) in enumerate(all_names):
+                if j == name and start + ref.start() > s:
+                    return i
+
+        return len(all_names)
+
+    def replaceRefs(self, match, all_names):
+        refs = list(self.regex_single.finditer(match.group()))
+        assert len(refs) > 1
+        refs.sort(key=lambda ref: self.sortRef(ref, all_names, match.start()))
+        space_before = match.group()[
+            :len(match.group()) - len(match.group().lstrip())]
+        return space_before + ''.join(map(lambda ref: ref.group(), refs))
+
+    def sortCategory(self, cat):
         split = cat.title(withNamespace=False, insite=cat.site).split()
         if any(x.isdigit() for x in split): # year
             return 2
@@ -445,8 +476,28 @@ class StyleFix(Fix):
             return 3
         return 0
 
-    def apply(self, page, summaries=[], callbacks=[]):
+    def apply(self, page, *args):
+        # remove empty list items
+        page.text = re.sub(r'^\* *\n', '', page.text, flags=re.M)
         # sort adjacent references
+        if 'group=' not in page.text and '<references>' not in page.text:
+            all_names = []
+            for match in self.regex_single.finditer(page.text):
+                name = match.group(1) or match.group(2)
+                if not name:
+                    continue
+                name = name.strip('" \'')
+                for i, _ in all_names:
+                    if i == name:
+                        break
+                else:
+                    all_names.append((name, match.start()))
+
+            if len(all_names) > 0:
+                 page.text = self.regex_adjacent.sub(
+                     lambda match: self.replaceRefs(match, all_names),
+                     page.text)
+
         # sort categories
         categories = textlib.getCategoryLinks(page.text, site=page.site)
         defaultsort = page.defaultsort()
@@ -485,8 +536,8 @@ class StyleFix(Fix):
             if is_alive:
                 categories.remove(category_living)
 
-            birth_categories.sort(key=self.sortCategories)
-            death_categories.sort(key=self.sortCategories)
+            birth_categories.sort(key=self.sortCategory)
+            death_categories.sort(key=self.sortCategory)
 
             if main_category:
                 categories.insert(0, main_category)
@@ -526,8 +577,7 @@ class TemplateFix(LazyFix):
         if any(template_name.startswith(x) for x in self.defaultsort):
             return match.group()
 
-        template_name_norm = template_name[0].upper() + template_name[1:]
-        template_name_norm = template_name_norm.partition('<!--')[0]
+        template_name_norm = first_upper(template_name).partition('<!--')[0]
         if template_name_norm not in self.cache:
             template = pywikibot.Page(self.site, template_name_norm, ns=10)
             if template.exists() and template.isRedirectPage():
@@ -540,8 +590,8 @@ class TemplateFix(LazyFix):
         if not target:
             return match.group()
 
-        if template_name[0].islower() and template_name != "n/a": # todo
-            target = target[0].lower() + target[1:]
+        if template_name not in (first_upper(template_name), "n/a"): # todo
+            target = first_lower(target)
 
         return match.group('before') + target + match.group('after')
 
@@ -567,6 +617,7 @@ class TypoFix(LazyFix):
         'inside-tags': TypoRule.exceptions[:],
     }
     _summary = u'oprava překlepů'
+    order = 1 # after redirects
 
     def load(self):
         loader = TyposLoader(self.site)

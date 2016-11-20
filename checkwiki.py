@@ -53,6 +53,7 @@ class CheckWiki(object):
         86: ExternalLinkLikeInternal,
         88: DefaultsortSpace,
         89: DefaultsortComma,
+        93: DoubleHttp,
         101: Ordinals,
         103: SuperfluousPipe,
         104: ReferenceQuotes,
@@ -66,17 +67,23 @@ class CheckWiki(object):
 
     def __init__(self, site, **kwargs):
         self.site = site
-        self.__cache = {}
         self.auto = kwargs.pop('auto', True)
-        self.loadSettings() # todo: remove when unneccessary
 
     def purge(self):
         self.__cache = {}
 
     @property
+    def site(self):
+        return self._site
+
+    @site.setter
+    def site(self, value):
+        self._site = value
+        self.purge()
+        self.loadSettings()
+
+    @property
     def settings(self):
-        if not hasattr(self, '_settings'):
-            self.loadSettings()
         return self._settings
 
     def loadSettings(self):
@@ -166,7 +173,8 @@ class CheckWiki(object):
 
     def loadErrors(self, limit=0, **kwargs):
         for error in self.iter_errors(**kwargs):
-            yield from error.loadError(limit)
+            for page in error.loadError(limit):
+                yield page
 
     def applyErrors(self, text, page, replaced=[], fixed=[], **kwargs):
         errors = list(self.iter_errors(**kwargs))
@@ -199,7 +207,7 @@ class CheckWiki(object):
 class CheckWikiBot(WikitextFixingBot):
 
     def __init__(self, numbers, **kwargs):
-        kwargs['cw'] = False
+        kwargs['checkwiki'] = False
         limit = kwargs.pop('limit', 100) # fixme: options
         super(CheckWikiBot, self).__init__(**kwargs)
         self.checkwiki = CheckWiki(self.site, **kwargs)
@@ -217,8 +225,9 @@ class CheckWikiBot(WikitextFixingBot):
         if self.getOption('always') is not True:
             pywikibot.showDiff(page.text, text)
         page.text = text
-        self._save_page(page, self.fix_wikitext, page, summary=summary,
-                        callback=lambda *args: self.markAsFixedOnSuccess(fixed, *args))
+        self._save_page(
+            page, self.fix_wikitext, page, summary=summary,
+            callback=lambda *args: self.markAsFixedOnSuccess(fixed, *args))
 
     def markAsFixedOnSuccess(self, numbers, page, exc=None):
         if exc is None:
@@ -230,15 +239,17 @@ def main(*args):
     genFactory = pagegenerators.GeneratorFactory()
     numbers = []
     for arg in local_args:
-        if not genFactory.handleArg(arg):
-            if arg.startswith('-'):
-                arg, sep, value = arg.partition(':')
-                if value != '':
-                    options[arg[1:]] = value if not value.isdigit() else int(value)
-                else:
-                    options[arg[1:]] = True
-            elif arg.isdigit():
-                numbers.append(int(arg))
+        if genFactory.handleArg(arg):
+            continue
+
+        if arg.startswith('-'):
+            arg, sep, value = arg.partition(':')
+            if value != '':
+                options[arg[1:]] = value if not value.isdigit() else int(value)
+            else:
+                options[arg[1:]] = True
+        elif arg.isdigit():
+            numbers.append(int(arg))
 
     generator = genFactory.getCombinedGenerator()
 

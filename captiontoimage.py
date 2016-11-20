@@ -22,7 +22,7 @@ class CaptionToImageBot(WikidataEntityBot):
         self.availableOptions.update({
             'removeall': False
         })
-        kwargs['bad_cache'] = [self.caption_property]
+        kwargs['bad_cache'] = kwargs.get('bad_cache', []) + [self.caption_property]
         super(CaptionToImageBot, self).__init__(**kwargs)
 
     def filterProperty(self, prop_page):
@@ -80,7 +80,7 @@ class CaptionToImageBot(WikidataEntityBot):
 
             caption.isQualifier = True
             self._save_page(item, self._save_entity, media_claim.addQualifier,
-                            caption)
+                            caption) # todo: remember decision for the action below
             remove_claims.append(caption)
 
         if len(remove_claims) > 0:
