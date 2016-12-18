@@ -1,4 +1,4 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 import pywikibot
 import re
 import requests
@@ -369,7 +369,7 @@ class HTMLEntity(EntityReplacement):
         entity = match.group('entity')
         if entity in self.entities_map:
             return self.entities_map[entity]
-        
+
         if entity not in ['amp', 'dagger', 'Dagger', 'mdash', 'ndash', 'nbsp',
                           'quot']:
             pywikibot.output('Unrecognized HTML entity "%s"' % match.group())
@@ -500,7 +500,7 @@ class HeaderHierarchy(HeaderError):
             level = len(match.group('start'))
             pos = match.end()
             if level != levels[i]:
-                eq = '=' * (levels[i])
+                eq = '=' * levels[i]
                 text = text[:match.start()] + u'{eq} {content} {eq}'.format(
                     eq=eq, content=match.group('content').strip()) + text[pos:]
             i += 1
@@ -1053,6 +1053,7 @@ class EmptyTag(CheckWikiError):
             'onlyinclude', 'pre', 'ref', 'span')
 
     def pattern(self):
+        # todo: add attributes and whitelist some of them
         return re.compile(r'<(%s)>(\s*)</\1>' % '|'.join(self.tags))
 
     def replacement(self, match):
@@ -1086,6 +1087,12 @@ class DefaultsortComma(DefaultsortError):
 
         return match.group()
 
+class InternalLink(CCHandledError):
+
+    number = 90
+    summary = 'oprava odkazu'
+    # todo: inside files
+
 class DoubleHttp(CheckWikiError):
 
     exceptions = list(set(CheckWikiError.exceptions) - set(['startspace']))
@@ -1093,7 +1100,7 @@ class DoubleHttp(CheckWikiError):
     summary = u'oprava externího odkazu'
 
     def pattern(self):
-        return re.compile('(?:https?:*/*){2,}')
+        return re.compile('(?i)(?:https?:*/*){2,}')
 
     def replacement(self, match):
         return match.group()[match.group().rfind('http'):]
@@ -1156,3 +1163,8 @@ class ReferenceQuotes(CheckWikiError):
                         handleParam, match.group('params'))
 
         return u'<ref %s%s>' % (params, match.group('slash') or '')
+
+# todo: own errors:
+# - duplicate defaultsort keys
+# - fake bullets
+# - inappropriate headlines

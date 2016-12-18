@@ -1,17 +1,18 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 import pywikibot
 
 from pywikibot import pagegenerators
 
-from scripts.wikidata import WikidataEntityBot
+from scripts.myscripts.wikidata import WikidataEntityBot
 
 class QualifiersFixingBot(WikidataEntityBot):
 
-    blacklist = set(['P143', 'P248', 'P459', 'P518', 'P577', 'P805', 'P972',
-                     'P1065', 'P1135', 'P1480', 'P1545', 'P1932', 'P2315',
-                     'P2701', ])
-    whitelist = set(['P17', 'P21', 'P155', 'P156', 'P281', 'P580', 'P582',
-                     'P585', 'P669', 'P708', 'P969', 'P1355', 'P1356', ])
+    blacklist = frozenset(['P143', 'P248', 'P459', 'P518', 'P577', 'P805',
+                           'P972', 'P1065', 'P1135', 'P1480', 'P1545', 'P1932',
+                           'P2315', 'P2701', ])
+    whitelist = frozenset(['P17', 'P21', 'P155', 'P156', 'P281', 'P580', 'P582',
+                           'P585', 'P669', 'P708', 'P969', 'P1355', 'P1356',
+                           ])
     good_item_id = 'Q15720608'
 
     def __init__(self, **kwargs):

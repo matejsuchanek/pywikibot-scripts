@@ -1,10 +1,10 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 import pywikibot
 
 from pywikibot import pagegenerators
 from pywikibot.bot import SkipPageError
 
-from scripts.wikidata import WikidataEntityBot
+from scripts.myscripts.wikidata import WikidataEntityBot
 
 class CaptionToImageBot(WikidataEntityBot):
 
@@ -97,7 +97,8 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    QUERY = "SELECT DISTINCT ?item WHERE { ?item wdt:P2096 [] }"
+    QUERY = ("SELECT DISTINCT ?item WHERE { ?item wdt:%s [] }"
+             % CaptionToImageBot.caption_property)
 
     site = pywikibot.Site('wikidata', 'wikidata')
 

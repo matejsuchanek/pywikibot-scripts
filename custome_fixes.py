@@ -1,10 +1,10 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 """
 Module holding fixes which can be applied to most articles.
 
 For use in user_fixes.py, please add to the file:
 
-from scripts.custome_fixes import lazy_fixes
+from scripts.myscripts.custome_fixes import lazy_fixes
 fixes.update(
     dict((key, fix.dictForUserFixes()) for key, fix in lazy_fixes.items())
 )
@@ -17,9 +17,8 @@ from pywikibot import textlib
 from pywikibot.tools import first_lower, first_upper
 from pywikibot.tools.formatter import color_format
 
-# fixme: these should rather be some dependencies
-from scripts.checkwiki_errors import CheckWikiError, deduplicate
-from scripts.typoloader import TypoRule, TyposLoader
+from scripts.myscripts.checkwiki_errors import CheckWikiError, deduplicate
+from scripts.myscripts.typoloader import TypoRule, TyposLoader
 
 class FixGenerator(object):
 
@@ -148,8 +147,8 @@ class AdataFix(Fix):
     def load(self):
         self.props = frozenset(
             ['P213', 'P214', 'P227', 'P244', 'P245', 'P496', 'P691', 'P1051'])
-        self.repo = self.site.data_repository()
-        self.human_item = pywikibot.ItemPage(self.repo, 'Q5')
+        repo = self.site.data_repository()
+        self.human_item = pywikibot.ItemPage(repo, 'Q5')
 
     def apply(self, page, summaries=[], callbacks=[]):
         text = page.text
@@ -185,6 +184,12 @@ class AdataFix(Fix):
 class FilesFix(LazyFix):
 
     key = 'files'
+    magic = ['img_alt', 'img_baseline', 'img_border', 'img_bottom',
+             'img_center', 'img_class', 'img_framed', 'img_frameless',
+             'img_lang', 'img_left', 'img_link', 'img_lossy', 'img_manualthumb',
+             'img_middle', 'img_none', 'img_page', 'img_right', 'img_sub',
+             'img_super', 'img_text_bottom', 'img_text_top', 'img_thumbnail',
+             'img_top', 'img_upright', 'img_width']
     regex = r'\[\[\s*(?:%s)\s*:\s*[^]|[]+(?:\|(?:[^]|[]|\[\[[^]]+\]\])+)+\]\]'
     _summary = u'úpravy obrázků'
 
@@ -195,13 +200,7 @@ class FilesFix(LazyFix):
 
         self.wordtokey = {}
         self.keytolocal = {}
-        for magic in ['img_alt', 'img_baseline', 'img_border', 'img_bottom',
-                      'img_center', 'img_class', 'img_framed', 'img_frameless',
-                      'img_lang', 'img_left', 'img_link', 'img_lossy',
-                      'img_manualthumb', 'img_middle', 'img_none', 'img_page',
-                      'img_right', 'img_sub', 'img_super', 'img_text_bottom',
-                      'img_text_top', 'img_thumbnail', 'img_top', 'img_upright',
-                      'img_width']:
+        for magic in self.magic:
             words = self.site.getmagicwords(magic)
             self.keytolocal[magic] = words.pop(0)
             for word in words:
@@ -227,13 +226,14 @@ class FilesFix(LazyFix):
         split[0] = re.sub('[ _]+', ' ', split[0]).strip()
         i = 1
         while i < len(split):
+            while (split[i].count('[[') != split[i].count(']]') or
+                   split[i].count('{{') != split[i].count('}}')):
+                split[i] += '|' + split[i+1]
+                del split[i+1]
+
             if split[i].strip() == '':
                 del split[i]
                 continue
-
-            while split[i].count('[[') != split[i].count(']]'):
-                split[i] += '|' + split[i+1]
-                del split[i+1]
 
             if split[i] in self.wordtokey:
                 split[i] = self.keytolocal[self.wordtokey[split[i]]]
@@ -291,7 +291,7 @@ class CheckWikiFix(LazyFix):
     _summary = u'opravy dle [[WP:WCW|CheckWiki]]'
 
     def load(self):
-        from scripts.checkwiki import CheckWiki
+        from scripts.myscripts.checkwiki import CheckWiki
         self.checkwiki = CheckWiki(self.site) # fixme: **kwargs
 
     def replacements(self):
@@ -311,7 +311,7 @@ class InterwikiFix(Fix):
 
     '''Fix removing interwiki links that are on Wikidata'''
 
-    key = 'interwiki'
+    key = 'iw'
 
     def apply(self, page, summaries=[], callbacks=[]):
         iw_links = textlib.getLanguageLinks(page.text, page.site)

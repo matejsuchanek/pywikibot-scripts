@@ -1,9 +1,9 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 import pywikibot
 
 from pywikibot import pagegenerators
 
-from scripts.captiontoimage import WikidataEntityBot
+from scripts.myscripts.captiontoimage import WikidataEntityBot
 
 class UnitsFixingBot(WikidataEntityBot):
 
@@ -21,7 +21,8 @@ class UnitsFixingBot(WikidataEntityBot):
         for claim in prop_page.claims['P2237']:
             if claim.snaktype == "novalue":
                 continue
-            if claim.snaktype == "value" and claim.target_equals(self.__good_item):
+            if (claim.snaktype == "value" and
+                claim.target_equals(self.__good_item)):
                 continue
             return False
         return True
@@ -34,29 +35,30 @@ class UnitsFixingBot(WikidataEntityBot):
                     if self.checkProperty(prop):
                         target = claim.getTarget()
                         if self.changeTarget(target):
-                            pywikibot.output("Removing unit in %s for property %s" % (item.getID(), prop))
-                            self._save_page(item, self._save_entity, claim.changeTarget,
-                                            target, summary="removing invalid unit, see [[P:%s#P2237|property's page]]" % prop)
+                            pywikibot.output("Removing unit for property %s" % prop)
+                            self._save_page(
+                                item, self._save_entity, claim.changeTarget,
+                                target, summary="removing invalid unit, see [[P:%s#P2237|property's page]]" % prop)
                 else:
-                    if prop not in self.bad_cache:
-                        self.bad_cache.append(prop)
+                    self.bad_cache.add(prop)
 
-                data = {"claims":[claim.toJSON()]}
+                json = claim.toJSON()
                 changed = False
                 for qprop, snaks in claim.qualifiers.items():
                     if not self.checkProperty(qprop):
                         continue
-                    data['claims'][0]['qualifiers'][qprop] = self.handleSnaks(snaks, changed)
-                    #pywikibot.output("Removing unit in %s for qualifier %s of %s" % (item.getID(), qprop, prop))
+                    json['qualifiers'][qprop] = self.handleSnaks(snaks, changed) #FIXME
+                    #pywikibot.output("Removing unit for qualifier %s of %s" % (qprop, prop))
 
                 for i, source in enumerate(claim.sources):
                     for ref_prop, snaks in source.items():
                         if not self.checkProperty(ref_prop):
                             continue
-                        data['claims'][0]['references'][i]['snaks'][ref_prop] = self.handleSnaks(snaks, changed)
-                        #pywikibot.output("Removing unit in %s for reference %s of %s" % (item.getID(), ref_prop, prop))
+                        json['references'][i]['snaks'][ref_prop] = self.handleSnaks(snaks, changed) #FIXME
+                        #pywikibot.output("Removing unit for reference %s of %s" % (ref_prop, prop))
 
                 if changed is True:
+                    data = {'claims': [json]}
                     self._save_page(item, self._save_entity, item.editEntity,
                                     data, summary="removing invalid unit(s)")
 
@@ -70,10 +72,8 @@ class UnitsFixingBot(WikidataEntityBot):
     def handleSnaks(self, snaks, changed):
         data = []
         for snak in snaks:
-            changed_target = False
             target = snak.getTarget()
-            changed_target = self.changeTarget(target)
-            if changed_target is True:
+            if self.changeTarget(target):
                 snak.setTarget(target)
                 changed = True
             data.append(snak.toJSON())
@@ -104,18 +104,20 @@ def main(*args):
   {
     ?statement ?psv ?value .
     ?value wikibase:quantityUnit ?unit .
+    FILTER(?unit != wd:Q199) .
     ?item ?p ?statement .
   } UNION {
     ?statement1 ?pqv ?value .
     ?value wikibase:quantityUnit ?unit .
+    FILTER(?unit != wd:Q199) .
     ?item ?claim1 ?statement1 .
   } UNION {
     ?ref ?prv ?value .
     ?value wikibase:quantityUnit ?unit .
+    FILTER(?unit != wd:Q199) .
     ?statement2 prov:wasDerivedFrom ?ref .
     ?item ?claim2 ?statement2 .
   } .
-  FILTER(?unit != wd:Q199) .
 }""".replace('\n', ' ')
 
     site = pywikibot.Site('wikidata', 'wikidata')

@@ -1,12 +1,12 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 import pywikibot
 import time
 
 from pywikibot import pagegenerators
 from pywikibot.bot import NoRedirectPageBot, SkipPageError
 
-from scripts.typoloader import TyposLoader
-from scripts.wikitext import WikitextFixingBot
+from scripts.myscripts.typoloader import TyposLoader
+from scripts.myscripts.wikitext import WikitextFixingBot
 
 class TypoBot(WikitextFixingBot, NoRedirectPageBot):
 

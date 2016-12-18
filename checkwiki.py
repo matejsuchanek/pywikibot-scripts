@@ -1,11 +1,11 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 import pywikibot
 import re
 
 from pywikibot import pagegenerators
 
-from scripts.checkwiki_errors import *
-from scripts.wikitext import WikitextFixingBot
+from scripts.myscripts.checkwiki_errors import *
+from scripts.myscripts.wikitext import WikitextFixingBot
 
 class CheckWiki(object):
 

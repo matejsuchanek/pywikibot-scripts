@@ -1,88 +1,79 @@
 # -*- coding: utf-8  -*-
 import datetime
+import codecs
 import pywikibot
 
 from pywikibot import pagegenerators
-from pywikibot.bot import (
-    BaseBot, ExistingPageBot, NoRedirectPageBot, SingleSiteBot, SkipPageError
-)
+from pywikibot.bot import BaseBot, SkipPageError
+
+from scripts.myscripts.wikidata import WikidataEntityBot
 
 class ErrorReportingBot(BaseBot):
 
-    def __init__(self, **kwargs):
-        pywikibot.output("constructing bot")
+    def __init__(self, page_pattern, file_name, **kwargs):
         self.availableOptions.update({
-            'interval': 5 * 60
+            'interval': 5 * 60,
         })
-        file_name = kwargs.pop('file_name')
-        page_pattern = kwargs.pop('page_pattern')
         super(ErrorReportingBot, self).__init__(**kwargs)
-        self.availableOptions.update({
-            'always': True
-        })
-        self.openFile(file_name)
-        self.loadPage(page_pattern)
+        self.open(file_name)
+        self.load_page(page_pattern)
         self.saveFile()
-        self.updateTimestamp()
+        self.update_time()
 
-    def openFile(self, file_name):
-        pywikibot.output("opening file")
+    def open(self, file_name):
         try:
-            file = open('..\%s' % file_name, 'x')
-            file.close()
+            open('..\%s' % file_name, 'x').close()
         except OSError:
             pass
 
-        self.file = open('..\%s' % file_name, 'r+')
+        self.file = codecs.open('..\%s' % file_name, 'r+', 'utf-8')
 
-    def loadPage(self, pattern):
-        pywikibot.output("loading page")
+    def load_page(self, pattern):
         self.log_page = pywikibot.Page(self.site, pattern % self.site.username())
         try:
             self.log_page.get()
         except pywikibot.NoPage:
             self.log_page.text = ''
 
-    def addToFile(self, text):
-        pywikibot.output("adding to file")
-        for line in text.splitlines():
-            self.file.write(line)
+    def append(self, text):
+        self.file.read()
+        self.file.write(text)
 
     def saveFile(self):
-        read = ''.join(self.file.readlines())
-        if len(read) > 1:
-            read = read[0:] # fixme: some invisible character
+        self.file.seek(0)
+        read = '\n'.join(self.file.read().splitlines())
+        if read:
             self.log_page.get(force=True)
             self.log_page.text += read
             self.log_page.save('update', async=True)
-            self.log_file.seek(0)
-            self.log_file.truncate()
-            self.updateTimestamp()
+            self.file.seek(0)
+            self.file.truncate()
+            self.update_time()
 
-    def checkSave(self):
+    def check_time(self):
         if (datetime.datetime.now() - self.timestamp).total_seconds() > self.getOption('interval'):
             self.saveFile()
 
-    def updateTimestamp(self):
+    def update_time(self):
         self.timestamp = datetime.datetime.now()
 
     def exit(self):
         self.file.close()
         super(ErrorReportingBot, self).exit()
 
-class DisambigsCheckingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot, ErrorReportingBot):
+class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
 
     skip = ['enwiki', 'mkwiki', 'mznwiki', 'specieswiki', 'towiki']
 
     def __init__(self, **kwargs):
-        kwargs['page_pattern'] = u'User:%s/Disambig_errors'
-        kwargs['file_name'] = 'log_disambigs.txt'
-        super(DisambigsCheckingBot, self).__init__(**kwargs)
-        self.repo = self.site.data_repository()
+        page_pattern = u'User:%s/Disambig_errors'
+        file_name = 'log_disambigs.txt'
+        super(DisambigsCheckingBot, self).__init__(
+            page_pattern=page_pattern, file_name=file_name, **kwargs)
         self.__disambig_item = pywikibot.ItemPage(self.repo, 'Q4167410')
 
     def init_page(self, item):
-        item.get()
+        super(DisambigsCheckingBot, self).init_page(item)
         if '[[%s]]' % item.title() in self.log_page.text:
             raise SkipPageError(
                 item,
@@ -138,9 +129,9 @@ class DisambigsCheckingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot, Er
             if count > 0:
                 prep += ' (%s sitelink%s)' % (count, 's' if count > 1 else '')
             append_text = prep + append_text
-            self.addToFile(append_text)
+            self.append(append_text)
 
-        self.checkSave()
+        self.check_time()
 
 def main(*args):
     options = {}
@@ -152,17 +143,22 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    QUERY = """SELECT DISTINCT ?item {
+# TODO: random order using hash
+    QUERY = """
+SELECT DISTINCT ?item {
   ?item wdt:P31 wd:Q4167410;
         schema:dateModified ?date .
-} ORDER BY ?date LIMIT 1000""".replace('\n', ' ')
+} ORDER BY ?date LIMIT 1000
+""".strip().replace('\n', ' ')
 
     site = pywikibot.Site('wikidata', 'wikidata')
 
     generator = pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site)
 
+    clearonly = options.pop('clearonly', False)
     bot = DisambigsCheckingBot(site=site, generator=generator, **options)
-    bot.run()
+    if not clearonly:
+        bot.run()
 
 if __name__ == "__main__":
     main()

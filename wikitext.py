@@ -1,4 +1,4 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 import pywikibot
 import re
 
@@ -6,8 +6,8 @@ from pywikibot import pagegenerators
 
 from pywikibot.bot import SingleSiteBot, ExistingPageBot
 
-#from scripts.checkwiki_errors import deduplicate
-from scripts.custome_fixes import all_fixes
+#from scripts.myscripts.checkwiki_errors import deduplicate
+from scripts.myscripts.custome_fixes import all_fixes
 
 class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
 
@@ -25,8 +25,8 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
         self.fixes = []
         for fix, cls in all_fixes.items():
             in_args = fix in kwargs
-            demand = ((in_args and not do_all) or
-                      (do_all and not (in_args and kwargs[fix] is False)))
+            demand = do_all ^ in_args
+            #((in_args and not do_all) or (do_all and not (in_args and bool(kwargs[fix]))))
             if in_args:
                 kwargs.pop(fix)
             if demand:

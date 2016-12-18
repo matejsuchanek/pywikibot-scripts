@@ -1,4 +1,4 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 import pywikibot
 import re
 import time
@@ -34,7 +34,7 @@ class TypoRule(object):
                    re.compile(u'„[^“]+“'), # quotation marks
                    re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1).)+\1", # italics
                               re.M | re.U),
-                   re.compile(r'\b[A-za-z]+\.[a-z]{2}')] # url fragment
+                   re.compile(r'\b[A-Za-z]+\.[a-z]{2}')] # url fragment
 
     def __init__(self, find, replacements, site, auto=False, query=None):
         self.find = find
@@ -142,9 +142,9 @@ class TypoRule(object):
                 pywikibot.warning(u'No replacement done in string "%s"' % old)
 
         if old != new:
-            fragment = u' → '.join([underscores(re.sub('\n', r'\\n', i))
-                                    for i in [old, new]])
-            if fragment.lower() not in [i.lower() for i in replaced]:
+            fragment = u' → '.join(underscores(re.sub('\n', r'\\n', i))
+                                   for i in (old, new))
+            if fragment.lower() not in (i.lower() for i in replaced):
                 replaced.append(fragment)
         return new
 
@@ -174,13 +174,13 @@ class TyposLoader(object):
     def getWhitelistPage(self):
         if self.whitelist_page_name is None:
             self.whitelist_page_name = u'Wikipedie:WPCleaner/Typo/False'
-        
+
         return pywikibot.Page(self.site, self.whitelist_page_name)
 
     def loadTypos(self):
         pywikibot.output('Loading typo rules')
         self.typoRules = []
-        
+
         if self.typos_page_name is None:
             self.typos_page_name = u'Wikipedie:WPCleaner/Typo'
         typos_page = pywikibot.Page(self.site, self.typos_page_name)

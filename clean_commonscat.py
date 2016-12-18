@@ -1,12 +1,12 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 import pywikibot
 import re
 
 from pywikibot import pagegenerators, textlib
 
-from scripts.deferred import DeferredCallbacksBot
-from scripts.wikidata import WikidataEntityBot
-from scripts.wikitext import WikitextFixingBot
+from scripts.myscripts.deferred import DeferredCallbacksBot
+from scripts.myscripts.wikidata import WikidataEntityBot
+from scripts.myscripts.wikitext import WikitextFixingBot
 
 class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallbacksBot):
 

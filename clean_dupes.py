@@ -1,11 +1,11 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 import pywikibot
 
 from pywikibot import pagegenerators
 
 from pywikibot.bot import SkipPageError
 
-from scripts.wikidata import WikidataEntityBot
+from scripts.myscripts.wikidata import WikidataEntityBot
 
 class DupesMergingBot(WikidataEntityBot):
 

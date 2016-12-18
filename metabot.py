@@ -1,11 +1,11 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 import datetime
 import pywikibot
 import re
 
 from pywikibot import textlib
 
-site = pywikibot.Site('wikidata','wikidata')
+site = pywikibot.Site('wikidata', 'wikidata')
 repo = site.data_repository()
 
 template_metadata = 'property documentation'
