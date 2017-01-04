@@ -99,7 +99,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
                 return
             claim = pywikibot.Claim(self.repo, 'P373')
             claim.setTarget(cat_name)
-            pywikibot.output('Importing P373 to %s' % (page.title(), item.getID()))
+            pywikibot.output('Importing P373 to %s' % item.getID())
             if self._save_page(item, self._save_entity, item.addClaim, claim):
                 old = self.getOption('always')
                 self.options['always'] = True
