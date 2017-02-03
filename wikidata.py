@@ -71,5 +71,7 @@ class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
     def getSource(self):
         if not hasattr(self, 'source'):
-            self.source = WikidataBot().getSource(self.site)
+            bot = WikidataBot()
+            bot.cacheSources()
+            self.source = bot.getSource(self.site)
         return self.source

@@ -2,14 +2,14 @@
 import pywikibot
 import re
 
+from itertools import chain
 from pywikibot import pagegenerators
 
-from pywikibot.bot import SingleSiteBot, ExistingPageBot
+from pywikibot.bot import SingleSiteBot, ExistingPageBot, NoRedirectPageBot
 
-#from scripts.myscripts.checkwiki_errors import deduplicate
-from scripts.myscripts.custome_fixes import all_fixes
+from .custome_fixes import all_fixes
 
-class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
+class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
     '''
     Class for bots that save wikitext. It uses all demanded fixes from
@@ -20,15 +20,13 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
     or all fixes using -all (then, each used fix is excluded).
     '''
 
-    def __init__(self, **kwargs):
+    def __init__(self, generator=None, **kwargs):
         do_all = kwargs.pop('all', False) is True
         self.fixes = []
         for fix, cls in all_fixes.items():
-            in_args = fix in kwargs
-            demand = do_all ^ in_args
-            #((in_args and not do_all) or (do_all and not (in_args and bool(kwargs[fix]))))
-            if in_args:
-                kwargs.pop(fix)
+            demand = do_all
+            if fix in kwargs:
+                demand = bool(kwargs.pop(fix))
             if demand:
                 options = {}
                 for opt in cls.options.keys():
@@ -41,15 +39,16 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
         super(WikitextFixingBot, self).__init__(**kwargs)
         for fix in self.fixes:
             fix.site = self.site
-
-    def init_page(self, page):
-        super(WikitextFixingBot, self).init_page(page)
-        page.get()
+        if not generator:
+            pywikibot.output('No generator provided, making own generator...')
+            generator = chain.from_iterable(map(lambda fix: fix.generator(),
+                                                self.fixes))
+        self.generator = pagegenerators.PreloadingGenerator(generator)
 
     def treat_page(self):
         summaries = []
         page = self.current_page
-        old_text = page.text
+        old_text = page.get()
         callbacks = self.applyFixes(page, summaries)
         if len(summaries) < 1:
             pywikibot.output('No replacements worth saving')
@@ -64,6 +63,25 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
         for fix in self.fixes:
             fix.apply(page, summaries, callbacks)
         return callbacks
+
+    def userPut(self, page, oldtext, newtext, **kwargs):
+        if oldtext.rstrip() == newtext.rstrip():
+            pywikibot.output('No changes were needed on %s'
+                             % page.title(asLink=True))
+            return
+
+        self.current_page = page
+
+        show_diff = kwargs.pop('show_diff', not self.getOption('always'))
+
+        if show_diff:
+            pywikibot.showDiff(oldtext, newtext)
+
+        if 'summary' in kwargs:
+            pywikibot.output('Edit summary: %s' % kwargs['summary'])
+
+        page.text = newtext
+        return self._save_page(page, self.fix_wikitext, page, **kwargs)
 
     def fix_wikitext(self, page, *data, **kwargs):
         summaries = [kwargs['summary']]
@@ -89,11 +107,8 @@ def main(*args):
                 options[arg[1:]] = True
 
     generator = genFactory.getCombinedGenerator()
-    if generator:
-        bot = WikitextFixingBot(generator=generator, **options)
-        bot.run()
-    else:
-        pass # todo: output
+    bot = WikitextFixingBot(generator=generator, **options)
+    bot.run()
 
 if __name__ == "__main__":
     main()

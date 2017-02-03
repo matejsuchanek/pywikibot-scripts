@@ -2,11 +2,12 @@
 import datetime
 import codecs
 import pywikibot
+import threading
 
 from pywikibot import pagegenerators
 from pywikibot.bot import BaseBot, SkipPageError
 
-from scripts.myscripts.wikidata import WikidataEntityBot
+from .wikidata import WikidataEntityBot
 
 class ErrorReportingBot(BaseBot):
 
@@ -15,18 +16,18 @@ class ErrorReportingBot(BaseBot):
             'interval': 5 * 60,
         })
         super(ErrorReportingBot, self).__init__(**kwargs)
-        self.open(file_name)
+        self.file_name = file_name
+        self.open()
         self.load_page(page_pattern)
-        self.saveFile()
-        self.update_time()
+        self.stop = False
+        self.save_file()
+        #self.update_time()
 
-    def open(self, file_name):
+    def open(self):
         try:
-            open('..\%s' % file_name, 'x').close()
+            open('..\%s' % self.file_name, 'x').close()
         except OSError:
             pass
-
-        self.file = codecs.open('..\%s' % file_name, 'r+', 'utf-8')
 
     def load_page(self, pattern):
         self.log_page = pywikibot.Page(self.site, pattern % self.site.username())
@@ -36,34 +37,40 @@ class ErrorReportingBot(BaseBot):
             self.log_page.text = ''
 
     def append(self, text):
-        self.file.read()
-        self.file.write(text)
+        with codecs.open('..\%s' % self.file_name, 'r+', 'utf-8') as f:
+            f.read() # jump to the end
+            f.write(text)
 
-    def saveFile(self):
-        self.file.seek(0)
-        read = '\n'.join(self.file.read().splitlines())
-        if read:
-            self.log_page.get(force=True)
-            self.log_page.text += read
-            self.log_page.save('update', async=True)
-            self.file.seek(0)
-            self.file.truncate()
-            self.update_time()
+    def save_file(self):
+        if self.stop:
+            return
+        with codecs.open('..\%s' % self.file_name, 'r+', 'utf-8') as f:
+            f.seek(0)
+            read = '\n'.join(f.read().splitlines())
+            if read:
+                self.log_page.get(force=True)
+                self.log_page.text += read
+                self.log_page.save('update', async=True)
+                f.seek(0)
+                f.truncate()
+                #self.update_time()
+        threading.Timer(self.getOption('interval'), self.save_file).start() # todo
 
     def check_time(self):
         if (datetime.datetime.now() - self.timestamp).total_seconds() > self.getOption('interval'):
-            self.saveFile()
+            self.save_file()
 
     def update_time(self):
         self.timestamp = datetime.datetime.now()
 
     def exit(self):
-        self.file.close()
+        self.stop = True
         super(ErrorReportingBot, self).exit()
+        pywikibot.output('Waiting for the second thread to stop') #fixme
 
 class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
 
-    skip = ['enwiki', 'mkwiki', 'mznwiki', 'specieswiki', 'towiki']
+    skip = ['enwiki', 'igwiki', 'mkwiki', 'mznwiki', 'specieswiki', 'towiki']
 
     def __init__(self, **kwargs):
         page_pattern = u'User:%s/Disambig_errors'
@@ -131,7 +138,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
             append_text = prep + append_text
             self.append(append_text)
 
-        self.check_time()
+        #self.check_time()
 
 def main(*args):
     options = {}
@@ -143,13 +150,10 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-# TODO: random order using hash
-    QUERY = """
-SELECT DISTINCT ?item {
-  ?item wdt:P31 wd:Q4167410;
-        schema:dateModified ?date .
-} ORDER BY ?date LIMIT 1000
-""".strip().replace('\n', ' ')
+    QUERY = """SELECT DISTINCT ?item {
+  ?item wdt:P31 wd:Q4167410 .
+  BIND( SHA512( CONCAT( STR( ?item ), STR( RAND() ) ) ) AS ?hash ) .
+} ORDER BY ?hash LIMIT 500""".replace('\n', ' ')
 
     site = pywikibot.Site('wikidata', 'wikidata')
 

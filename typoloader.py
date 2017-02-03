@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import pywikibot
 import re
 import time
@@ -26,12 +28,14 @@ class TypoRule(object):
                   'interwiki', 'invoke', 'pre', 'property', 'source',
                   'startspace', 'template'] # todo: remove 'template' or 'startspace'
     # tags
-    exceptions += ['ce', 'code', 'graph', 'imagemap', 'mapframe', 'maplink',
-                   'math', 'nowiki', 'poem', 'score', 'section', 'timeline']
+    exceptions += ['ce', 'chem', 'code', 'graph', 'imagemap', 'mapframe',
+                   'maplink', 'math', 'nowiki', 'poem', 'score', 'section',
+                   'timeline']
 
+    # todo: linktrail?
     exceptions += [re.compile(r'\[\[[^][|]+[]|]'), # 'target-part' of a wikilink
                    re.compile('<[a-z]+ [^>]+>'), # HTML tag
-                   re.compile(u'„[^“]+“'), # quotation marks
+                   re.compile('„[^“]+“'), # quotation marks
                    re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1).)+\1", # italics
                               re.M | re.U),
                    re.compile(r'\b[A-Za-z]+\.[a-z]{2}')] # url fragment
@@ -43,6 +47,14 @@ class TypoRule(object):
         self.auto = auto
         self.query = query
         self.longest = 0
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.id == other.id
+        raise NotImplemented
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
 ## TODO
 ##    def __repr__(self):
@@ -93,11 +105,11 @@ class TypoRule(object):
                 else:
                     try:
                         re.compile(part)
-                        query = u'insource:/%s/' % part
+                        query = 'insource:/%s/' % part
                     except re.error as exc:
                         raise InvalidExpressionException(exc, 'query')
 
-        auto = 'auto' in parameters and parameters['auto'] == 'ano'
+        auto = parameters.get('auto', 'ne') == 'ano'
 
         return cls(find, replacements, site, auto, query)
 
@@ -120,17 +132,13 @@ class TypoRule(object):
                 replacement = match.expand(repl)
                 replacements.append(replacement)
                 options.append(
-                    (u"%s %s" % (i, underscores(replacement)), str(i))
+                    ('%s %s' % (i, underscores(replacement)), str(i))
                 )
             text = match.string
-            pre = text[max(0, match.start() - 30):match.start()]
-            post = text[match.end():match.end() + 30]
-            if "\n" in pre:
-                pre = pre[pre.rindex("\n") + 1:]
-            if "\n" in post:
-                post = post[:post.index("\n")]
-            pywikibot.output(
-                pre + color_format(u'{lightred}{0}{default}', old) + post)
+            pre = text[max(0, match.start() - 30):match.start()].rpartition('\n')[2]
+            post = text[match.end():match.end() + 30].partition('\n')[0]
+            pywikibot.output(color_format('{0}{lightred}{1}{default}{2}',
+                                          pre, old, post))
             choice = pywikibot.input_choice('Choose the best replacement',
                                             options, automatic_quit=False,
                                             default='k')
@@ -139,11 +147,11 @@ class TypoRule(object):
         else:
             new = match.expand(self.replacements[0])
             if old == new:
-                pywikibot.warning(u'No replacement done in string "%s"' % old)
+                pywikibot.warning('No replacement done in string "%s"' % old)
 
         if old != new:
-            fragment = u' → '.join(underscores(re.sub('\n', r'\\n', i))
-                                   for i in (old, new))
+            fragment = ' → '.join(underscores(re.sub('\n', r'\\n', i))
+                                  for i in (old, new))
             if fragment.lower() not in (i.lower() for i in replaced):
                 replaced.append(fragment)
         return new
@@ -157,11 +165,13 @@ class TypoRule(object):
         delta = finish - start
         self.longest = max(delta, self.longest)
         if delta > 5:
-            pywikibot.warning(u'Slow typo rule "%s" (%s)' % (
+            pywikibot.warning('Slow typo rule "%s" (%s)' % (
                 self.find.pattern, delta))
         return text
 
 class TyposLoader(object):
+
+    top_id = 0
 
     '''Class loading and holding typo rules'''
 
@@ -173,7 +183,7 @@ class TyposLoader(object):
 
     def getWhitelistPage(self):
         if self.whitelist_page_name is None:
-            self.whitelist_page_name = u'Wikipedie:WPCleaner/Typo/False'
+            self.whitelist_page_name = 'Wikipedie:WPCleaner/Typo/False'
 
         return pywikibot.Page(self.site, self.whitelist_page_name)
 
@@ -182,7 +192,7 @@ class TyposLoader(object):
         self.typoRules = []
 
         if self.typos_page_name is None:
-            self.typos_page_name = u'Wikipedie:WPCleaner/Typo'
+            self.typos_page_name = 'Wikipedie:WPCleaner/Typo'
         typos_page = pywikibot.Page(self.site, self.typos_page_name)
         if not typos_page.exists():
             # todo: feedback
@@ -199,9 +209,11 @@ class TyposLoader(object):
                     pywikibot.warning(exc.message)
                 except InvalidExpressionException as exc:
                     if 'fixed-width' not in exc.message:
-                        pywikibot.warning(u'Invalid %s %s: %s' % (
+                        pywikibot.warning('Invalid %s %s: %s' % (
                             exc.aspect, fielddict['1'], exc.message))
                 else:
+                    rule.id = self.top_id
+                    self.top_id += 1
                     if load_all or not rule.needsDecision():
                         self.typoRules.append(rule)
 

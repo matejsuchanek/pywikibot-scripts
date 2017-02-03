@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import pywikibot
 import time
 
 from pywikibot import pagegenerators
-from pywikibot.bot import NoRedirectPageBot, SkipPageError
+from pywikibot.bot import SkipPageError
 
-from scripts.myscripts.typoloader import TyposLoader
-from scripts.myscripts.wikitext import WikitextFixingBot
+from .typoloader import TyposLoader
+from .wikitext import WikitextFixingBot
 
-class TypoBot(WikitextFixingBot, NoRedirectPageBot):
+class TypoBot(WikitextFixingBot):
 
     '''
     Bot for typo fixing
@@ -39,19 +41,19 @@ class TypoBot(WikitextFixingBot, NoRedirectPageBot):
         self.whitelist = loader.loadWhitelist()
         self.offset = offset
         generator = genFactory.getCombinedGenerator()
-        if generator:
-            self.own_generator = False
-            self.generator = generator
-        else:
-            self.own_generator = True
-            self.generator = self.makeGenerator()
+        self.own_generator = not bool(generator)
+        if self.own_generator:
+            generator = self.makeGenerator
+        self.generator = pagegenerators.PreloadingGenerator(generator)
 
+    @property
     def isRuleAccurate(self):
         threshold = float(self.getOption('threshold'))
         result = (self.processed < threshold or
                   self.processed / threshold < self.replaced)
         return result
 
+    @property
     def makeGenerator(self):
         for i, rule in enumerate(self.typoRules[:]):
             if self.offset > i:
@@ -61,7 +63,7 @@ class TypoBot(WikitextFixingBot, NoRedirectPageBot):
 
             # todo: if not allrules:...
             self.offset = i
-            pywikibot.output(u'\nQuery: "%s"' % rule.query)
+            pywikibot.output('\nQuery: "%s"' % rule.query)
             old_max = rule.longest
             rule.longest = 0.0
             self.currentrule = rule
@@ -69,17 +71,17 @@ class TypoBot(WikitextFixingBot, NoRedirectPageBot):
             self.replaced = 0.0
             for page in rule.querySearch():
                 yield page
-                if not self.isRuleAccurate():
+                if not self.isRuleAccurate:
                     pywikibot.output(
-                        u'Skipped inefficient query "%s" (%s/%s)' % (
+                        'Skipped inefficient query "%s" (%s/%s)' % (
                             rule.query,
                             int(self.replaced), int(self.processed)))
                     break
             else:
                 if self.processed < 1:
-                    pywikibot.output(u'No results from query %s' % rule.query)
+                    pywikibot.output('No results from query %s' % rule.query)
                 else:
-                    pywikibot.output(u'{}% accuracy of query {}'.format(
+                    pywikibot.output('{}% accuracy of query {}'.format(
                         int((self.replaced / self.processed) * 100), rule.query))
 
             if self.processed > 0:
@@ -88,8 +90,8 @@ class TypoBot(WikitextFixingBot, NoRedirectPageBot):
 
     def saveFalsePositive(self):
         title = self.current_page.title()
-        self.fp_page.text += u'\n* [[%s]]' % title
-        self.fp_page.save(summary=u'[[%s]]' % title, async=True)
+        self.fp_page.text += '\n* [[%s]]' % title
+        self.fp_page.save(summary='[[%s]]' % title, async=True)
         self.whitelist.append(title)
 
     def init_page(self, page):
@@ -108,10 +110,11 @@ class TypoBot(WikitextFixingBot, NoRedirectPageBot):
         page = self.current_page
         text = page.text
         done_replacements = []
+        quickly = self.getOption('quick') is True
         if self.own_generator:
             text = self.currentrule.apply(page.text, done_replacements)
             if page.text == text:
-                if self.getOption('quick') is True:
+                if quickly:
                     # todo: output
                     return
             else:
@@ -119,22 +122,22 @@ class TypoBot(WikitextFixingBot, NoRedirectPageBot):
 
         start = time.clock()
         for rule in self.typoRules:
+            if rule == self.currentrule: # __eq__
+                continue
             if rule.matches(page.title()):
                 continue
-            if (self.getOption('quick') is True or
-                (self.getOption('allrules') is not True
-                 and rule.needsDecision())):
+            if quickly and rule.needsDecision():
                 continue
 
             text = rule.apply(text, done_replacements)
             stop = time.clock()
-            if self.getOption('quick') is True and stop - start > 15:
+            if quickly and stop - start > 15:
                 pywikibot.warning('Other typos exceeded 15s, skipping')
                 break
 
         if len(done_replacements) > 0:
             always = self.getOption('always') is True
-            if not always:
+            if not always: # fixme: override supermethod
                 pywikibot.showDiff(page.text, text)
                 options = [('yes', 'y'),
                            ('no', 'n'),
@@ -161,7 +164,7 @@ class TypoBot(WikitextFixingBot, NoRedirectPageBot):
             self.options['always'] = True # fixme: can bypass other features
             self._save_page(
                 page, self.fix_wikitext, page, async=True,
-                summary=u'oprava překlepů: %s' % ', '.join(done_replacements))
+                summary='oprava překlepů: %s' % ', '.join(done_replacements))
             self.options['always'] = always
 
     def exit(self):
@@ -169,11 +172,11 @@ class TypoBot(WikitextFixingBot, NoRedirectPageBot):
         rules = sorted(filter(lambda rule: not rule.needsDecision(),
                               self.typoRules),
                        key=lambda rule: rule.longest, reverse=True)[:3]
-        pywikibot.output("\nSlowest autonomous rules:")
+        pywikibot.output('\nSlowest autonomous rules:')
         for i, rule in enumerate(rules, start=1):
             pywikibot.output(
                 '%s. "%s" - %s' % (i, rule.find.pattern, rule.longest))
-        pywikibot.output("\nCurrent offset: %s\n" % self.offset)
+        pywikibot.output('\nCurrent offset: %s\n' % self.offset)
 
 def main(*args):
     options = {}

@@ -6,9 +6,9 @@ import re
 
 from pywikibot import i18n, pagegenerators, textlib
 
-from scripts.myscripts.deferred import DeferredCallbacksBot
-from scripts.myscripts.wikidata import WikidataEntityBot
-from scripts.myscripts.wikitext import WikitextFixingBot
+from .deferred import DeferredCallbacksBot
+from .wikidata import WikidataEntityBot
+from .wikitext import WikitextFixingBot
 
 save_summary = {
     'cs': 'odstranění odkazu na neexistující kategorii na Commons',
@@ -73,26 +73,22 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
             if has_param is True:
                 regex += r'\| *' + re.escape(cat_name)
             regex += r'[^\}]*\}\}'
-            page_replaced_text = re.sub(regex, '', page.text, flags=re.M | re.U)
-            if page_replaced_text == page.text:
-                pywikibot.warning('No replacement done')
-            else:
+            page_replaced_text = re.sub(regex, '', page.text, flags=re.M | re.U,
+                                        count=1)
+            if page_replaced_text != page.text:
                 templates = (
                     '|'.join(map(re.escape, self.site.getmagicwords('defaultsort'))),
                     '[Pp]ahýl', '[Pp]osloupnost', '[Aa]utoritní data', '[Pp]ortály')
                 page_replaced_text = re.sub(
                     r'\s*==+ ?Externí odkazy ?==+ *$\s*^(==|\{\{'
                     '(?:' + '|'.join(templates) + ')'
-                    '|\[\[(?:%s):)' % '|'.join(self.site.namespaces[14]),
+                    r'|\[\[(?:%s):)' % '|'.join(self.site.namespaces[14]),
                     r'\n\n\1',
-                    page_replaced_text,
-                    flags=re.M | re.U)
-                if not self.getOption('always'):
-                    pywikibot.showDiff(page.text, page_replaced_text)
-                page.text = page_replaced_text
-                self.doWithCallback(
-                    self._save_page, page, self.fix_wikitext, page,
-                    summary=i18n.translate(self.site, save_summary))
+                    page_replaced_text, flags=re.M | re.U, count=1)
+
+            self.doWithCallback(
+                self.userPut, page, page.text, page_replaced_text,
+                summary=i18n.translate(self.site, save_summary))
         else:
             if self.getOption('noimport') is True:
                 pywikibot.output('Category exists on Commons, import restricted')
@@ -107,6 +103,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
                 self._save_page(item, self._save_entity, claim.addSource, ref)
                 self.options['always'] = old
                 self.addCallback(page.touch, botflag=True)
+            #else: todo
 
 def main(*args):
     options = {}
@@ -123,8 +120,8 @@ def main(*args):
                 options[arg[1:]] = True
 
     generator = genFactory.getCombinedGenerator()
+    site = pywikibot.Site()
     if not generator:
-        site = pywikibot.Site()
         repo = site.data_repository()
         item = pywikibot.ItemPage(repo, 'Q11925744')
         try:

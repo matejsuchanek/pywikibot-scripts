@@ -1,14 +1,21 @@
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import pywikibot
 import random
 import re
 
 from pywikibot import pagegenerators, textlib
 
-from pywikibot.bot import NoRedirectPageBot
 from pywikibot.tools import first_upper
 
-from scripts.myscripts.wikitext import WikitextFixingBot
+try:
+    from .wikitext import WikitextFixingBot
+except ImportError:
+    from pywikibot.bot import SingleSiteBot, ExistingPageBot, NoRedirectPageBot
+
+    class WikitextFixingBot(SingleSiteBot, NoRedirectPageBot, ExistingPageBot):
+        pass
 
 class OldParamException(Exception):
     pass
@@ -19,7 +26,7 @@ class RemoveParamException(Exception):
 class UnknownParamException(Exception):
     pass
 
-class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
+class InfoboxMigratingBot(WikitextFixingBot):
 
     '''
     Bot to rename an infobox and its parameters
@@ -34,12 +41,12 @@ class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
 
     alt_param = 'alt'
     caption_param = 'popisek'
-    image_param = u'obrázek'
-    image_size_param = u'velikost obrázku'
-    latitude = u'zeměpisná šířka'
-    longitude = u'zeměpisná délka'
+    image_param = 'obrázek'
+    image_size_param = 'velikost obrázku'
+    latitude = 'zeměpisná šířka'
+    longitude = 'zeměpisná délka'
 
-    summary = u'sjednocení infoboxu'
+    summary = 'sjednocení infoboxu'
 
     all_params = []
     rename_params = {}
@@ -95,12 +102,12 @@ class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
                 end = text.index('}}', start)
 
             for name, value in fielddict.items():
-                end += len(u'|%s=%s' % (name, value))
+                end += len('|%s=%s' % (name, value))
 
                 name = name.strip()
                 value = (value
-                         .replace(u'\n<!-- Zastaralé parametry -->', '')
-                         .replace(u'\n<!-- Neznámé parametry -->', '')
+                         .replace('\n<!-- Zastaralé parametry -->', '')
+                         .replace('\n<!-- Neznámé parametry -->', '')
                          .strip())
 
                 try:
@@ -182,28 +189,26 @@ class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
         self.handleParams(new_params, old_params, removed_params, unknown_params)
         new_params.sort(key=self.keyForSort)
 
-        new_template = u'{{%s' % self.new_template
+        new_template = '{{%s' % self.new_template
         if len(new_params) > 0:
             new_template += '\n'
             for param, value in new_params:
-                new_template += u'%s| %s = %s\n' % (space_before, param, value)
+                new_template += '%s| %s = %s\n' % (space_before, param, value)
 
         if len(old_params) > 0:
-            new_template += u'<!-- Zastaralé parametry -->\n'
+            new_template += '<!-- Zastaralé parametry -->\n'
             for param, value in old_params:
-                new_template += u'%s| %s = %s\n' % (space_before, param, value)
+                new_template += '%s| %s = %s\n' % (space_before, param, value)
 
         if len(unknown_params) > 0:
-            new_template += u'<!-- Neznámé parametry -->\n'
+            new_template += '<!-- Neznámé parametry -->\n'
             for param, value in unknown_params:
-                new_template += u'%s| %s = %s\n' % (space_before, param, value)
+                new_template += '%s| %s = %s\n' % (space_before, param, value)
 
         new_template += '}}\n'
 
-        page.text = text[:start] + new_template + text[end:]
-        if self.getOption('always') is not True:
-            pywikibot.showDiff(text, page.text)
-        self._save_page(page, self.fix_wikitext, page, summary=self.summary)
+        self.userPut(page, page.text, text[:start] + new_template + text[end:],
+                     summary=self.summary)
 
     def keyForSort(self, value):
         name = value[0]
@@ -326,7 +331,7 @@ class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
         if match:
             image, _, rest = match.group().partition('|')
             image = image.strip('[').strip()
-            for x in rest.split('|'):
+            for x in rest[:-2].split('|'):
                 if size and caption:
                     break
                 if x.startswith('alt='):
@@ -351,11 +356,11 @@ class InfoboxMigratingBot(WikitextFixingBot, NoRedirectPageBot):
                    for ns in self.site.namespaces[6]):
                 image = image.partition(':')[2].strip()
 
-        return image, '', ''
+        return image, size, caption
 
     def exit(self):
         super(InfoboxMigratingBot, self).exit()
-        pywikibot.output("Current offset: %s" % self.offset)
+        pywikibot.output('Current offset: %s' % self.offset)
 
 # TODO: prepare for extending
 def main(*args): # bot_class=InfoboxMigratingBot
@@ -383,7 +388,7 @@ def main(*args): # bot_class=InfoboxMigratingBot
 
     generator = genFactory.getCombinedGenerator()
     if not generator:
-        genFactory.handleArg(u'-transcludes:%s' % options['template'])
+        genFactory.handleArg('-transcludes:%s' % options['template'])
         generator = genFactory.getCombinedGenerator()
 
     bot = InfoboxMigratingBot(generator=generator, **options) # bot_class

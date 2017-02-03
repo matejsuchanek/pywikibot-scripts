@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 """
 Module holding fixes which can be applied to most articles.
 
@@ -8,17 +9,20 @@ from scripts.myscripts.custome_fixes import lazy_fixes
 fixes.update(
     dict((key, fix.dictForUserFixes()) for key, fix in lazy_fixes.items())
 )
-
 """
 import pywikibot
 import re
 
-from pywikibot import textlib
+from itertools import chain
+from pywikibot import pagegenerators, textlib
+from pywikibot.textlib import mwparserfromhell
 from pywikibot.tools import first_lower, first_upper
 from pywikibot.tools.formatter import color_format
 
-from scripts.myscripts.checkwiki_errors import CheckWikiError, deduplicate
-from scripts.myscripts.typoloader import TypoRule, TyposLoader
+from .checkwiki_errors import CheckWikiError, deduplicate
+from .typoloader import TypoRule, TyposLoader
+
+FULL_ARTICLE_REGEX = '(?s)^.*$'
 
 class FixGenerator(object):
 
@@ -38,13 +42,24 @@ class FixGenerator(object):
     def __len__(self):
         return self.len
 
-class Fix(object):
+class BaseFix(object):
 
     '''Abstract class representing a wikitext fix'''
 
     key = None
-    options = {}
     order = 0
+
+    def apply(self, page, *args):
+        raise NotImplementedError('All fixes must be applicable')
+
+    def generator(self):
+        return (x for x in []) # empty
+
+class Fix(BaseFix):
+
+    '''A wikitext fix that needs access to the page'''
+
+    options = {}
     _exceptions = {}
 
     def __init__(self, **kwargs):
@@ -56,7 +71,7 @@ class Fix(object):
     @property
     def site(self):
         if not hasattr(self, '_site'):
-            self._site = pywikibot.Site() # todo: is this okay? should load?
+            self._site = pywikibot.Site() # todo: is this correct? should load?
         return self._site
 
     @site.setter
@@ -67,14 +82,8 @@ class Fix(object):
     def load(self):
         pass
 
-    def generator(self):
-        return (x for x in []) # empty
-
     def dictForUserFixes(self):
         raise NotImplementedError('Fixes for user-fixes.py must extend LazyFix')
-
-    def apply(self, *args):
-        raise NotImplementedError('All fixes must be applicable')
 
     def safeSub(self, text, find, replace):
         exceptions = self.exceptions
@@ -87,7 +96,7 @@ class Fix(object):
     def exceptions(self):
         return self._exceptions
 
-class LazyFix(Fix):
+class LazyFix(Fix): # todo: extend BaseFix
 
     '''Abstract class for fixes that can also be used for user-fixes.py'''
 
@@ -150,10 +159,24 @@ class AdataFix(Fix):
         repo = self.site.data_repository()
         self.human_item = pywikibot.ItemPage(repo, 'Q5')
 
+    def generator(self):
+        extra = {
+            'common_wiki': 'wikidata',
+            'templates_no': 'Autoritní data', # l10n!
+            'wikidata_source_sites': self.site.dbName(),
+            'wikidata_item': 'with',
+            'wikidata_prop_item_use': ','.join(self.props),
+        }
+        petscan = pagegenerators.PetScanPageGenerator(
+            ['Muži', 'Ženy', 'Žijící_lidé'], subset_combination=False,
+            site=self.site, namespaces=[0], extra_options=extra) # l10n!
+        items = pagegenerators.PreloadingItemGenerator(petscan) # hack
+        return pagegenerators.WikidataPageFromItemGenerator(items, self.site)
+
     def apply(self, page, summaries=[], callbacks=[]):
         text = page.text
-        adata = u'{{Autoritní data}}'
-        if adata.lower() in text.lower():
+        adata = '{{Autoritní data}}' # fixme: l10n
+        if adata.lower() in text.lower(): # fixme: with parameters
             return
 
         try:
@@ -161,26 +184,148 @@ class AdataFix(Fix):
         except pywikibot.NoPage:
             return
 
-        item.get()
+        claims = item.get().get('claims')
         if not any(st.target_equals(self.human_item)
-                   for st in item.claims.get('P31', [])):
+                   for st in claims.get('P31', [])):
+            return # fixme: not mandatory
+
+        if len(self.props & set(claims.keys())) < self.minprops:
             return
 
-        if len(self.props & set(item.claims.keys())) < self.minprops:
-            return
-
-        # fixme: l10n
-        new_text = re.sub(r'(\{\{[Pp]ortály\|)', r'%s\n\1' % adata, text, count=1)
+        new_text = re.sub(r'(\{\{[Pp]ortály\|)', r'%s\n\1' % adata, text,
+                          count=1) # fixme: l10n
         if new_text == text:
-            new_text = re.sub(r'(\{\{DEFAULTSORT:)', r'%s\n\n\1' % adata, text, count=1)
+            new_text = re.sub(
+                r'\{\{ *(%s)' % '|'.join(
+                    map(re.escape, page.site.getmagicwords('defaultsort'))),
+                r'%s\n\n{{\1' % adata, text, count=1)
         if new_text == text:
-            new_text = re.sub(r'(\[\[Kategorie:)', r'%s\n\n\1' % adata, text, count=1)
+            new_text = re.sub(
+                r'\[\[ *(%s)' % '|'.join(
+                    map(re.escape, page.site.namespaces[14])),
+                r'%s\n\n[[\1' % adata, text, count=1, flags=re.I)
         if new_text != text:
-            summaries.append(u'doplnění autoritních dat')
+            summaries.append('doplnění autoritních dat')
             page.text = new_text
         else:
             pywikibot.output('Failed to add authority control')
 
+class CategoriesFix(LazyFix):
+
+    '''
+    Fixes category sortkeys
+    '''
+
+    key = 'categories'
+    _summary = 'oprava řazení kategorií'
+
+    def generator(self):
+        pass # incategory:Muži|Ženy|Žijící_lidé -insource:DEFAULTSORT insource:/\[\[Kategorie:[^]|[]+\|[^]]+,/
+
+    def replacements(self):
+        yield (FULL_ARTICLE_REGEX, self.duplicateSortKey)
+        yield (FULL_ARTICLE_REGEX, self.harvestSortKey)
+
+    def sortCategories(self, category):
+        MAIN_CATEGORY = 0
+        REGULAR_CATEGORY = 1
+        BIRTH_CATEGORY = 10
+        DEATH_CATEGORY = 20
+        PLACE = 0
+        CENTURY = 1
+        YEAR = 2
+        DATE = 3
+        LIVING_CATEGORY = 30
+        MAINTENANCE_CATEGORY = 50
+        GENDER_CATEGORY = 100
+        if category.sortKey == ' ':
+            return MAIN_CATEGORY
+
+        title = category.title(withNamespace=False, insite=category.site)
+        split = title.split()
+        if title.startswith('Údržba:'):
+            return MAINTENANCE_CATEGORY
+        if title == 'Žijící lidé':
+            return LIVING_CATEGORY
+        if title in ('Muži', 'Ženy'):
+            return GENDER_CATEGORY
+
+        index = REGULAR_CATEGORY
+        if split[0] in ('Narození', 'Úmrtí'):
+            if title.startswith('Narození'):
+                index = BIRTH_CATEGORY
+            elif title.startswith('Úmrtí'):
+                index = DEATH_CATEGORY
+
+            if 'století' in split:
+                index += CENTURY
+            elif 'v' in split or 've' in split:
+                index += PLACE
+            elif split[1] == split[-1] and split[-1].isdigit():
+                index += YEAR
+            else:
+                index += DATE
+
+        return index
+
+    def duplicateSortKey(self, match):
+        text = match.group()
+        matches = list(re.finditer(r'\{\{(?:%s)([^}]+)\}\}' % '|'.join(
+            map(re.escape, self.site.getmagicwords('defaultsort'))), text))
+        if not matches:
+            return text
+        defaultsort = matches.pop().group(1).strip()
+        categories = textlib.getCategoryLinks(text, site=self.site)
+        changed = False
+        for category in categories:
+            if category.sortKey == defaultsort:
+                category.sortKey = None
+                changed = True
+
+        if changed:
+            categories.sort(key=self.sortCategories)
+            return textlib.replaceCategoryLinks(text, categories, self.site)
+        else:
+            return text
+
+    def harvestSortKey(self, match):
+        text = match.group()
+        magic = self.site.getmagicwords('defaultsort')
+        if re.search(r'\{\{(?:%s)([^}]+)\}\}' % '|'.join(map(re.escape, magic)), text):
+            return text
+
+        keys = {}
+        categories = textlib.getCategoryLinks(text, site=self.site)
+        if not any(category.title(withNamespace=False) in (
+            'Muži', 'Žijící lidé', 'Ženy') for category in categories):
+            return text
+
+        for category in categories:
+            key = category.sortKey
+            if key and key.strip():
+                keys[key.strip()] = keys.get(key.strip(), 0) + 1
+                if len(keys) > 1:
+                    return text
+        if not keys:
+            return text
+
+        key = list(keys.keys()).pop()
+        if ', ' not in key: # temp
+            return text
+        if float(len(categories)) / sum(keys.values()) > 2:
+            return text
+
+        for category in categories:
+            if category.sortKey == key:
+                category.sortKey = None
+
+        categories.sort(key=self.sortCategories)
+        text = textlib.removeCategoryLinks(text, self.site)
+        text += '\n\n{{DEFAULTSORT:%s}}' % key
+        before, _, after = textlib.replaceCategoryLinks(
+            text, categories, self.site).rpartition('\n\n') # fixme: safer
+        return before + '\n' + after
+        
 class FilesFix(LazyFix):
 
     key = 'files'
@@ -191,10 +336,10 @@ class FilesFix(LazyFix):
              'img_super', 'img_text_bottom', 'img_text_top', 'img_thumbnail',
              'img_top', 'img_upright', 'img_width']
     regex = r'\[\[\s*(?:%s)\s*:\s*[^]|[]+(?:\|(?:[^]|[]|\[\[[^]]+\]\])+)+\]\]'
-    _summary = u'úpravy obrázků'
+    _summary = 'úpravy obrázků'
 
     def load(self):
-        pywikibot.output("Please help fix [[phab:T148959]] for better wikisyntax parsing")
+        pywikibot.output('Please help fix [[phab:T148959]] for better wikisyntax parsing') # fixme: resolved
         self.file_regex = re.compile(
             self.regex % '|'.join(self.site.namespaces[6]))
 
@@ -220,19 +365,20 @@ class FilesFix(LazyFix):
 ##      if match.group().count('[[') != match.group().count(']]'):
 ##          return match.group()
 
-        split = [x.strip() for x in match.group()[2:-2].split('|')]
+        split = match.group()[2:-2].split('|')
 
-        split[0] = pywikibot.page.url2unicode(split[0])
+        split[0] = pywikibot.page.url2unicode(split[0].strip())
         split[0] = re.sub('[ _]+', ' ', split[0]).strip()
         i = 1
         while i < len(split):
             while (split[i].count('[[') != split[i].count(']]') or
                    split[i].count('{{') != split[i].count('}}')):
                 split[i] += '|' + split[i+1]
-                del split[i+1]
+                split.pop(i+1)
 
-            if split[i].strip() == '':
-                del split[i]
+            split[i] = split[i].strip()
+            if split[i] == '':
+                split.pop(i)
                 continue
 
             if split[i] in self.wordtokey:
@@ -240,9 +386,9 @@ class FilesFix(LazyFix):
                 i += 1
                 continue
 
-            if re.match(r'\d*x?\d+(%s)$' %
-                        '|'.join(x[2:] for x in self.wordtokey
-                                 if x.startswith('$1')), split[i]):
+            if re.match(r'\d*x?\d+(%s)$' % '|'.join(
+                map(re.escape, (x[2:] for x in self.wordtokey
+                    if x.startswith('$1')))), split[i]):
                 i += 1
                 continue
 
@@ -256,8 +402,8 @@ class FilesFix(LazyFix):
                     word = self.keytolocal[key].partition('=')[0]
                     break
                 else:
-                    if rest.endswith('.'): # todo
-                        pass
+                    # if rest.endswith('.'): todo
+                    pass
 
             split[i] = word + eq + rest
             i += 1
@@ -272,7 +418,7 @@ class FilesFix(LazyFix):
 
         return '[[' + '|'.join(split) + ']]'
 
-class CheckWikiFix(LazyFix):
+class CheckWikiFix(LazyFix): # todo: make abstract and split
 
     '''
     Fixes errors detected by Check Wikipedia project
@@ -283,16 +429,18 @@ class CheckWikiFix(LazyFix):
 
     key = 'checkwiki'
     options = {
-        'maxsummarycw': 5
+        'maxsummarycw': 5 # todo: really support
     }
     _exceptions = {
         'inside-tags': CheckWikiError.exceptions[:],
     }
-    _summary = u'opravy dle [[WP:WCW|CheckWiki]]'
+    _summary = 'opravy dle [[WP:WCW|CheckWiki]]'
 
     def load(self):
         from scripts.myscripts.checkwiki import CheckWiki
         self.checkwiki = CheckWiki(self.site) # fixme: **kwargs
+
+    #def generator(self): todo
 
     def replacements(self):
         for error in self.checkwiki.iter_errors([], forFixes=True):
@@ -304,7 +452,7 @@ class CheckWikiFix(LazyFix):
         fixed = []
         page.text = self.checkwiki.applyErrors(page.text, page, replaced, fixed)
         if len(replaced) > 0: # todo: maxsummarycw
-            summaries.append(u'[[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced))
+            summaries.append('[[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced))
             callbacks.append(lambda: self.checkwiki.markFixed(fixed, page))
 
 class InterwikiFix(Fix):
@@ -332,7 +480,7 @@ class InterwikiFix(Fix):
         new_links = dict((site, iw_links[site]) for site in new_sites)
 
         page.text = textlib.replaceLanguageLinks(page.text, new_links, page.site)
-        summaries.append(u'odstranění interwiki')
+        summaries.append('odstranění interwiki')
 
 class RedirectFix(LazyFix):
 
@@ -347,15 +495,15 @@ class RedirectFix(LazyFix):
     options = {
         'onlypiped': False,
     }
-    page_title = u'Wikipedista:PastoriBot/narovnaná přesměrování'
+    page_title = 'Wikipedista:PastoriBot/narovnaná přesměrování'
     _exceptions = {
         'inside-tags': ['comment', 'nowiki', 'pre', 'source'],
-        'text-contains': [u'{{Rozcestník', u'{{rozcestník'],
+        'text-contains': ['{{Rozcestník', '{{rozcestník'],
     }
-    _summary = u'narovnání přesměrování'
+    _summary = 'narovnání přesměrování'
 
     def load(self):
-        self.redirects = []
+        self.redirects = [] # todo: set?
         self.cache = {}
         pywikibot.output('Loading redirects')
         page = pywikibot.Page(self.site, self.page_title)
@@ -369,74 +517,95 @@ class RedirectFix(LazyFix):
 
         pywikibot.output('%s redirects loaded' % len(self.redirects))
 
-    def replacements(self):
-        yield (r'\[\[([^][]+)\]\]', self.replace)
+    def from_cache(self, link):
+        link = link.replace('_', ' ').strip() # todo
+        if link not in self.redirects:
+            return False
 
-    def replace(self, match):
-        split = match.group(1).split('|')
-        if len(split) > 2:
-            return match.group()
-        if len(split) == 1 and self.onlypiped:
-            return match.group()
-        if split[0].startswith('Kategorie:'): # fixme: l10n
-            return match.group()
-
-        page_title = split[0].replace('_', ' ').strip()
-        if page_title not in self.redirects:
-            return match.group()
-
-        if page_title not in self.cache:
-            page = pywikibot.Page(self.site, page_title)
+        if link not in self.cache:
+            page = pywikibot.Page(self.site, link)
             if not page.exists():
                 pywikibot.warning('%s does not exist' % page.title())
-                self.redirects.remove(page_title) # fixme: both cases
-                return match.group()
+                self.redirects.remove(link) # fixme: both cases
+                return False
             if not page.isRedirectPage():
                 pywikibot.warning('%s is not a redirect' % page.title())
-                self.redirects.remove(page_title) # fixme: both cases
-                return match.group()
+                self.redirects.remove(link) # fixme: both cases
+                return False
 
             target = page.getRedirectTarget()
             title = target.title()
-            if page_title == first_lower(page_title):
-                self.cache[page_title] = first_lower(title)
+            if link == first_lower(link):
+                self.cache[link] = first_lower(title)
             else:
-                self.cache[page_title] = title
+                self.cache[link] = title
 
-        if len(split) == 1:
-            options = []
-            options_list = [
-                '[[%s]]' % page_title,
-                '[[%s]]' % self.cache[page_title],
-                '[[%s|%s]]' % (self.cache[page_title], page_title)
-            ]
-            for i, opt in enumerate(options_list, start=1):
-                options.append(
-                    ('%s %s' % (i, opt), str(i))
-                )
-            options.append(
-                ('Do not replace unpiped links', 'n')
+        return self.cache[link]
+
+    def replacements(self):
+        yield (r'\[\[([^]|[]+)\|', self.replace1)
+        if self.onlypiped is False:
+            yield (r'\[\[([^]|[]+)\]\](%s)?' % self.site.linktrail(),
+                   self.replace2)
+
+    def replace1(self, match):
+        link = match.group(1)
+        left_spaces = len(link) - len(link.lstrip())
+        right_spaces = len(link) - len(link.rstrip())
+        target = self.from_cache(link)
+        if not target:
+            return match.group()
+
+        return '[[%s%s%s|' % (left_spaces * ' ', target, right_spaces * ' ')
+
+    def replace2(self, match):
+        if self.onlypiped is True: # todo: user_interactor
+            return match.group()
+
+        link = match.group(1)
+        trail = match.group(2) or ''
+        target = self.from_cache(link)
+        if not target:
+            return match.group()
+
+        options_list = [match.group()]
+        if not trail:
+            left_spaces = len(link) - len(link.lstrip())
+            right_spaces = len(link) - len(link.rstrip())
+            options_list.append(
+                '[[%s%s%s]]' % (left_spaces * ' ', target, right_spaces * ' ')
             )
+        options_list.append(
+            '[[%s|%s%s]]' % (target, link, trail)
+        )
 
-            pre = match.string[max(0, match.start() - 30):match.start()]
-            post = match.string[match.end():match.end() + 30]
-            pywikibot.output(pre + color_format(u'{lightred}{0}{default}',
-                                                match.group()) + post)
-            choice = pywikibot.input_choice('Replace this link?',
-                                            options, default='1')
-            if choice == 'n':
-                self.onlypiped = True
-                return match.group()
-            else:
-                return options_list[int(choice)-1]
+        options = list(map(lambda x: ('%s %s' % (x[0], x[1]), str(x[0])),
+                           enumerate(options_list, start=1)))
+        options.append(
+            ('Do not replace unpiped links', 'n')
+        )
 
-        # fixme: let CC decide about whitespace
-        return '[[%s|%s]]' % (self.cache[page_title], split[-1])
+        pre = match.string[max(0, match.start() - 30):match.start()].rpartition('\n')[2]
+        post = match.string[match.end():match.end() + 30].partition('\n')[0]
+        pywikibot.output(color_format('{0}{lightred}{1}{default}{2}',
+                                      pre, match.group(), post))
+        choice = pywikibot.input_choice('Replace this link?', options,
+                                        default='1', automatic_quit=False)
+        if choice == 'n':
+            self.onlypiped = True
+            choice = 1
 
-class StyleFix(Fix):
+        return options_list[int(choice)-1]
 
-    key = 'mos' # style?
-    order = 2 # after CheckWiki
+class RefSortFix(LazyFix):
+
+    '''
+    Fix that reorders references in text
+    '''
+
+    key = 'sortref'
+    order = 2 # after checkwiki
+    _summary = 'seřazení referencí'
 
     def load(self):
         self.regex_single = re.compile(
@@ -446,7 +615,7 @@ class StyleFix(Fix):
             r'(?:\s*<ref(?:(?: name *=[^/=>]+)?>(?:(?!</ref>).)+</ref|'
             ' name *=[^/=>]+/)>){2,}', re.S)
 
-    def sortRef(self, ref, all_names, start):
+    def sortkey(self, ref, all_names, start):
         name = ref.group(1) or ref.group(2)
         if name:
             name = name.strip('" \'')
@@ -456,113 +625,242 @@ class StyleFix(Fix):
 
         return len(all_names)
 
-    def replaceRefs(self, match, all_names):
+    def replace_refs(self, match, all_names):
         refs = list(self.regex_single.finditer(match.group()))
         assert len(refs) > 1
-        refs.sort(key=lambda ref: self.sortRef(ref, all_names, match.start()))
+        refs.sort(key=lambda ref: self.sortkey(ref, all_names, match.start()))
         space_before = match.group()[
             :len(match.group()) - len(match.group().lstrip())]
         return space_before + ''.join(map(lambda ref: ref.group(), refs))
 
-    def sortCategory(self, cat):
-        split = cat.title(withNamespace=False, insite=cat.site).split()
-        if any(x.isdigit() for x in split): # year
-            return 2
-        elif u'století' in split: # century
-            return 2
-        elif 'v' in split or 've' in split: # place
-            return 1
-        elif any(x.rstrip('.').isdigit() for x in split): # date
-            return 3
-        return 0
+    def replacements(self):
+        yield (FULL_ARTICLE_REGEX, self.replace)
+
+    def replace(self, match):
+        text = match.group()
+        if 'group=' in text or '<references>' in text: # todo
+            return text
+
+        all_names = []
+        for match in self.regex_single.finditer(text):
+            name = match.group(1) or match.group(2)
+            if not name:
+                continue
+            name = name.strip('" \'')
+            for i, _ in all_names:
+                if i == name:
+                    break
+            else:
+                all_names.append((name, match.start()))
+
+        if len(all_names) > 0:
+            callback = lambda match: self.replace_refs(match, all_names)
+            text = self.regex_adjacent.sub(callback, text)
+
+        return text
+
+class SectionsFix(LazyFix):
+
+    '''
+    This fix reorders and cleans up closing sections (those with references,
+    external links etc.)
+    '''
+
+    key = 'sections'
+    bad_headers = ('Zdroj', 'Zdroje',)
+    replace_headers = {
+        'Externí odkaz': 'Externí odkazy',
+        'Externí zdroj': 'Externí odkazy',
+        'Externí zdroje': 'Externí odkazy',
+        'Podívejte se také na': 'Související články',
+        'Podobné články': 'Související články',
+        'Související stránka': 'Související články',
+        'Související stránky': 'Související články',
+        'Viz též': 'Související články',
+    }
+    root_header = 'Odkazy'
+    headers_in_order = ('Poznámky',
+                        'Reference',
+                        'Literatura',
+                        'Související články',
+                        'Externí odkazy',
+                        )
+    order = 3
+    _summary = 'standardizace závěrečných sekcí'
+
+    def load(self):
+        self.parser = mwparserfromhell
+        self.can_load = not isinstance(self.parser, Exception)
+
+    def replacements(self):
+        if self.can_load:
+            yield (FULL_ARTICLE_REGEX, self.replace)
+        else:
+            pywikibot.error('Cannot run SectionsFix when mwparserfromhell '
+                            'is not installed')
+
+    def iter_all_headers(self):
+        return chain(self.headers_in_order, self.bad_headers, [self.root_header])
+
+    def add_contents(self, sections, code):
+        next_index = code.nodes.index(sections[0]['nodes'][-1])
+        for i in range(1, len(sections)):
+            this_index = code.nodes.index(sections[i-1]['nodes'][0])
+            next_index = code.nodes.index(sections[i]['nodes'][0], this_index+1)
+            sections[i-1]['nodes'].extend(code.nodes[this_index+1:next_index])
+
+        index = next_index + 1
+        for index, node in enumerate(code.nodes[index:], start=index):
+            if isinstance(node, self.parser.nodes.wikilink.Wikilink):
+                text = str(node)[2:-2]
+                link = pywikibot.Link(text, self.site)
+                try:
+                    diff_site = link.site != self.site
+                except ValueError:
+                    diff_site = True
+                if diff_site:
+                    break
+                if link.namespace == 14:
+                    break
+            elif isinstance(node, self.parser.nodes.template.Template):
+                if any(node.name.startswith(magic)
+                       for magic in self.site.getmagicwords('defaultsort')):
+                    break
+                if any(node.name.matches(x) for x in ('Překlad', 'ID autority')):
+                    pass
+                elif str(code.nodes[index-1]).endswith('\n'):
+                    break
+            sections[-1]['nodes'].append(node)
+        else:
+            index += 1
+
+        return index
+
+    def deduplicate(self, sections, code):
+        do_more = False
+        for name in set(sect['name'] for sect in sections):
+            dupes = list(filter(lambda sect: sect['name'] == name, sections))
+            if len(dupes) == 1:
+                continue
+            do_more = True
+            i = len(dupes) - 2
+            while i > -1:
+                dupes[-1]['nodes'][1:1] = dupes[i]['nodes'][1:]
+                dupes.pop(i)
+                i -= 1
+
+        for sect in sections:
+            old_title = sect['nodes'][0].title
+            left_spaces = len(old_title) - len(old_title.lstrip())
+            right_spaces = len(old_title) - len(old_title.rstrip())
+            sect['nodes'][0].title = '%s%s%s' % (left_spaces * ' ',
+                                                 sect['name'],
+                                                 right_spaces * ' ')
+        return do_more
+
+    def sortkey(self, sect):
+        if sect['name'] == self.root_header:
+            return -1
+        return self.headers_in_order.index(sect['name']) # fixme: unsafe
+
+    def check_levels(self, sections, code):
+        do_more = False
+        mixed_levels = set([2, 3]) <= set(sect['nodes'][0].level
+                                          for sect in sections)
+        if mixed_levels:
+            if self.root_header not in (sect['name'] for sect in sections):
+                new_header = '== %s ==\n' % self.root_header
+                sections.insert(0, {
+                    'name': self.root_header,
+                    'nodes': self.parser.parse(new_header).nodes
+                })
+                for sect in sections[1:]:
+                    sect['nodes'][0].level = 3
+                do_more = True
+
+        return do_more
+
+    def reorganize(self, sections, code):
+        pass
+
+    def clean_empty(self, sections, code, do_more):
+        to_remove = []
+        for sect in sections[:-1]: # todo
+            if sect['name'] == self.root_header:
+                continue
+            if not ''.join(map(str, sect['nodes'][1:])).strip():
+                to_remove.append(sect)
+        for sect in to_remove:
+            sections.remove(sect)
+            do_more = True
+        if do_more:
+            for sect in sections:
+                if sect['name'] == self.root_header:
+                    continue
+                sect['nodes'][-1] = sect['nodes'][-1].rstrip() + '\n\n'
+
+    def replace(self, match):
+        text = match.group()
+        code = self.parser.parse(text, skip_style_tags=True)
+        sections = []
+        for header in code.ifilter_headings():
+            name = header.title.strip()
+            if name in self.replace_headers:
+                name = self.replace_headers[name]
+            if name in self.iter_all_headers():
+                sections.append({
+                    'name': first_upper(name),
+                    'nodes': [header],
+                })
+            else:
+                sections[:] = []
+        if not sections:
+            return text
+
+        do_more = False
+        first_index = min(code.nodes.index(sect['nodes'][0]) for sect in sections)
+        last_index = self.add_contents(sections, code)
+        do_more = self.deduplicate(sections, code) or do_more
+        do_more = self.check_levels(sections, code) or do_more
+        if do_more:
+            sections.sort(key=self.sortkey)
+        self.reorganize(sections, code)
+        self.clean_empty(sections, code, do_more)
+        code.nodes[first_index:last_index] = [node for sect in sections
+                                              for node in sect['nodes']]
+        return str(code)
+
+class StyleFix(Fix): # todo: split and delete
+
+    key = 'mos'
+    order = 2 # after checkwiki
 
     def apply(self, page, *args):
         # remove empty list items
         page.text = re.sub(r'^\* *\n', '', page.text, flags=re.M)
-        # sort adjacent references
-        if 'group=' not in page.text and '<references>' not in page.text:
-            all_names = []
-            for match in self.regex_single.finditer(page.text):
-                name = match.group(1) or match.group(2)
-                if not name:
-                    continue
-                name = name.strip('" \'')
-                for i, _ in all_names:
-                    if i == name:
-                        break
-                else:
-                    all_names.append((name, match.start()))
-
-            if len(all_names) > 0:
-                 page.text = self.regex_adjacent.sub(
-                     lambda match: self.replaceRefs(match, all_names),
-                     page.text)
 
         # sort categories
         categories = textlib.getCategoryLinks(page.text, site=page.site)
-        defaultsort = page.defaultsort()
-        category_men = pywikibot.Category(page.site, u'Muži')
-        category_women = pywikibot.Category(page.site, u'Ženy')
-        category_living = pywikibot.Category(page.site, u'Žijící lidé')
-        if any(x in categories for x in (category_men, category_women,
-                                         category_living)):
-            main_category = None
-            birth_categories = []
-            death_categories = []
-            maint_categories = []
-            for cat in categories[:]:
-                if defaultsort == cat.sortKey:
-                    cat.sortKey = None
-                title = cat.title(withNamespace=False, insite=page.site)
-                if title.startswith(u'Narození '):
-                    birth_categories.append(cat)
-                elif title.startswith(u'Úmrtí '):
-                    death_categories.append(cat)
-                elif title.startswith(u'Údržba:'):
-                    maint_categories.append(cat)
-                elif cat.sortKey == ' ':
-                    main_category = cat
-                else:
-                    continue
-                categories.remove(cat) # fixme: duplicate categories could break this
-
-            is_man = category_men in categories
-            is_woman = category_women in categories
-            is_alive = category_living in categories
-            if is_man:
-                categories.remove(category_men)
-            if is_woman:
-                categories.remove(category_women)
-            if is_alive:
+        category_living = pywikibot.Category(page.site, 'Žijící lidé')
+        if category_living in categories:
+            if any(cat.title(withNamespace=False).startswith('Úmrtí ')
+                   for cat in categories):
                 categories.remove(category_living)
+                page.text = textlib.replaceCategoryLinks(
+                    page.text, categories, page.site)
 
-            birth_categories.sort(key=self.sortCategory)
-            death_categories.sort(key=self.sortCategory)
-
-            if main_category:
-                categories.insert(0, main_category)
-            categories.extend(birth_categories)
-            categories.extend(death_categories)
-            categories.extend(maint_categories)
-            if is_alive and len(death_categories) == 0:
-                categories.append(category_living)
-            if is_man:
-                categories.append(category_men)
-            if is_woman:
-                categories.append(category_women)
-
-            page.text = textlib.replaceCategoryLinks(
-                page.text, categories, page.site)
-
-        page.text = re.sub(r'(\{\{DEFAULTSORT:[^}]+\}\}\n)\n(\[\[Kategorie:)',
-                           r'\1\2', page.text) # fixme: l10n
+        page.text = re.sub(
+            r'(\{\{ *(?:%s)[^}]+\}\}\n)\n(\[\[(?:%s))' % (
+                '|'.join(map(re.escape, self.site.getmagicwords('defaultsort'))),
+                '|'.join(self.site.namespaces[14])),
+            r'\1\2', page.text)
 
 class TemplateFix(LazyFix):
 
     '''Fixes redirected templates'''
 
     key = 'templates'
-    _summary = u'narovnání šablon'
+    _summary = 'narovnání šablon'
 
     def load(self):
         self.cache = {}
@@ -590,7 +888,7 @@ class TemplateFix(LazyFix):
         if not target:
             return match.group()
 
-        if template_name not in (first_upper(template_name), "n/a"): # todo
+        if template_name not in (first_upper(template_name), 'n/a', 'neutralita'): # todo
             target = first_lower(target)
 
         return match.group('before') + target + match.group('after')
@@ -616,13 +914,18 @@ class TypoFix(LazyFix):
     _exceptions = { # todo: whitelist
         'inside-tags': TypoRule.exceptions[:],
     }
-    _summary = u'oprava překlepů'
+    _summary = 'oprava překlepů'
     order = 1 # after redirects
 
     def load(self):
         loader = TyposLoader(self.site)
         self.typoRules = loader.loadTypos()
         self.whitelist = loader.loadWhitelist()
+
+    def generator(self):
+        return chain.from_iterable(
+            map(lambda rule: rule.querySearch(),
+                filter(lambda rule: rule.canSearch(), self.typoRules)))
 
     def replacements(self):
         return map(
@@ -646,19 +949,20 @@ class TypoFix(LazyFix):
         if count > 0: # todo: separate function
             if count > 1:
                 max_typos = self.maxsummarytypos
-                summary = u'oprava překlepů: %s' % ', '.join(replaced[:max_typos])
+                summary = 'oprava překlepů: %s' % ', '.join(replaced[:max_typos])
                 if count > max_typos:
                     if count - max_typos > 1:
-                        summary += u' a %s dalších' % (count - max_typos)
+                        summary += ' a %s dalších' % (count - max_typos)
                     else:
-                        summary += u' a jednoho dalšího'
+                        summary += ' a jednoho dalšího'
             else:
-                summary = u'oprava překlepu: %s' % replaced[0]
+                summary = 'oprava překlepu: %s' % replaced[0]
 
             summaries.append(summary)
 
 lazy_fixes = dict((fix.key, fix) for fix in [
-    CheckWikiFix, FilesFix, RedirectFix, TemplateFix, TypoFix])
+    CategoriesFix, CheckWikiFix, FilesFix, RedirectFix, RefSortFix, SectionsFix,
+    TemplateFix, TypoFix])
 all_fixes = dict((fix.key, fix) for fix in [
     AdataFix, InterwikiFix, StyleFix])
 all_fixes.update(lazy_fixes)
