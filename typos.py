@@ -4,6 +4,8 @@ from __future__ import unicode_literals
 import pywikibot
 import time
 
+from operator import attrgetter
+
 from pywikibot import pagegenerators
 from pywikibot.bot import SkipPageError
 
@@ -25,7 +27,7 @@ class TypoBot(WikitextFixingBot):
     * -whitelistpage: - what page holds pages which should be skipped
     '''
 
-    def __init__(self, genFactory, offset=0, **kwargs):
+    def __init__(self, generator, offset=0, **kwargs):
         self.availableOptions.update({
             'allrules': False,
             'quick': False,
@@ -34,17 +36,18 @@ class TypoBot(WikitextFixingBot):
             'whitelistpage': None,
         })
         kwargs['typos'] = False
+        self.own_generator = not bool(generator)
+        if self.own_generator:
+            self.generator = self.makeGenerator
+        else:
+            self.generator = pagegenerators.PreloadingGenerator(generator)
+
         super(TypoBot, self).__init__(**kwargs)
-        loader = TyposLoader(self.site, **kwargs)
+        loader = TyposLoader(self.site, **kwargs) # fixme: too many args
         self.typoRules = loader.loadTypos()
         self.fp_page = loader.getWhitelistPage()
         self.whitelist = loader.loadWhitelist()
         self.offset = offset
-        generator = genFactory.getCombinedGenerator()
-        self.own_generator = not bool(generator)
-        if self.own_generator:
-            generator = self.makeGenerator
-        self.generator = pagegenerators.PreloadingGenerator(generator)
 
     @property
     def isRuleAccurate(self):
@@ -88,8 +91,8 @@ class TypoBot(WikitextFixingBot):
                 pywikibot.output('Longest match: %ss' % rule.longest)
             rule.longest = max(old_max, rule.longest)
 
-    def saveFalsePositive(self):
-        title = self.current_page.title()
+    def save_false_positive(self, page):
+        title = page.title()
         self.fp_page.text += '\n* [[%s]]' % title
         self.fp_page.save(summary='[[%s]]' % title, async=True)
         self.whitelist.append(title)
@@ -115,7 +118,8 @@ class TypoBot(WikitextFixingBot):
             text = self.currentrule.apply(page.text, done_replacements)
             if page.text == text:
                 if quickly:
-                    # todo: output
+                    pywikibot.output('Typo not found, not fixing another typos '
+                                     'in quick mode')
                     return
             else:
                 self.replaced += 1
@@ -135,48 +139,51 @@ class TypoBot(WikitextFixingBot):
                 pywikibot.warning('Other typos exceeded 15s, skipping')
                 break
 
-        if len(done_replacements) > 0:
-            always = self.getOption('always') is True
-            if not always: # fixme: override supermethod
-                pywikibot.showDiff(page.text, text)
-                options = [('yes', 'y'),
-                           ('no', 'n'),
-                           ('open in browser', 'b'),
-                           ('always', 'a')]
-                if self.fp_page.exists():
-                    options.insert(2, ('false positive', 'f'))
-                choice = pywikibot.input_choice(
-                    'Do you want to accept these changes?',
-                    options, default='n')
+        self.userPut(page, page.text, text, summary='oprava překlepů: %s' %
+                     ', '.join(done_replacements))
 
-                if choice == 'n':
-                    return
-                if choice == 'b':
-                    pywikibot.bot.open_webbrowser(page)
-                    return
-                if choice == 'f':
-                    self.saveFalsePositive()
-                    return
-                if choice == 'a':
-                    self.options['always'] = always = True
+    def user_confirm(self, question):
+        if self.getOption('always'):
+            return True
 
-            page.text = text
-            self.options['always'] = True # fixme: can bypass other features
-            self._save_page(
-                page, self.fix_wikitext, page, async=True,
-                summary='oprava překlepů: %s' % ', '.join(done_replacements))
-            self.options['always'] = always
+        options = [('Yes', 'y'), ('No', 'n'), ('All', 'a'),
+                   ('open in browser', 'b'), ('Quit', 'q')]
+        if self.fp_page.exists():
+            options.insert(2, ('false positive', 'f'))
+
+        choice = pywikibot.input_choice(question, options, default='N',
+                                        automatic_quit=False)
+
+        if choice == 'n':
+            return False
+
+        if choice == 'b':
+            pywikibot.bot.open_webbrowser(self.current_page)
+            return False
+
+        if choice == 'f':
+            self.save_false_positive(self.current_page)
+            return False
+
+        if choice == 'q':
+            self.quit()
+
+        if choice == 'a':
+            self.options['always'] = True
+
+        return True
 
     def exit(self):
         super(TypoBot, self).exit()
         rules = sorted(filter(lambda rule: not rule.needsDecision(),
                               self.typoRules),
-                       key=lambda rule: rule.longest, reverse=True)[:3]
+                       key=attrgetter('longest'), reverse=True)[:3]
         pywikibot.output('\nSlowest autonomous rules:')
         for i, rule in enumerate(rules, start=1):
             pywikibot.output(
                 '%s. "%s" - %s' % (i, rule.find.pattern, rule.longest))
-        pywikibot.output('\nCurrent offset: %s\n' % self.offset)
+        if self.own_generator:
+            pywikibot.output('\nCurrent offset: %s\n' % self.offset)
 
 def main(*args):
     options = {}
@@ -193,8 +200,9 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    bot = TypoBot(genFactory, **options)
+    generator = genFactory.getCombinedGenerator()
+    bot = TypoBot(generator, **options)
     bot.run()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

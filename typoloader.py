@@ -5,6 +5,8 @@ import pywikibot
 import re
 import time
 
+from operator import methodcaller
+
 from pywikibot import pagegenerators, textlib
 
 from pywikibot.tools.formatter import color_format
@@ -152,7 +154,7 @@ class TypoRule(object):
         if old != new:
             fragment = ' → '.join(underscores(re.sub('\n', r'\\n', i))
                                   for i in (old, new))
-            if fragment.lower() not in (i.lower() for i in replaced):
+            if fragment.lower() not in map(methodcaller('lower'), replaced):
                 replaced.append(fragment)
         return new
 
@@ -206,7 +208,7 @@ class TyposLoader(object):
                 try:
                     rule = TypoRule.newFromParameters(fielddict, self.site)
                 except IncompleteTypoRuleException as exc:
-                    pywikibot.warning(exc.message)
+                    pywikibot.warning(exc.message) # pwb.exception?
                 except InvalidExpressionException as exc:
                     if 'fixed-width' not in exc.message:
                         pywikibot.warning('Invalid %s %s: %s' % (

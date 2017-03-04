@@ -5,6 +5,8 @@ import pywikibot
 import random
 import re
 
+from itertools import chain
+
 from pywikibot import pagegenerators, textlib
 
 from pywikibot.tools import first_upper
@@ -25,6 +27,21 @@ class RemoveParamException(Exception):
 
 class UnknownParamException(Exception):
     pass
+
+class UnnamedParamException(Exception):
+    pass
+
+class IterUnnamed(object):
+
+    def __init__(self, unnamed):
+        self.unnamed = unnamed
+
+    def __iter__(self):
+        while self.unnamed:
+            yield self.unnamed.popitem()
+
+    def __nonzero__(self):
+        return True
 
 class InfoboxMigratingBot(WikitextFixingBot):
 
@@ -101,7 +118,8 @@ class InfoboxMigratingBot(WikitextFixingBot):
             else:
                 end = text.index('}}', start)
 
-            for name, value in fielddict.items():
+            unnamed = {}
+            for name, value in chain(fielddict.items(), IterUnnamed(unnamed)):
                 end += len('|%s=%s' % (name, value))
 
                 name = name.strip()
@@ -113,21 +131,18 @@ class InfoboxMigratingBot(WikitextFixingBot):
                 try:
                     new_name = self.handleParam(name)
                 except OldParamException:
-                    if textlib.removeDisabledParts(
-                        value, ['comments']).strip() != '':
+                    if textlib.removeDisabledParts(value, ['comments']).strip():
                         old_params.append(
                             (name, value)
                         )
                 except RemoveParamException:
                     changed = True
-                    if textlib.removeDisabledParts(
-                        value, ['comments']).strip() != '':
+                    if textlib.removeDisabledParts(value, ['comments']).strip():
                         removed_params.append(
                             (name, value)
                         )
                 except UnknownParamException:
-                    if textlib.removeDisabledParts(
-                        value, ['comments']).strip() != '':
+                    if textlib.removeDisabledParts(value, ['comments']).strip():
                         unknown_params.append(
                             (name, value)
                         )
@@ -135,6 +150,8 @@ class InfoboxMigratingBot(WikitextFixingBot):
                     pywikibot.error(
                         'Couldn\'t handle parameter "%s"' % name)
                     return
+                except UnnamedParamException:
+                    unnamed[value] = ''
                 else:
                     new_params.append(
                         (new_name, value)
@@ -187,6 +204,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
             space_before = ' '
 
         self.handleParams(new_params, old_params, removed_params, unknown_params)
+        self.deduplicate(new_params)
         new_params.sort(key=self.keyForSort)
 
         new_template = '{{%s' % self.new_template
@@ -218,9 +236,9 @@ class InfoboxMigratingBot(WikitextFixingBot):
         if name in self.all_params:
             return self.all_params.index(name)
 
-        if self.endsWithDigit(name):
+        if self.endsWithDigit(name): # fixme: sort as tuple
             name, digit = self.stripDigit(name)
-            digit = int(digit) * 1.0
+            digit = int(digit) + 1.0
             if name not in self.all_params:
                 return len(self.all_params) + digit
 
@@ -241,10 +259,10 @@ class InfoboxMigratingBot(WikitextFixingBot):
 
     def stripDigit(self, text):
         assert self.endsWithDigit(text)
-        return re.match(r'(.+?)(\d+)$', text).groups()
+        return re.fullmatch(r'(.+?)(\d+)', text).groups()
 
     def handleParam(self, name):
-        if name == '':
+        if not name:
             raise UnknownParamException
 
         name = name.replace('_', ' ')
@@ -260,6 +278,9 @@ class InfoboxMigratingBot(WikitextFixingBot):
 
         if name in self.old_params:
             raise OldParamException
+
+        if name.isdigit():
+            raise UnnamedParamException
 
         new_name = name
         if self.endsWithDigit(name):
@@ -325,7 +346,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
     def handleImage(self, image):
         caption = ''
         size = ''
-        from scripts.myscripts.custome_fixes import FilesFix
+        from .custome_fixes import FilesFix
         regex = re.compile(FilesFix.regex % '|'.join(self.site.namespaces[6]))
         match = regex.fullmatch(image)
         if match:
@@ -352,11 +373,23 @@ class InfoboxMigratingBot(WikitextFixingBot):
             image = pywikibot.page.url2unicode(image)
             image = re.sub('[ _]+', ' ', image).strip()
 
-            if any(image.lower().startswith('%s:' % ns.lower())
-                   for ns in self.site.namespaces[6]):
+            if image.lower().startswith(tuple(map(lambda ns: '%s:' % ns.lower(),
+                                                  self.site.namespaces[6]))):
                 image = image.partition(':')[2].strip()
 
         return image, size, caption
+
+    def deduplicate(self, params):
+        keys = [i for i, j in params]
+        duplicates = set(filter(lambda x: keys.count(x) > 1, keys))
+        if duplicates:
+            pywikibot.warning('Duplicate arguments %s' % duplicates)
+            for dupe in duplicates:
+                values = list(filter(lambda x: x[0] == dupe, params))
+                while '' in values:
+                    params.remove((dupe, ''))
+                    values.remove('')
+                #while len(set(values)) < len(values):
 
     def exit(self):
         super(InfoboxMigratingBot, self).exit()

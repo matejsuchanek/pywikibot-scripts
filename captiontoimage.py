@@ -4,7 +4,7 @@ import pywikibot
 from pywikibot import pagegenerators
 from pywikibot.bot import SkipPageError
 
-from scripts.myscripts.wikidata import WikidataEntityBot
+from .wikidata import WikidataEntityBot
 
 class CaptionToImageBot(WikidataEntityBot):
 
@@ -25,19 +25,27 @@ class CaptionToImageBot(WikidataEntityBot):
         kwargs['bad_cache'] = kwargs.get('bad_cache', []) + [self.caption_property]
         super(CaptionToImageBot, self).__init__(**kwargs)
 
+    @property
+    def generator(self):
+        QUERY = ('SELECT DISTINCT ?item WHERE { ?item wdt:%s [] }'
+                 % self.caption_property)
+        return pagegenerators.PreloadingItemGenerator(
+            pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=self.repo))
+
     def filterProperty(self, prop_page):
-        return prop_page.type == "commonsMedia"
+        return prop_page.type == 'commonsMedia'
 
     def init_page(self, item):
         super(CaptionToImageBot, self).init_page(item)
         if self.caption_property not in item.claims.keys():
             raise SkipPageError(
                 item,
-                "Missing %s property" % self.caption_property
+                'Missing %s property' % self.caption_property
             )
 
     def treat_page(self):
         item = self.current_page
+        item.get() # fixme upstream
         our_prop = self.image_property
         if our_prop not in item.claims.keys():
             our_prop = None
@@ -46,22 +54,22 @@ class CaptionToImageBot(WikidataEntityBot):
                     if our_prop is None:
                         our_prop = prop
                     else:
-                        pywikibot.output("More than one media property used")
+                        pywikibot.output('More than one media property used')
                         return
 
         remove_claims = []
         remove_all = self.getOption('removeall') is True
         if our_prop is None:
-            pywikibot.output("No media property found")
+            pywikibot.output('No media property found')
             if remove_all:
                 remove_claims.extend(item.claims[self.caption_property])
                 self._save_page(item, self._save_entity, item.removeClaims,
-                                remove_claims, summary="removing redundant property")
+                                remove_claims, summary='removing redundant property')
             return
 
         media_claim = item.claims[our_prop][0]
         if len(item.claims[our_prop]) > 1:
-            pywikibot.output("Property %s has more than one value" % our_prop)
+            pywikibot.output('Property %s has more than one value' % our_prop)
             return
 
         for caption in item.claims[self.caption_property]:
@@ -72,20 +80,20 @@ class CaptionToImageBot(WikidataEntityBot):
                     if claim.getTarget().language == language:
                         has_same_lang = True
                         break
-                if has_same_lang is True:
-                    pywikibot.output("Property %s already has a caption in language %s" % (our_prop, language))
+                if has_same_lang:
+                    pywikibot.output('Property %s already has a caption in language %s' % (our_prop, language))
                     if remove_all:
                         remove_claims.append(caption)
                     continue
 
             caption.isQualifier = True
-            self._save_page(item, self._save_entity, media_claim.addQualifier,
-                            caption) # todo: remember decision for the action below
-            remove_claims.append(caption)
+            if self._save_page(item, self._save_entity, media_claim.addQualifier,
+                               caption):
+                remove_claims.append(caption)
 
         if len(remove_claims) > 0:
             self._save_page(item, self._save_entity, item.removeClaims,
-                            remove_claims, summary="removing redundant property")
+                            remove_claims, summary='removing redundant property')
 
 def main(*args):
     options = {}
@@ -97,15 +105,8 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    QUERY = ("SELECT DISTINCT ?item WHERE { ?item wdt:%s [] }"
-             % CaptionToImageBot.caption_property)
-
-    site = pywikibot.Site('wikidata', 'wikidata')
-
-    generator = pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site)
-
-    bot = CaptionToImageBot(site=site, generator=generator, **options)
+    bot = CaptionToImageBot(**options)
     bot.run()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

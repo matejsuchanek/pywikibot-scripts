@@ -3,7 +3,7 @@ import pywikibot
 
 from pywikibot import pagegenerators
 
-from scripts.myscripts.wikidata import WikidataEntityBot
+from .wikidata import WikidataEntityBot
 
 class QualifiersFixingBot(WikidataEntityBot):
 
@@ -13,7 +13,7 @@ class QualifiersFixingBot(WikidataEntityBot):
     whitelist = frozenset(['P17', 'P21', 'P155', 'P156', 'P281', 'P580', 'P582',
                            'P585', 'P669', 'P708', 'P969', 'P1355', 'P1356',
                            ])
-    good_item_id = 'Q15720608'
+    good_item = 'Q15720608'
 
     def __init__(self, **kwargs):
         kwargs.update({
@@ -21,19 +21,18 @@ class QualifiersFixingBot(WikidataEntityBot):
             'good_cache': kwargs.get('good_cache', []) + list(self.whitelist),
         })
         super(QualifiersFixingBot, self).__init__(**kwargs)
-        self.__good_item = pywikibot.ItemPage(self.repo, self.good_item_id)
 
     def filterProperty(self, prop_page):
-        if prop_page.type == "external-id":
+        if prop_page.type == 'external-id':
             return False
 
         prop_page.get()
         if 'P31' not in prop_page.claims.keys():
-            pywikibot.warning("%s is not classified" % prop_page.getID())
+            pywikibot.warning('%s is not classified' % prop_page.getID())
             return False
 
         for claim in prop_page.claims['P31']:
-            if claim.target_equals(self.__good_item):
+            if claim.target_equals(self.good_item):
                 return True
 
         return False
@@ -47,10 +46,7 @@ class QualifiersFixingBot(WikidataEntityBot):
                 i = -1
                 for source in claim.sources:
                     i += 1
-                    for ref_prop in source.keys():
-                        if not self.checkProperty(ref_prop):
-                            continue
-
+                    for ref_prop in filter(self.checkProperty, source.keys()):
                         for snak in source[ref_prop]:
                             json['qualifiers'] = json.get('qualifiers', {})
                             json['qualifiers'][ref_prop] = json['qualifiers'].get(ref_prop, [])
@@ -78,7 +74,7 @@ class QualifiersFixingBot(WikidataEntityBot):
     def makeSummary(self, prop, props):
         props = list(map(lambda x: '[[Property:P%s]]' % x,
                          sorted(map(lambda x: int(x[1:]), props))))
-        return "[[Property:%s]]: moving misplaced reference%s %s to qualifiers" % (
+        return '[[Property:%s]]: moving misplaced reference%s %s to qualifiers' % (
             prop, 's' if len(props) > 1 else '', '%s and %s' % (
                 ', '.join(props[:-1]), props[-1]) if len(props) > 1 else props[0])
 
@@ -108,7 +104,7 @@ def main(*args):
   ?item ?p ?statement .
   [] wikibase:claim ?p .
 }""".replace('\n', ' ') % (
-    QualifiersFixingBot.good_item_id,
+    QualifiersFixingBot.good_item,
     ', wd:'.join(QualifiersFixingBot.whitelist),
     ', wd:'.join(QualifiersFixingBot.blacklist)
 )
@@ -119,5 +115,5 @@ def main(*args):
     bot = QualifiersFixingBot(site=site, generator=generator, **options)
     bot.run()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

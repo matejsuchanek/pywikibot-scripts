@@ -17,12 +17,13 @@ save_summary = {
 
 class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallbacksBot):
 
-    def __init__(self, **kwargs):
+    def __init__(self, generator, **kwargs):
         self.availableOptions.update({
             'createnew': False,
             'noclean': False,
             'noimport': False,
         })
+        self.generator = pagegenerators.PreloadingGenerator(generator)
         super(CommonscatCleaningBot, self).__init__(**kwargs)
         self.commons = pywikibot.Site('commons', 'commons')
 
@@ -59,7 +60,8 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
                 if self.getOption('createnew') is True:
                     commons_cat.text = '{{Uncategorized}}'
                     exists = self.doWithCallback(
-                        self._save_page, commons_cat, commons_cat.save)
+                        self._save_page, commons_cat, commons_cat.save,
+                        async=False)
                 else:
                     pywikibot.warning('%s is not empty' % commons_cat.title())
                     return
@@ -86,7 +88,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
                     r'\n\n\1',
                     page_replaced_text, flags=re.M | re.U, count=1)
 
-            self.doWithCallback(
+            self.doWithCallback( # fixme
                 self.userPut, page, page.text, page_replaced_text,
                 summary=i18n.translate(self.site, save_summary))
         else:
@@ -137,7 +139,7 @@ def main(*args):
                                                              gen_subcats])
         generator = pagegenerators.WikibaseItemFilterPageGenerator(gen_combined)
 
-    bot = CommonscatCleaningBot(generator=generator, site=site, **options)
+    bot = CommonscatCleaningBot(generator, site=site, **options)
     bot.run()
 
 if __name__ == "__main__":

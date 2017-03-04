@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import pywikibot
 import re
 
 from pywikibot import pagegenerators
 
-from scripts.myscripts.checkwiki_errors import *
-from scripts.myscripts.wikitext import WikitextFixingBot
+from .checkwiki_errors import *
+from .wikitext import WikitextFixingBot
 
 class CheckWiki(object):
 
@@ -67,7 +69,7 @@ class CheckWiki(object):
 
     def __init__(self, site, **kwargs):
         self.site = site
-        self.auto = kwargs.pop('auto', True)
+        self.auto = kwargs.pop('auto', True) # todo: user_interactor
 
     def purge(self):
         self.__cache = {}
@@ -149,16 +151,13 @@ class CheckWiki(object):
                 self._settings['whitelists'][num] = text
 
         self._settings['project'] = project
-        pywikibot.output(u'%s CheckWiki errors recognized' % i)
+        pywikibot.output('%s CheckWiki errors recognized' % i)
 
     def getError(self, number):
-        if number not in self.__cache:
-            error = self.errorMap[number](self)
-            self.__cache[number] = error
-        return self.__cache[number]
+        return self.__cache.setdefault(number, self.errorMap[number](self))
 
     def iter_errors(self, numbers=[], forFixes=False, instances=[],
-                    priorities=['*'], **kwargs):
+                    priorities=['*'], **kwargs): # todo: own generator
         for num in self.errorMap.keys():
             if numbers and num not in numbers:
                 continue
@@ -206,12 +205,12 @@ class CheckWiki(object):
 
 class CheckWikiBot(WikitextFixingBot):
 
-    def __init__(self, numbers, **kwargs):
+    def __init__(self, numbers, generator, **kwargs):
         kwargs['checkwiki'] = False
         limit = kwargs.pop('limit', 100) # fixme: options
         super(CheckWikiBot, self).__init__(**kwargs)
         self.checkwiki = CheckWiki(self.site, **kwargs)
-        if self.generator is None:
+        if generator: # fixme!
             self.generator = self.checkwiki.loadErrors(limit, numbers=numbers)
 
     def treat_page(self):
@@ -219,14 +218,9 @@ class CheckWikiBot(WikitextFixingBot):
         replaced = []
         fixed = []
         text = self.checkwiki.applyErrors(page.text, page, replaced, fixed)
-        if page.text == text:
-            return
-        summary = u'opravy dle [[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced)
-        if self.getOption('always') is not True:
-            pywikibot.showDiff(page.text, text)
-        page.text = text
-        self._save_page(
-            page, self.fix_wikitext, page, summary=summary,
+        summary = 'opravy dle [[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced)
+        self.userPut(
+            page, page.text, text, summary=summary,
             callback=lambda *args: self.markAsFixedOnSuccess(fixed, *args))
 
     def markAsFixedOnSuccess(self, numbers, page, exc=None):
@@ -253,7 +247,7 @@ def main(*args):
 
     generator = genFactory.getCombinedGenerator()
 
-    bot = CheckWikiBot(numbers, generator=generator, **options)
+    bot = CheckWikiBot(numbers, generator, **options)
     bot.run()
 
 if __name__ == "__main__":

@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import pywikibot
 import re
 import requests
@@ -23,7 +25,7 @@ class CheckWikiError(object):
         self.checkwiki = checkwiki
 
     def __repr__(self):
-        return u'%s(%r, %s)' % (self.__class__.__name__, self.site, self.priority)
+        return '%s(%r, %s)' % (self.__class__.__name__, self.site, self.priority)
 
     @property
     def site(self):
@@ -75,7 +77,7 @@ class CheckWikiError(object):
 
         return self._priority
 
-    def needsDecision(self): # todo: per subclass
+    def needsDecision(self): # todo: per subclass, user_interactor
         return False
 
     def handledByCC(self):
@@ -95,7 +97,7 @@ class HeaderError(CheckWikiError):
 
 class TagReplacement(CheckWikiError):
 
-    summary = u'odstranění zb. HTML tagu'
+    summary = 'odstranění zb. HTML tagu'
     tag = None # extend
 
     def pattern(self):
@@ -108,7 +110,7 @@ class EntityReplacement(CheckWikiError):
     summary = 'substituce HTML entity'
 
     def pattern(self):
-        return re.compile(u'&(?P<entity>%s);' % '|'.join(self.entities_map.keys()))
+        return re.compile('&(?P<entity>%s);' % '|'.join(self.entities_map.keys()))
 
     def replacement(self, match):
         entity = match.group('entity')
@@ -125,7 +127,7 @@ class DefaultsortError(CheckWikiError):
 class PrefixedTemplate(CheckWikiError):
 
     number = 1
-    summary = u'odstranění prefixu šablony'
+    summary = 'odstranění prefixu šablony'
 
     def pattern(self):
         namespaces = self.site.namespaces[10]
@@ -139,7 +141,7 @@ class PrefixedTemplate(CheckWikiError):
 class BrokenHTMLTag(CheckWikiError):
 
     number = 2
-    summary = u'oprava chybné syntaxe HTML tagu'
+    summary = 'oprava chybné syntaxe HTML tagu'
     tags = ('abbr', 'b', 'big', 'blockquote', 'center', 'cite', 'del', 'div',
             'em', 'font', 'i', 'p', 's', 'small', 'span', 'strike', 'sub',
             'sup', 'table', 'td', 'th', 'tr', 'tt', 'u')
@@ -166,7 +168,7 @@ class BrokenHTMLTag(CheckWikiError):
                     params.append(p.group('param', 'content'))
                 if len(params) == 1:
                     if params[0][0] == 'id':
-                        return u'{{Kotva|%s}}' % params[0][1] #fixme: l10n
+                        return '{{Kotva|%s}}' % params[0][1] #fixme: l10n
                     if params[0][0] in ('clear', 'style'):
                         for s in ('right', 'left'):
                             if s in params[0][1]:
@@ -199,7 +201,7 @@ class LowHeadersLevel(HeaderError):
 
     number = 7
     needsFirst = [8]
-    summary = u'oprava úrovní nadpisů'
+    summary = 'oprava úrovní nadpisů'
 
     def apply(self, text, page):
         regex = self.pattern()
@@ -213,7 +215,7 @@ class LowHeadersLevel(HeaderError):
 
         if min_level > 2:
             text = regex.sub(
-                lambda match: u'{eq} {content} {eq}'.format(
+                lambda match: '{eq} {content} {eq}'.format(
                     eq=match.group('start')[min_level-2:],
                     content=match.group('content').strip()),
                 text)
@@ -223,7 +225,7 @@ class LowHeadersLevel(HeaderError):
 class MissingEquation(CheckWikiError):
 
     number = 8
-    summary = u'oprava úrovně nadpisů'
+    summary = 'oprava úrovně nadpisů'
 
     def pattern(self):
         return re.compile(
@@ -237,7 +239,7 @@ class MissingEquation(CheckWikiError):
         if end.count('=') != len(end):
             end = end.replace(' ', '')
             if start == end:
-                return u'%s %s %s' % (start, content.strip(), end)
+                return '%s %s %s' % (start, content.strip(), end)
 
         return match.group()
 
@@ -260,7 +262,7 @@ class NoEndSquareBrackets(CheckWikiError): # fixme
     def replacement(self, match):
         inside, after = match.group('inside', 'after')
         if any(inside.lstrip().lower().startswith(
-            u'%s:' % x) for x in list(self.site.namespaces[6])):
+            '%s:' % x) for x in list(self.site.namespaces[6])):
             return match.group()
 
         if after == ']]':
@@ -270,23 +272,23 @@ class NoEndSquareBrackets(CheckWikiError): # fixme
             if '|' not in inside:
                 if '[' in inside:
                     if inside.startswith('['):
-                        return u'[[%s]]' % inside.replace('[', '')
+                        return '[[%s]]' % inside.replace('[', '')
                     else:
-                        return u'[[%s]]' % inside.replace('[', '|')
+                        return '[[%s]]' % inside.replace('[', '|')
 
                 elif ']' in inside:
-                    return u'[[%s]]' % inside.replace(']', '|')
+                    return '[[%s]]' % inside.replace(']', '|')
             else:
-                return u'[[%s]]' % re.sub('[][]', '', inside)
+                return '[[%s]]' % re.sub('[][]', '', inside)
 
         else:
             if ']' in inside:
                 split = inside.split(']', 1)
-                return u'[[%s%s' % (']]'.join(split), after or '')
+                return '[[%s%s' % (']]'.join(split), after or '')
 
             if after == '[[':
                 if match.string[match.end():].find(']]') > match.string[match.end():].find('[['):
-                    return u'[[%s]]' % inside
+                    return '[[%s]]' % inside
 
             if '|' in inside:
                 link = inside[:inside.index('|')]
@@ -298,7 +300,7 @@ class NoEndSquareBrackets(CheckWikiError): # fixme
                     if word.lower().startswith(split_link[-1].lower()): # todo: better comparison
                         text = ' '.join(split_text[:i+1])
                         text_after = ' '.join(split_text[i+1:])
-                        return u'[[%s|%s]] %s%s%s' % (
+                        return '[[%s|%s]] %s%s%s' % (
                             link, text, text_after, space_after, after or '')
 
                 return match.group() # todo: same words in link and text
@@ -315,50 +317,50 @@ class HTMLEntity(EntityReplacement):
     # grave pm centerdot half div rsquor lsquor rdquor ldquor ddagger bullet
     # mldr ap approx leq geq
     entities_map = {
-        'acute': u'´', 'times': u'×', 'sbquo': u'‚',
-        'prime': u'′', 'Prime': u'″', 'minus': u'−',
+        'acute': '´', 'times': '×', 'sbquo': '‚',
+        'prime': '′', 'Prime': '″', 'minus': '−',
 
-        'aacute': u'á', 'Aacute': u'Á', 'acirc': u'â', 'Acirc': u'Â',
-        'aelig': u'æ', 'AElig': u'Æ', 'agrave': u'à', 'Agrave': u'À',
-        'alpha': u'α', 'aring': u'å', 'Aring': u'Å', 'asymp': u'≈',
-        'atilde': u'ã', 'Atilde': u'Ã', 'auml': u'ä', 'Auml': u'Ä',
-        'beta': u'β', 'bdquo': u'„', 'brvbar': u'¦', 'bull': u'•',
-        'ccedil': u'ç', 'Ccedil': u'Ç', 'cent': u'¢', 'chi': u'χ',
-        'clubs': u'♣', 'copy': u'©', 'crarr': u'↵', 'darr': u'↓', 'dArr': u'⇓',
-        'deg': u'°', 'delta': u'δ', 'Delta': u'Δ', 'diams': u'♦',
-        'divide': u'÷', 'eacute': u'é', 'Eacute': u'É', 'ecirc': u'ê',
-        'Ecirc': u'Ê', 'egrave': u'è', 'Egrave': u'È', 'epsilon': u'ε',
-        'equiv': u'≡', 'eta': u'η', 'eth': u'ð', 'ETH': u'Ð', 'euml': u'ë',
-        'Euml': u'Ë', 'euro': u'€', 'fnof': u'ƒ', 'frac12': u'½',
-        'frac14': u'¼', 'frac34': u'¾', 'frasl': u'⁄', 'gamma': u'γ',
-        'Gamma': u'Γ', 'ge': u'≥', 'harr': u'↔', 'hArr': u'⇔', 'hearts': u'♥',
-        'hellip': u'…', 'iacute': u'í', 'Iacute': u'Í', 'icirc': u'î',
-        'Icirc': u'Î', 'iexcl': u'¡', 'igrave': u'ì', 'Igrave': u'Ì',
-        'infin': u'∞', 'int': u'∫', 'iota': u'ι', 'Iota': u'Ι', 'iquest': u'¿',
-        'iuml': u'ï', 'Iuml': u'Ï', 'lambda': u'λ', 'Lambda': u'Λ',
-        'laquo': u'«', 'larr': u'←', 'lArr': u'⇐', 'ldquo': u'“', 'le': u'≤',
-        'loz': u'◊', 'lsaquo': u'‹', 'lsquo': u'‘', 'micro': u'µ',
-        'middot': u'·', 'mu': u'μ', 'ne': u'≠', 'not': u'¬', 'ntilde': u'ñ',
-        'Ntilde': u'Ñ', 'oacute': u'ó', 'Oacute': u'Ó', 'ocirc': u'ô',
-        'Ocirc': u'Ô', 'oelig': u'œ', 'OElig': u'Œ', 'ograve': u'ò',
-        'Ograve': u'Ò', 'oline': u'‾', 'omega': u'ω', 'Omega': u'Ω',
-        'ordf': u'ª', 'ordm': u'º', 'oslash': u'ø', 'Oslash': u'Ø',
-        'otilde': u'õ', 'Otilde': u'Õ', 'ouml': u'ö', 'Ouml': u'Ö',
-        'para': u'¶', 'part': u'∂', 'permil': u'‰', 'phi': u'φ', 'Phi': u'Φ',
-        'pi': u'π', 'Pi': u'Π', 'piv': u'ϖ', 'plusmn': u'±', 'pound': u'£',
-        'prod': u'∏', 'psi': u'ψ', 'Psi': u'Ψ', 'radic': u'√', 'raquo': u'»',
-        'rarr': u'→', 'rArr': u'⇒', 'rdquo': u'”', 'reg': u'®', 'rho': u'ρ',
-        'raquo': u'»', 'rsaquo': u'›', 'rsquo': u'’', 'scaron': u'š',
-        'Scaron': u'Š', 'sect': u'§', 'sigma': u'σ', 'Sigma': u'Σ',
-        'sigmaf': u'ς', 'spades': u'♠', 'sum': u'∑', 'sup1': u'¹', 'sup2': u'²',
-        'sup3': u'³', 'szlig': u'ß', 'tau': u'τ', 'theta': u'θ', 'Theta': u'Θ',
-        'thetasym': u'ϑ', 'thorn': u'þ', 'THORN': u'Þ', 'tilde': u'˜',
-        'trade': u'™', 'uacute': u'ú', 'Uacute': u'Ú', 'uarr': u'↑',
-        'uArr': u'⇑', 'ucirc': u'û', 'Ucirc': u'Û', 'ugrave': u'ù',
-        'Ugrave': u'Ù', 'upsih': u'ϒ', 'upsilon': u'υ', 'uuml': u'ü',
-        'Uuml': u'Ü', 'xi': u'ξ', 'Xi': u'Ξ', 'yacute': u'ý', 'Yacute': u'Ý',
-        'yen': u'¥', 'yuml': u'ÿ', 'Yuml': u'Ÿ', 'zeta': u'ζ', 'Zeta': u'Ζ',
-        #'quot': u'"',
+        'aacute': 'á', 'Aacute': 'Á', 'acirc': 'â', 'Acirc': 'Â',
+        'aelig': 'æ', 'AElig': 'Æ', 'agrave': 'à', 'Agrave': 'À',
+        'alpha': 'α', 'aring': 'å', 'Aring': 'Å', 'asymp': '≈',
+        'atilde': 'ã', 'Atilde': 'Ã', 'auml': 'ä', 'Auml': 'Ä',
+        'beta': 'β', 'bdquo': '„', 'brvbar': '¦', 'bull': '•',
+        'ccedil': 'ç', 'Ccedil': 'Ç', 'cent': '¢', 'chi': 'χ',
+        'clubs': '♣', 'copy': '©', 'crarr': '↵', 'darr': '↓', 'dArr': '⇓',
+        'deg': '°', 'delta': 'δ', 'Delta': 'Δ', 'diams': '♦',
+        'divide': '÷', 'eacute': 'é', 'Eacute': 'É', 'ecirc': 'ê',
+        'Ecirc': 'Ê', 'egrave': 'è', 'Egrave': 'È', 'epsilon': 'ε',
+        'equiv': '≡', 'eta': 'η', 'eth': 'ð', 'ETH': 'Ð', 'euml': 'ë',
+        'Euml': 'Ë', 'euro': '€', 'fnof': 'ƒ', 'frac12': '½',
+        'frac14': '¼', 'frac34': '¾', 'frasl': '⁄', 'gamma': 'γ',
+        'Gamma': 'Γ', 'ge': '≥', 'harr': '↔', 'hArr': '⇔', 'hearts': '♥',
+        'hellip': '…', 'iacute': 'í', 'Iacute': 'Í', 'icirc': 'î',
+        'Icirc': 'Î', 'iexcl': '¡', 'igrave': 'ì', 'Igrave': 'Ì',
+        'infin': '∞', 'int': '∫', 'iota': 'ι', 'Iota': 'Ι', 'iquest': '¿',
+        'iuml': 'ï', 'Iuml': 'Ï', 'lambda': 'λ', 'Lambda': 'Λ',
+        'laquo': '«', 'larr': '←', 'lArr': '⇐', 'ldquo': '“', 'le': '≤',
+        'loz': '◊', 'lsaquo': '‹', 'lsquo': '‘', 'micro': 'µ',
+        'middot': '·', 'mu': 'μ', 'ne': '≠', 'not': '¬', 'ntilde': 'ñ',
+        'Ntilde': 'Ñ', 'oacute': 'ó', 'Oacute': 'Ó', 'ocirc': 'ô',
+        'Ocirc': 'Ô', 'oelig': 'œ', 'OElig': 'Œ', 'ograve': 'ò',
+        'Ograve': 'Ò', 'oline': '‾', 'omega': 'ω', 'Omega': 'Ω',
+        'ordf': 'ª', 'ordm': 'º', 'oslash': 'ø', 'Oslash': 'Ø',
+        'otilde': 'õ', 'Otilde': 'Õ', 'ouml': 'ö', 'Ouml': 'Ö',
+        'para': '¶', 'part': '∂', 'permil': '‰', 'phi': 'φ', 'Phi': 'Φ',
+        'pi': 'π', 'Pi': 'Π', 'piv': 'ϖ', 'plusmn': '±', 'pound': '£',
+        'prod': '∏', 'psi': 'ψ', 'Psi': 'Ψ', 'radic': '√', 'raquo': '»',
+        'rarr': '→', 'rArr': '⇒', 'rdquo': '”', 'reg': '®', 'rho': 'ρ',
+        'raquo': '»', 'rsaquo': '›', 'rsquo': '’', 'scaron': 'š',
+        'Scaron': 'Š', 'sect': '§', 'sigma': 'σ', 'Sigma': 'Σ',
+        'sigmaf': 'ς', 'spades': '♠', 'sum': '∑', 'sup1': '¹', 'sup2': '²',
+        'sup3': '³', 'szlig': 'ß', 'tau': 'τ', 'theta': 'θ', 'Theta': 'Θ',
+        'thetasym': 'ϑ', 'thorn': 'þ', 'THORN': 'Þ', 'tilde': '˜',
+        'trade': '™', 'uacute': 'ú', 'Uacute': 'Ú', 'uarr': '↑',
+        'uArr': '⇑', 'ucirc': 'û', 'Ucirc': 'Û', 'ugrave': 'ù',
+        'Ugrave': 'Ù', 'upsih': 'ϒ', 'upsilon': 'υ', 'uuml': 'ü',
+        'Uuml': 'Ü', 'xi': 'ξ', 'Xi': 'Ξ', 'yacute': 'ý', 'Yacute': 'Ý',
+        'yen': '¥', 'yuml': 'ÿ', 'Yuml': 'Ÿ', 'zeta': 'ζ', 'Zeta': 'Ζ',
+        #'quot': '"',
     }
     number = 11
 
@@ -370,8 +372,8 @@ class HTMLEntity(EntityReplacement):
         if entity in self.entities_map:
             return self.entities_map[entity]
 
-        if entity not in ['amp', 'dagger', 'Dagger', 'mdash', 'ndash', 'nbsp',
-                          'quot']:
+        if entity not in ['amp', 'dagger', 'Dagger', 'gt', 'lt', 'mdash',
+                          'ndash', 'nbsp', 'quot']:
             pywikibot.output('Unrecognized HTML entity "%s"' % match.group())
 
         return match.group()
@@ -384,7 +386,7 @@ class DuplicateCategory(CheckWikiError):
 
     needsFirst = [21]
     number = 17
-    summary = u'odstranění duplicitní kategorie'
+    summary = 'odstranění duplicitní kategorie'
 
     def apply(self, text, page):
         categories = textlib.getCategoryLinks(text)
@@ -401,26 +403,26 @@ class SingleEquationHeader(HeaderError):
 
     needsFirst = [8]
     number = 19
-    summary = u'oprava úrovně nadpisu'
+    summary = 'oprava úrovně nadpisu'
 
     def pattern(self):
         return re.compile(r'(?m)^=([^\n=]+)= *$')
 
     def replacement(self, match):
-        return u'== %s ==' % match.group(1).strip()
+        return '== %s ==' % match.group(1).strip()
 
 class Dagger(EntityReplacement):
 
     entity_map = {
-        'dagger': u'†',
-        'Dagger': u'‡',
+        'dagger': '†',
+        'Dagger': '‡',
     }
     number = 20
 
 class EnglishCategory(CCHandledError):
 
     number = 21
-    summary = u'počeštění jmenného prostoru'
+    summary = 'počeštění jmenného prostoru'
 
     def pattern(self):
         return re.compile(r'\[\[ *[Cc]ategory *: *')
@@ -428,12 +430,12 @@ class EnglishCategory(CCHandledError):
     def replacement(self, match):
         ns = list(self.site.namespaces[14])
         ns.remove('Category')
-        return u'[[%s:' % ns[0]
+        return '[[%s:' % ns[0]
 
 class CategoryWithSpace(CheckWikiError):
 
     number = 22
-    summary = u'odstranění bílých znaků z kategorie'
+    summary = 'odstranění bílých znaků z kategorie'
 
     def pattern(self):
         return textlib._get_regexes(['category'], self.site).pop()
@@ -455,9 +457,9 @@ class CategoryWithSpace(CheckWikiError):
         if (prefix != new_prefix or content != new_content
             or (has_key and key != new_key)):
             if has_key:
-                return u'[[%s:%s|%s]]' % (new_prefix, new_content, new_key)
+                return '[[%s:%s|%s]]' % (new_prefix, new_content, new_key)
             else:
-                return u'[[%s:%s]]' % (new_prefix, new_content)
+                return '[[%s:%s]]' % (new_prefix, new_content)
 
         return match.group()
 
@@ -465,7 +467,7 @@ class HeaderHierarchy(HeaderError):
 
     needsFirst = [8]
     number = 25
-    summary = u'oprava úrovně nadpisu'
+    summary = 'oprava úrovně nadpisu'
 
     def apply(self, text, page):
         regex = self.pattern()
@@ -501,7 +503,7 @@ class HeaderHierarchy(HeaderError):
             pos = match.end()
             if level != levels[i]:
                 eq = '=' * levels[i]
-                text = text[:match.start()] + u'{eq} {content} {eq}'.format(
+                text = text[:match.start()] + '{eq} {content} {eq}'.format(
                     eq=eq, content=match.group('content').strip()) + text[pos:]
             i += 1
 
@@ -537,11 +539,11 @@ class MultiplePipes(CheckWikiError):
         if len(split) > 2:
             if '' in split:
                 split.remove('')
-                return u'[[%s]]' % '|'.join(split)
+                return '[[%s]]' % '|'.join(split)
 
             if len(set(split)) == 2:
                 deduplicate(split)
-                return u'[[%s]]' % '|'.join(split)
+                return '[[%s]]' % '|'.join(split)
 
         return match.group()
 
@@ -552,7 +554,7 @@ class MagicWords(CheckWikiError):
         'fullpagename', 'sitename', 'namespace', 'basepagename', 'pagename',
         'subpagename', 'namespacenumber', 'talkpagename', 'fullpagenamee')
     number = 34
-    summary = u'odstranění kouzelných slov'
+    summary = 'odstranění kouzelných slov'
 
     def pattern(self):
         return re.compile(r'(?:\{\{([^}|]+)\}\}|\{\{\{[^}]+\}\}\})')
@@ -589,7 +591,7 @@ class BoldHeader(HeaderError):
 
     #needsFirst = [26]
     number = 44
-    summary = u'odtučnění nadpisu'
+    summary = 'odtučnění nadpisu'
 
     def replacement(self, match, *args):
         content = match.group('content')
@@ -603,7 +605,7 @@ class SelfLink(CheckWikiError):
 
     needsFirst = [103]
     number = 48
-    summary = u'odstranění odkazu na sebe'
+    summary = 'odstranění odkazu na sebe'
 
     def replacement(self, match, title):
         split = match.group('inside').split('|')
@@ -617,9 +619,9 @@ class SelfLink(CheckWikiError):
                 return before + split[-1] + after
 
             index = match.string.replace('&nbsp;', ' ').find(
-                u"'''%s'''" % title)
+                "'''%s'''" % title)
             if index < 0 or match.end() < index:
-                return u"'''%s'''" % split[-1]
+                return "'''%s'''" % split[-1]
             else:
                 return split[-1]
 
@@ -640,8 +642,8 @@ class HTMLHeader(CCHandledError):
 class EntitesAsDashes(EntityReplacement):
 
     entities_map = {
-        'mdash': u'—',
-        'ndash': u'–',
+        'mdash': '—',
+        'ndash': '–',
     }
     number = 50
 
@@ -661,7 +663,7 @@ class ListWithBreak(CheckWikiError):
 
     list_chars = ':*#'
     number = 54
-    summary = u'odstranění zb. zalomení'
+    summary = 'odstranění zb. zalomení'
 
     def pattern(self):
         return re.compile(r'(?m)^[%s]+.*$' % self.list_chars)
@@ -676,7 +678,7 @@ class ListWithBreak(CheckWikiError):
 class HeaderWithColon(HeaderError):
 
     number = 57
-    summary = u'odstranění dvojtečky v nadpisu'
+    summary = 'odstranění dvojtečky v nadpisu'
 
     def replacement(self, match):
         content = match.group('content').strip()
@@ -689,7 +691,7 @@ class ParameterWithBreak(CheckWikiError):
 
     number = 59
     regex = re.compile(r'(?: *<[ /]*br[ /]*> *)+(?P<after>\s*)$')
-    summary = u'odstranění zb. zalomení'
+    summary = 'odstranění zb. zalomení'
 
     def replacement(self, match):
         if match.group('unhandled_depth'):
@@ -788,7 +790,7 @@ class RefBeforePunctuation(CheckWikiError):
 class SmallInsideTags(CheckWikiError):
 
     number = 63
-    summary = u'oprava zmenšení textu uvnitř jiných značek'
+    summary = 'oprava zmenšení textu uvnitř jiných značek'
     tags = ('ref', 'sub', 'sup')
 
     def pattern(self):
@@ -802,7 +804,7 @@ class SmallInsideTags(CheckWikiError):
         new_content = re.sub('</?small>', '', content)
         if new_content != content:
             content = new_content.strip()
-        return u'<{tag}{params}>{content}</{tag}>'.format(
+        return '<{tag}{params}>{content}</{tag}>'.format(
             tag=match.group('tag'), content=content,
             params=match.group('params') or '')
 
@@ -810,7 +812,7 @@ class BadListStructure(CheckWikiError): # todo
 
     list_chars = ':*#'
     number = 75
-    summary = u'oprava odsazení seznamu'
+    summary = 'oprava odsazení seznamu'
 
     def replace(self, match, levels):
         line = match.group()
@@ -866,7 +868,7 @@ class NoSpace(CheckWikiError): # todo
 class BrokenExternalLink(CheckWikiError): # todo
 
     number = 80
-    summary = u'oprava externího odkazu'
+    summary = 'oprava externího odkazu'
 
     def pattern(self):
         return re.compile(r'\[(?P<link>https?://[^][\n<]+)'
@@ -891,7 +893,7 @@ class DuplicateReferences(CheckWikiError):
     exceptions = CheckWikiError.exceptions[:] + ['references']
     needsFirst = [104]
     number = 81
-    summary = u'oprava duplicitních referencí'
+    summary = 'oprava duplicitních referencí'
 
     def apply(self, text, page):
         ref_regex = re.compile(
@@ -930,14 +932,13 @@ class DuplicateReferences(CheckWikiError):
             content = match.group('content').strip()
             name, group = getParams(match.group('params'))
 
-            if group not in named_contents:
-                named_contents[group] = [] # the order is important!
-                duplicate_named_contents[group] = set()
-                unnamed_contents[group] = set()
-                duplicate_unnamed_contents[group] = set()
-                names[group] = set()
-                destroyed_names[group] = {}
-                i[group] = 1
+            named_contents.setdefault(group, [])
+            duplicate_named_contents.setdefault(group, set())
+            unnamed_contents.setdefault(group, set())
+            duplicate_unnamed_contents.setdefault(group, set())
+            names.setdefault(group, set())
+            destroyed_names.setdefault(group, {})
+            i.setdefault(group, 1)
 
             if name == '':
                 if content in unnamed_contents[group]:
@@ -965,8 +966,8 @@ class DuplicateReferences(CheckWikiError):
                     if ref_content == content:
                         if ref_name != name:
                             destroyed_names[group][name] = ref_name
-                        return u'<ref name="%s"%s />' % (
-                            ref_name, (u' group="%s"' % group)
+                        return '<ref name="%s"%s />' % (
+                            ref_name, (' group="%s"' % group)
                             if group != '' else '')
 
                 for ref_name, ref_content in named_contents[group]:
@@ -987,8 +988,8 @@ class DuplicateReferences(CheckWikiError):
             else:
                 for ref_name, ref_content in named_contents[group] + list(duplicate_named_contents[group]):
                     if ref_content == content:
-                        return u'<ref name="%s"%s />' % (
-                            ref_name, (u' group="%s"' % group)
+                        return '<ref name="%s"%s />' % (
+                            ref_name, (' group="%s"' % group)
                             if group != '' else '')
 
                 if content in duplicate_unnamed_contents[group]:
@@ -1000,8 +1001,8 @@ class DuplicateReferences(CheckWikiError):
                     duplicate_named_contents[group].add(
                         (new_name, content)
                     )
-                    return u'<ref name="%s"%s>%s</ref>' % (
-                        new_name, (u' group="%s"' % group)
+                    return '<ref name="%s"%s>%s</ref>' % (
+                        new_name, (' group="%s"' % group)
                         if group != '' else '', content)
 
             return match.group()
@@ -1019,13 +1020,13 @@ class DuplicateReferences(CheckWikiError):
 
             if name in destroyed_names[group]:
                 if content is None:
-                    return u'<ref name="%s"%s />' % (
+                    return '<ref name="%s"%s />' % (
                         destroyed_names[group][name],
-                        (u' group="%s"' % group) if group != '' else '')
+                        (' group="%s"' % group) if group != '' else '')
                 else:
-                    return u'<ref name="%s"%s>%s</ref>' % (
+                    return '<ref name="%s"%s>%s</ref>' % (
                         destroyed_names[group][name],
-                        (u' group="%s"' % group) if group != '' else '',
+                        (' group="%s"' % group) if group != '' else '',
                         content.strip())
 
             ref = '<ref'
@@ -1036,7 +1037,7 @@ class DuplicateReferences(CheckWikiError):
                 ref += ' {param}={quote}{content}{quote}'.format(
                     param=param, quote=quote, content=param_content)
             if content is not None:
-                return ref + u'>%s</ref>' % content.strip()
+                return ref + '>%s</ref>' % content.strip()
             else:
                 return ref + ' />'
 
@@ -1048,7 +1049,7 @@ class DuplicateReferences(CheckWikiError):
 class EmptyTag(CheckWikiError):
 
     number = 85
-    summary = u'odstranění prázdného tagu'
+    summary = 'odstranění prázdného tagu'
     tags = ('center', 'code', 'div', 'gallery', 'includeonly', 'noinclude',
             'onlyinclude', 'pre', 'ref', 'span')
 
@@ -1062,7 +1063,7 @@ class EmptyTag(CheckWikiError):
 class ExternalLinkLikeInternal(CCHandledError):
 
     number = 86
-    summary = u'oprava syntaxe odkazu'
+    summary = 'oprava syntaxe odkazu'
 
 class DefaultsortSpace(DefaultsortError):
 
@@ -1097,7 +1098,7 @@ class DoubleHttp(CheckWikiError):
 
     exceptions = list(set(CheckWikiError.exceptions) - set(['startspace']))
     number = 93
-    summary = u'oprava externího odkazu'
+    summary = 'oprava externího odkazu'
 
     def pattern(self):
         return re.compile('(?i)(?:https?:*/*){2,}')
@@ -1109,7 +1110,7 @@ class Ordinals(CheckWikiError):
 
     needsFirst = [81]
     number = 101
-    summary = u'oprava řadových číslovek'
+    summary = 'oprava řadových číslovek'
 
     def pattern(self):
         return re.compile(r'(?i)([1-9]\d*)<sup>(st|nd|rd|th)</sup>')
@@ -1120,7 +1121,7 @@ class Ordinals(CheckWikiError):
 class SuperfluousPipe(CheckWikiError):
 
     number = 103
-    summary = u'odstranění zb. kouzelných slov'
+    summary = 'odstranění zb. kouzelných slov'
 
     def pattern(self):
         return re.compile(r'\[\[([^]|[{}]+)\{\{!\}\}([^]|[{}]+)\]\]')
@@ -1131,7 +1132,7 @@ class SuperfluousPipe(CheckWikiError):
 class ReferenceQuotes(CheckWikiError):
 
     number = 104
-    summary = u'oprava uvozovek v referencích'
+    summary = 'oprava uvozovek v referencích'
 
     def pattern(self):
         return re.compile('<ref (?P<params>((?! */>)[^>])+?)(?P<slash> ?/)?>')
@@ -1152,7 +1153,7 @@ class ReferenceQuotes(CheckWikiError):
             if starts != ends and len(starts) == 0:
                 quote = ends
 
-            return u'{param}={quote}{content}{quote}'.format(
+            return '{param}={quote}{content}{quote}'.format(
                 content=p.group('content').strip(),
                 quote=quote, param=p.group('param'))
 
@@ -1162,9 +1163,4 @@ class ReferenceQuotes(CheckWikiError):
                         '(?P<ends>[\'"]+)?',
                         handleParam, match.group('params'))
 
-        return u'<ref %s%s>' % (params, match.group('slash') or '')
-
-# todo: own errors:
-# - duplicate defaultsort keys
-# - fake bullets
-# - inappropriate headlines
+        return '<ref %s%s>' % (params, match.group('slash') or '')

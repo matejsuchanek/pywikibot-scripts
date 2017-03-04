@@ -3,6 +3,8 @@ import pywikibot
 import re
 
 from itertools import chain
+from operator import methodcaller
+
 from pywikibot import pagegenerators
 
 from pywikibot.bot import SingleSiteBot, ExistingPageBot, NoRedirectPageBot
@@ -20,13 +22,15 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
     or all fixes using -all (then, each used fix is excluded).
     '''
 
-    def __init__(self, generator=None, **kwargs):
+    def __init__(self, **kwargs):
         do_all = kwargs.pop('all', False) is True
         self.fixes = []
         for fix, cls in all_fixes.items():
-            demand = do_all
-            if fix in kwargs:
-                demand = bool(kwargs.pop(fix))
+            if do_all:
+                demand = fix not in kwargs
+                kwargs.pop(fix, None)
+            else:
+                demand = bool(kwargs.pop(fix, False))
             if demand:
                 options = {}
                 for opt in cls.options.keys():
@@ -39,11 +43,10 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         super(WikitextFixingBot, self).__init__(**kwargs)
         for fix in self.fixes:
             fix.site = self.site
-        if not generator:
+        if not self.generator:
             pywikibot.output('No generator provided, making own generator...')
-            generator = chain.from_iterable(map(lambda fix: fix.generator(),
-                                                self.fixes))
-        self.generator = pagegenerators.PreloadingGenerator(generator)
+            self.generator = pagegenerators.PreloadingGenerator(
+                chain.from_iterable(map(methodcaller('generator'), self.fixes)))
 
     def treat_page(self):
         summaries = []

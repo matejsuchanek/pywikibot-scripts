@@ -33,15 +33,9 @@ class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         try:
             item.get()
         except pywikibot.IsRedirectPage:
-            raise SkipPageError(
-                item,
-                "Redirect item"
-            )
+            raise SkipPageError(item, 'Redirect item')
         except pywikibot.NoPage:
-            raise SkipPageError(
-                item,
-                "Item doesn't exist"
-            )
+            raise SkipPageError(item, 'Item doesn\'t exist')
 
     def checkProperty(self, prop):
         if prop in self.good_cache:
@@ -61,7 +55,7 @@ class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
     def filterProperty(self, prop_page):
         raise NotImplementedError(
-            "%s.filterProperty needs overriding in a subclass" % self.__class__
+            '%s.filterProperty needs overriding in a subclass' % self.__class__
         )
 
     def _save_entity(self, func, *args, **kwargs):

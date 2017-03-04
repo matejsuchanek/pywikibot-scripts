@@ -1,9 +1,13 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import datetime
 import pywikibot
 
-from pywikibot import pagegenerators
-from pywikibot import textlib
+from pywikibot import pagegenerators, textlib
+from pywikibot.tools import first_lower
+
+pywikibot.handle_args()
 
 start = datetime.datetime.now()
 
@@ -11,7 +15,7 @@ do_only = []
 dont_do = []
 
 tp_map = {
-    u'cs|wikipedia': {
+    'cs|wikipedia': {
         'commons': {
             '1': {
                 'lang': 'commons',
@@ -26,20 +30,20 @@ tp_map = {
                 'namespaces': [14]
             },
         },
-        u'wikicitáty': {
-            u'dílo': {
+        'wikicitáty': {
+            'dílo': {
                 'family': 'wikiquote',
-                'pattern': u'Dílo:%s'
+                'pattern': 'Dílo:%s'
             },
             'kategorie': {
                 'family': 'wikiquote',
                 'pattern': 'Kategorie:%s'
             },
             'osoba': 'wikiquote',
-            u'téma': 'wikiquote'
+            'téma': 'wikiquote'
         },
         'wikizdroje': {
-            u'dílo': 'wikisource',
+            'dílo': 'wikisource',
             'autor': {
                 'family': 'wikisource',
                 'pattern': 'Autor:%s'
@@ -56,7 +60,7 @@ tp_map = {
             },
         },
     },
-    u'cs|wikiquote': {
+    'cs|wikiquote': {
         'commons': {
             'galerie': {
                 'lang': 'commons',
@@ -70,10 +74,10 @@ tp_map = {
             },
         },
         'wikipedie': {
-            u'článek': 'wikipedia'
+            'článek': 'wikipedia'
         },
     },
-    u'cs|wikisource': {
+    'cs|wikisource': {
         'commons': {
             'galerie': {
                 'lang': 'commons',
@@ -91,22 +95,22 @@ tp_map = {
             'WikiquoteCS': 'wikiquote'
         },
     },
-    u'de|wikiquote': {
+    'de|wikiquote': {
         'wikipedia': {
             '1': 'wikipedia'
         },
     },
-    u'es|wikiquote': {
+    'es|wikiquote': {
         'wikipedia': {
             '1': 'wikipedia'
         },
     },
-    u'fi|wikiquote': {
+    'fi|wikiquote': {
         'wikipedia': {
             '1': 'wikipedia'
         },
     },
-    u'fr|wikiquote': {
+    'fr|wikiquote': {
         'autres projets': {
             'w': 'wikipedia',
             's': 'wikisource',
@@ -128,51 +132,74 @@ tp_map = {
             },
         },
     },
-    u'fr|wikiquote': {
+    'fr|wikiquote': {
         'wikipedia': {
             '1': 'wikipedia'
         },
     },
-    u'pt|wikiquote': {
+    'id|wikiquote': {
+        'wikipedia': {
+            '1': 'wikipedia'
+        },
+    },
+    'pl|wikiquote': {
+        'commons': {
+            '1': {
+                'lang': 'commons',
+                'family': 'commons'
+            }
+        },
+        'wikinews': dict((str(i), 'wikinews') for i in range(1, 10)),
+        'wikipediakat': {
+            '1': {
+                'lang': 'pl',
+                'family': 'wikipedia',
+                'pattern': 'Category:%s',
+                'namespaces': [14],
+            },
+        },
+        'wikisource': {}, # todo
+    },
+    'pt|wikiquote': {
         'autor': {
             'Wikinoticias': 'wikinews',
             'Wikipedia': 'wikipedia',
             'Wikisource': 'wikisource'
         },
-        u'wikipédia': {
+        'wikipédia': {
             '1': 'wikipedia'
         },
         'wikisource': {
             '1': 'wikisource'
         },
     },
-    u'ru|wikiquote': {
-        u'википедия': {
+    'ru|wikiquote': {
+        'википедия': {
             '1': 'wikipedia'
         },
         'wikipedia': {
             '1': 'wikipedia'
         },
-        u'навигация': {
-            u'Википедия': 'wikipedia',
-            u'Викитека': 'wikisource',
-            u'Викивиды': {
+        'навигация': {
+            'Википедия': 'wikipedia',
+            'Викитека': 'wikisource',
+            'Викивиды': {
                 'family': 'species',
                 'lang': 'species'
             },
-            u'Викисклад': {
+            'Викисклад': {
                 'lang': 'commons',
                 'family': 'commons'
             },
-            u'Викигид': 'wikivoyage',
+            'Викигид': 'wikivoyage',
         },
     },
-    u'sk|wikiquote': {
+    'sk|wikiquote': {
         'wikipedia': {
             '1': 'wikipedia'
         },
     },
-    u'sv|wikiquote': {
+    'sv|wikiquote': {
         'wikipedia': {
             '1': 'wikipedia'
         },
@@ -180,7 +207,7 @@ tp_map = {
 }
 
 for project in tp_map.keys():
-    (lang, family) = project.split('|')
+    lang, family = project.split('|', 1)
     if len(do_only) > 0 and lang + family not in do_only and family not in do_only:
         continue
     if lang + family in dont_do or family in dont_do:
@@ -188,63 +215,87 @@ for project in tp_map.keys():
 
     site = pywikibot.Site(lang, family)
     pywikibot.output('Doing %s%s' % (lang, family))
+    site.login()
 
-    for page in pagegenerators.UnconnectedPageGenerator(site, 1500):
-        if page.namespace() not in [0, 14, 100]:
+    genFactory = pagegenerators.GeneratorFactory(site=site)
+    for ns in (0, 14, 100):
+        if family != 'wikisource' and ns == 100: # fixme: cswikiquote
             continue
-        if family == 'wikisource' and page.namespace() == 0:
+        if family == 'wikisource' and ns == 0:
             continue
-        if family == 'wikipedia' and page.namespace() == 100:
-            continue
+        genFactory.handleArg('-ns:%i' % ns)
+    genFactory.handleArg('-unconnectedpages')
+    generator = genFactory.getCombinedGenerator()
+
+    for page in pagegenerators.PreloadingGenerator(generator):
         if page.namespace() != 14 and page.isDisambig():
             continue
 
-        for template, fields in textlib.extract_templates_and_params(page.get()):
-            if template.lower() in tp_map[project].keys():
-                params = tp_map[project][template.lower()]
-                for key in fields.keys():
-                    if key in params.keys():
-                        title = fields[key].strip()
-                        if not title:
-                            continue
+        for template, fields in textlib.extract_templates_and_params(page.text):
+            if first_lower(template) not in tp_map[project].keys():
+                continue
 
-                        target_lang = lang
-                        target_family = family
-                        if type(params[key]) == type({}):
-                            if 'namespaces' in params[key].keys() and page.namespace() not in params[key]['namespaces']:
-                                continue
-                            if 'pattern' in params[key].keys():
-                                title = params[key]['pattern'] % title
-                            if 'family' in params[key].keys():
-                                target_family = params[key]['family']
-                            if 'lang' in params[key].keys():
-                                target_lang = params[key]['lang']
-                        else:
-                            target_family = params[key]
+            params = tp_map[project][first_lower(template)]
+            for key in fields.keys():
+                if key not in params.keys():
+                    continue
 
-                        target_site = pywikibot.Site(target_lang, target_family)
-                        target_page = pywikibot.Page(target_site, title)
-                        if not target_page.exists():
-                            continue
-                        while target_page.isRedirectPage():
-                            target_page = target_page.getRedirectTarget()
-                        if target_page.isDisambig():
-                            continue
-                        try:
-                            item = target_page.data_item()
-                            item.get()
-                            if site.dbName() in item.sitelinks.keys():
-                                continue
-                            item.setSitelink(
-                                page, summary=u'Adding sitelink %s' % page.title(
-                                    asLink=True, forceInterwiki=True))
-                            page.touch()
-                            break
-                        except pywikibot.PageRelatedError as exc:
-                            pywikibot.output(exc)
-                        except pywikibot.data.api.APIError as exc:
-                            pywikibot.output(exc)
+                title = fields[key].strip()
+                if not title:
+                    continue
+
+                target_lang = lang
+                target_family = family
+                if isinstance(params[key], dict):
+                    if params[key].get('namespaces', []) and page.namespace() not in params[key]['namespaces']:
+                        continue
+                    if 'pattern' in params[key].keys():
+                        title = params[key]['pattern'] % title
+                    if 'family' in params[key].keys():
+                        target_family = params[key]['family']
+                    if 'lang' in params[key].keys():
+                        target_lang = params[key]['lang']
+                else:
+                    target_family = params[key]
+
+                target_site = pywikibot.Site(target_lang, target_family)
+                if '{{' in title:
+                    title = site.expand_text(title, page.title())
+                target_page = pywikibot.Page(target_site, title)
+                if not target_page.exists():
+                    pywikibot.output('%s doesn\'t exist' % target_page)
+                    continue
+                while target_page.isRedirectPage():
+                    target_page = target_page.getRedirectTarget()
+                if target_page.isDisambig():
+                    pywikibot.output('%s is a disambiguation' % target_page)
+                    continue
+
+                try:
+                    item = target_page.data_item()
+                except pywikibot.NoPage:
+                    repo = site.data_repository()
+                    # fixme: unused
+                    data = repo.linkTitles(page, target_page)
+                    pywikibot.output('Item created')
+                    pywikibot.output(data) # todo
+                    break
+                if site.dbName() in item.get()['sitelinks'].keys():
+                    pywikibot.output(page)
+                    pywikibot.output('%s already has sitelink to %s%s' % (
+                        item, lang, family))
+                    continue
+
+                try:
+                    item.setSitelink(
+                        page, summary='Adding sitelink %s' % page.title(
+                            asLink=True, insite=item.site))
+                except pywikibot.data.api.APIError:
+                    pass
+                else:
+                    page.purge()
+                    break
 
 end = datetime.datetime.now()
 
-pywikibot.output("Complete! Took %s seconds" % (end - start).total_seconds())
+pywikibot.output('Complete! Took %s seconds' % (end - start).total_seconds())

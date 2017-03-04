@@ -1,4 +1,6 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import datetime
 import codecs
 import pywikibot
@@ -54,7 +56,7 @@ class ErrorReportingBot(BaseBot):
                 f.seek(0)
                 f.truncate()
                 #self.update_time()
-        threading.Timer(self.getOption('interval'), self.save_file).start() # todo
+        threading.Timer(self.getOption('interval'), self.save_file).start() # fixme
 
     def check_time(self):
         if (datetime.datetime.now() - self.timestamp).total_seconds() > self.getOption('interval'):
@@ -73,7 +75,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
     skip = ['enwiki', 'igwiki', 'mkwiki', 'mznwiki', 'specieswiki', 'towiki']
 
     def __init__(self, **kwargs):
-        page_pattern = u'User:%s/Disambig_errors'
+        page_pattern = 'User:%s/Disambig_errors'
         file_name = 'log_disambigs.txt'
         super(DisambigsCheckingBot, self).__init__(
             page_pattern=page_pattern, file_name=file_name, **kwargs)
@@ -82,10 +84,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
     def init_page(self, item):
         super(DisambigsCheckingBot, self).init_page(item)
         if '[[%s]]' % item.title() in self.log_page.text:
-            raise SkipPageError(
-                item,
-                "Already reported page"
-            )
+            raise SkipPageError(item, 'Already reported page')
 
         for prop in item.claims:
             if prop == 'P31':
@@ -93,10 +92,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
                     if claim.target_equals(self.__disambig_item):
                         return
 
-        raise SkipPageError(
-            item,
-            "Item is not a disambiguation"
-        )
+        raise SkipPageError(item, 'Item is not a disambiguation')
 
     def treat_page(self):
         item = self.current_page
@@ -111,7 +107,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
             page = pywikibot.Page(apisite, item.sitelinks[dbname])
             if not page.exists():
                 args = []
-                append_text += u"\n** {} – [[{}:{}]] – doesn't exist".format(
+                append_text += '\n** {} – [[{}:{}]] – doesn\'t exist'.format(
                     dbname, apisite.sitename(), page.title())
                 continue
             if page.isRedirectPage():
@@ -124,11 +120,11 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
                 if not target.isDisambig():
                     target_id += ', not a disambiguation'
                 sitename = apisite.sitename()
-                append_text += u"\n** {} – [[{}:{}]] – redirects to [[{}:{}]] ({})".format(
+                append_text += '\n** {} – [[{}:{}]] – redirects to [[{}:{}]] ({})'.format(
                     dbname, sitename, page.title(), sitename, target.title(), target_id)
                 continue
             if not page.isDisambig():
-                append_text += u"\n** {} – [[{}:{}]] – not a disambiguation".format(
+                append_text += '\n** {} – [[{}:{}]] – not a disambiguation'.format(
                     dbname, apisite.sitename(), page.title())
 
         if append_text != '':
