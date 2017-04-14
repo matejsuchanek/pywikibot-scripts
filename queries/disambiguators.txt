@@ -1,0 +1,10 @@
+SELECT ?item {
+  ?item ^schema:about/schema:isPartOf/^wdt:P856 wd:Q191168 .
+  FILTER( xsd:integer( STRAFTER( STR( ?item ), STR( wd:Q ) ) ) > %(i)s ) .
+  ?item rdfs:label ?label FILTER( LANG( ?label ) = '%(lang)s' ) .
+  ?item schema:description ?desc FILTER( LANG( ?label ) = LANG( ?desc ) ) .
+  FILTER( STRENDS( ?label, ')' ) ) .
+  FILTER( !STRSTARTS( ?label, 'Kategorie:' ) ) .
+  FILTER( !STRSTARTS( ?label, 'Šablona:' ) ) .
+  FILTER( !STRSTARTS( ?label, 'Wikipedie:' ) ) .
+} LIMIT 200 # run %(run)s

@@ -1,0 +1,1 @@
+SELECT DISTINCT ?item WHERE { ?item wdt:%(prop)s [] }

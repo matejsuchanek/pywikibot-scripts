@@ -1,0 +1,31 @@
+SELECT DISTINCT ?item WHERE {
+  {
+    ?pst rdf:type wdno:P2237 .
+  } UNION {
+    ?pst ps:P2237 wd:%(good)s .
+  } .
+  ?prop p:P2237 ?pst;
+        wikibase:claim ?p;
+        wikibase:statementValue ?psv;
+        wikibase:qualifierValue ?pqv;
+        wikibase:referenceValue ?prv .
+  FILTER( ?prop != wd:P1092 ) .
+  {
+    ?statement ?psv ?value .
+    ?value wikibase:quantityUnit ?unit .
+    FILTER( ?unit != wd:Q199 ) .
+    ?item ?p ?statement .
+  } UNION {
+    ?statement1 ?pqv ?value .
+    ?value wikibase:quantityUnit ?unit .
+    FILTER( ?unit != wd:Q199 ) .
+    ?item ?claim1 ?statement1 .
+  } UNION {
+    ?ref ?prv ?value .
+    ?value wikibase:quantityUnit ?unit .
+    FILTER( ?unit != wd:Q199 ) .
+    ?statement2 prov:wasDerivedFrom ?ref .
+    ?item ?claim2 ?statement2 .
+  } .
+  MINUS { ?item wikibase:propertyType [] } .
+}

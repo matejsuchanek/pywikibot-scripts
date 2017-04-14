@@ -428,6 +428,6 @@ def main(*args):
 
 if __name__ == '__main__':
     if isinstance(mwparserfromhell, Exception):
-        pywikibot.error()
+        pywikibot.error('metabot.py requires having mwparserfromhell installed')
     else:
         main()

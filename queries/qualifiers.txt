@@ -1,0 +1,16 @@
+SELECT DISTINCT ?item WHERE {
+  ?prop wikibase:propertyType [] .
+  {
+    ?prop p:P31/ps:P31 wd:%(item)s .
+    MINUS { ?prop wikibase:propertyType wikibase:ExternalId } .
+  } UNION {
+    FILTER( ?prop IN ( wd:%(good)s ) ) .
+  } .
+  FILTER( ?prop NOT IN ( wd:%(bad)s ) ) .
+  MINUS { ?prop p:P31/ps:P31 wd:Q18608359 } .
+  ?prop wikibase:reference ?pr .
+  ?ref ?pr ?value .
+  ?statement prov:wasDerivedFrom ?ref .
+  ?item ?p ?statement .
+  [] wikibase:claim ?p .
+}
