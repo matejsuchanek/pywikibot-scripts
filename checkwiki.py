@@ -5,6 +5,7 @@ import pywikibot
 import re
 
 from pywikibot import pagegenerators
+from pywikibot.exceptions import UnknownExtension
 
 from .checkwiki_errors import *
 from .wikitext import WikitextFixingBot

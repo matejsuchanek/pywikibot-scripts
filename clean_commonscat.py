@@ -5,7 +5,7 @@ import pywikibot
 import re
 
 from pywikibot import i18n, pagegenerators, textlib
-from pywikibot.exceptions from UnknownExtension
+from pywikibot.exceptions import UnknownExtension
 
 from .deferred import DeferredCallbacksBot
 from .wikidata import WikidataEntityBot
