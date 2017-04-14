@@ -3,6 +3,7 @@ import pywikibot
 
 from pywikibot import pagegenerators
 
+from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 
 class QualifiersFixingBot(WikidataEntityBot):
@@ -10,9 +11,9 @@ class QualifiersFixingBot(WikidataEntityBot):
     blacklist = frozenset(['P143', 'P248', 'P459', 'P518', 'P577', 'P805',
                            'P972', 'P1065', 'P1135', 'P1480', 'P1545', 'P1932',
                            'P2315', 'P2701', ])
-    whitelist = frozenset(['P17', 'P21', 'P155', 'P156', 'P281', 'P580', 'P582',
-                           'P585', 'P669', 'P708', 'P969', 'P1355', 'P1356',
-                           ])
+    whitelist = frozenset(['P17', 'P21', 'P39', 'P155', 'P156', 'P281', 'P580',
+                           'P582', 'P585', 'P669', 'P708', 'P969', 'P1355',
+                           'P1356', ])
     good_item = 'Q15720608'
 
     def __init__(self, **kwargs):
@@ -21,6 +22,7 @@ class QualifiersFixingBot(WikidataEntityBot):
             'good_cache': kwargs.get('good_cache', []) + list(self.whitelist),
         })
         super(QualifiersFixingBot, self).__init__(**kwargs)
+        self.store = QueryStore()
 
     def filterProperty(self, prop_page):
         if prop_page.type == 'external-id':
@@ -36,6 +38,15 @@ class QualifiersFixingBot(WikidataEntityBot):
                 return True
 
         return False
+
+    @property
+    def generator(self):
+        query = self.store.build_query('qualifiers',
+                                       item=self.good_item,
+                                       good=', wd:'.join(self.whitelist),
+                                       bad=', wd:'.join(self.blacklist))
+        return pagegenerators.PreloadingItemGenerator(
+            pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo))
 
     def treat_page(self):
         item = self.current_page
@@ -88,31 +99,9 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    QUERY = """SELECT DISTINCT ?item WHERE {
-  ?prop wikibase:propertyType [] .
-  {
-    ?prop p:P31/ps:P31 wd:%s .
-    MINUS { ?prop wikibase:propertyType wikibase:ExternalId } .
-  } UNION {
-    FILTER( ?prop IN ( wd:%s ) ) .
-  } .
-  FILTER( ?prop NOT IN ( wd:%s ) ) .
-  MINUS { ?prop p:P31/ps:P31 wd:Q18608359 } .
-  ?prop wikibase:reference ?pr .
-  ?ref ?pr ?value .
-  ?statement prov:wasDerivedFrom ?ref .
-  ?item ?p ?statement .
-  [] wikibase:claim ?p .
-}""".replace('\n', ' ') % (
-    QualifiersFixingBot.good_item,
-    ', wd:'.join(QualifiersFixingBot.whitelist),
-    ', wd:'.join(QualifiersFixingBot.blacklist)
-)
-
     site = pywikibot.Site('wikidata', 'wikidata')
 
-    generator = pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=site)
-    bot = QualifiersFixingBot(site=site, generator=generator, **options)
+    bot = QualifiersFixingBot(site=site, **options)
     bot.run()
 
 if __name__ == '__main__':

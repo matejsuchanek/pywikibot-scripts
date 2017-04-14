@@ -6,9 +6,7 @@ Module holding fixes which can be applied to most articles.
 For use in user_fixes.py, please add to the file:
 
 from scripts.myscripts.custome_fixes import lazy_fixes
-fixes.update(
-    dict((key, fix.dictForUserFixes()) for key, fix in lazy_fixes.items())
-)
+fixes.update((key, fix.dictForUserFixes()) for key, fix in lazy_fixes.items())
 """
 import pywikibot
 import re
@@ -347,7 +345,6 @@ class FilesFix(LazyFix):
     regex = r'\[\[\s*(?:%s)\s*:\s*[^]|[]+(?:\|(?:[^]|[]|\[\[[^]]+\]\])+)+\]\]'
 
     def load(self):
-        pywikibot.output('Please help fix [[phab:T148959]] for better wikisyntax parsing') # fixme: resolved
         self.file_regex = re.compile(
             self.regex % '|'.join(self.site.namespaces[6]))
 
@@ -510,7 +507,7 @@ class RedirectFix(LazyFix):
         self.cache = {}
         pywikibot.output('Loading redirects')
         page = pywikibot.Page(self.site, self.page_title)
-        text = page.get().partition('{{SHORTTOC}}\n')[2]
+        text = page.text.partition('{{SHORTTOC}}\n')[2]
         for line in text.splitlines():
             if line.strip() == '':
                 continue
@@ -824,7 +821,8 @@ class SectionsFix(LazyFix):
             return text
 
         do_more = False
-        first_index = min(code.nodes.index(sect['nodes'][0]) for sect in sections)
+        first_index = min(code.nodes.index(sect['nodes'][0])
+                          for sect in sections)
         last_index = self.add_contents(sections, code)
         do_more = self.deduplicate(sections, code) or do_more
         do_more = self.check_levels(sections, code) or do_more

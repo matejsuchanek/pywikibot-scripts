@@ -9,11 +9,13 @@ from pywikibot import pagegenerators
 
 from pywikibot.bot import SkipPageError
 
+from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 
 class DuosManagingBot(WikidataEntityBot):
 
     conj = {
+        'af': ' en ',
         'br': ' ha ',
         'ca': ' i ',
         'cs': ' a ',
@@ -28,6 +30,7 @@ class DuosManagingBot(WikidataEntityBot):
         'eu': ' eta ',
         'fi': ' ja ',
         'fr': ' et ',
+        'fy': ' en ',
         'hr': ' i ',
         'hu': ' és ',
         'id': ' dan ',
@@ -35,7 +38,7 @@ class DuosManagingBot(WikidataEntityBot):
         'la': ' et ',
         'nl': ' en ',
         #'nn':
-        #'nb':
+        'nb': ' og ',
         'pl': ' i ',
         'pt': ' e ',
         'ro': ' și ',
@@ -57,6 +60,7 @@ class DuosManagingBot(WikidataEntityBot):
             'min_labels': 1
         })
         super(DuosManagingBot, self).__init__(**kwargs)
+        self.store = QueryStore()
 
     def init_page(self, item):
         super(DuosManagingBot, self).init_page(item)
@@ -67,14 +71,9 @@ class DuosManagingBot(WikidataEntityBot):
 
     @property
     def generator(self):
-        QUERY = '''
-SELECT DISTINCT ?item WHERE {
-  ?item wdt:P31/wdt:P279* wd:Q15618652 .
-  MINUS { ?item wdt:P527 [] } .
-}'''.strip().replace('\n', ' ')
-
+        query = self.store.get_query('duos')
         return pagegenerators.PreloadingItemGenerator(
-            pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=self.repo,
+            pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo,
                                                        result_type=tuple))
 
     def get_relation(self, item, prop, cache, step):
@@ -119,13 +118,13 @@ SELECT DISTINCT ?item WHERE {
 
     def treat_page(self):
         item = self.current_page
-        item.get() # fixme upstream
         relation = self.get_relation(item, 'P31', [], 0)
         labels = self.get_labels(item, relation)
         if sum(map(len, labels)) < self.getOption('min_labels'):
+            pywikibot.output('Too few labels (%i)' % sum(map(len, labels)))
             return
 
-        # todo: pywikibot.output
+        pywikibot.output('Creating items (relation: %s)...' % relation)
         items = [self.create_item(data, relation) for data in labels]
         for i in range(2):
             claim = pywikibot.Claim(self.repo, 'P527')
@@ -158,7 +157,6 @@ SELECT DISTINCT ?item WHERE {
         data = {'labels': labels}
         item.editEntity(data, summary='based on data in %s' %
                         self.current_page.title(asLink=True, insite=self.repo))
-        item.get(force=True) # fixme upstream
 
         claim = pywikibot.Claim(self.repo, 'P31')
         claim.setTarget(pywikibot.ItemPage(self.repo, 'Q5'))

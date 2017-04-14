@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 import pywikibot
 
+import requests
+import time
+
 from operator import attrgetter, methodcaller
+
+from pywikibot.data.sparql import SparqlQuery
 
 class Merger(object):
 
@@ -10,9 +15,15 @@ class Merger(object):
         'revisions': '_sort_by_revisions',
         'sitelinks': '_sort_by_sitelinks',
     }
-    no_overlap_props = ['P17', 'P19', 'P21', 'P31', 'P105', 'P171', 'P225',
-                        'P495', 'P569', 'P734']
-    no_overlap_types = ['external-id']
+    no_conflict_props = ['P17', 'P21', 'P105', 'P170', 'P171', 'P225', 'P271',
+                         'P296', 'P495', 'P569', 'P570', 'P734', 'P856']
+    no_conflict_trees = {
+        'P19': 'P131',
+        'P31': 'P279',
+        'P131': 'P131',
+        'P279': 'P279',
+    }
+    no_conflict_types = ['external-id']
 
     @classmethod
     def merge(cls, item_from, item_to, **kwargs):
@@ -22,14 +33,13 @@ class Merger(object):
             raise pywikibot.OtherPageSaveError(item_from, e)
 
     @classmethod
-    def clean_merge(cls, item_from, item_to, safe=False, **kwargs):
-        if safe and not cls.can_merge(item_from, item_to):
+    def clean_merge(cls, item_from, item_to, safe=False, quick=True, **kwargs):
+        if safe and not cls.can_merge(item_from, item_to, quick=quick):
             raise pywikibot.OtherPageSaveError(
                 item_from, 'Cannot merge %s with %s' % (item_from, item_to))
 
         cls.merge(item_from, item_to, **kwargs)
         if not item_from.isRedirectPage():
-            item_from.get(force=True) # fixme upstream
             data = {'claims': [], 'descriptions': {}, 'sitelinks': []}
             for lang in item_from.descriptions:
                 data['descriptions'][lang] = '' # fixme upstream
@@ -50,7 +60,7 @@ class Merger(object):
 
     @classmethod
     def _conflicts(cls, data1, data2):
-        set1 = set(map(repr, map(attrgetter('target'), data1)))
+        set1 = set(map(repr, map(attrgetter('target'), data1))) # hack
         set2 = set(map(repr, map(attrgetter('target'), data2)))
         return not bool(set1 & set2)
 
@@ -62,8 +72,39 @@ class Merger(object):
         return False
 
     @classmethod
-    def can_merge(cls, item1, item2):
-        for prop in cls.no_overlap_props:
+    def _same_tree(cls, prop, data1, data2):
+        sparql = SparqlQuery() # fixme: dependencies
+        pattern = ('ASK { VALUES ?x1 { wd:%s } . VALUES ?x2 { wd:%s } . '
+                   '?x1 wdt:%s* ?x2 }')
+        item1 = ' wd:'.join(map(attrgetter('target.id'), data1))
+        item2 = ' wd:'.join(map(attrgetter('target.id'), data2))
+        tries = 3
+        for ask in (pattern % (item1, item2, prop),
+                    pattern % (item2, item1, prop)):
+            res = False
+            while True:
+                try:
+                    res = sparql.ask(ask)
+                except requests.exceptions.ConnectionError:
+                    tries -= 1
+                    if tries == 0:
+                        raise
+                    time.sleep(1)
+                    continue
+                else:
+                    break
+            if res:
+                return True
+
+        return False
+
+    @classmethod
+    def can_merge(cls, item1, item2, quick=True):
+        props = list(cls.no_conflict_props)
+        if quick:
+            props.extend(cls.no_conflict_trees.keys())
+
+        for prop in props:
             item1.get()
             data1 = item1.claims.get(prop, [])
             if not data1:
@@ -76,7 +117,7 @@ class Merger(object):
                 return False
 
         key = lambda claims: claims[0].id
-        for dtype in cls.no_overlap_types:
+        for dtype in cls.no_conflict_types:
             callback = lambda claims: claims[0].type == dtype
             item1.get()
             keys1 = set(map(key, filter(callback, item1.claims.values())))
@@ -88,6 +129,19 @@ class Merger(object):
                 continue
             for prop in keys1 & keys2:
                 if cls._conflicts(item1.claims[prop], item2.claims[prop]):
+                    return False
+
+        if not quick:
+            for prop in cls.no_conflict_trees:
+                item1.get()
+                data1 = item1.claims.get(prop, [])
+                if not data1:
+                    continue
+                item2.get()
+                data2 = item2.claims.get(prop, [])
+                if not data2:
+                    continue
+                if not cls._same_tree(cls.no_conflict_trees[prop], data1, data2):
                     return False
 
         return True

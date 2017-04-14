@@ -70,9 +70,12 @@ class TypoBot(WikitextFixingBot):
             old_max = rule.longest
             rule.longest = 0.0
             self.currentrule = rule
+            self.skip_rule = False
             self.processed = 0.0
             self.replaced = 0.0
             for page in rule.querySearch():
+                if self.skip_rule:
+                    break
                 yield page
                 if not self.isRuleAccurate:
                     pywikibot.output(
@@ -92,10 +95,10 @@ class TypoBot(WikitextFixingBot):
             rule.longest = max(old_max, rule.longest)
 
     def save_false_positive(self, page):
-        title = page.title()
-        self.fp_page.text += '\n* [[%s]]' % title
-        self.fp_page.save(summary='[[%s]]' % title, async=True)
-        self.whitelist.append(title)
+        link = page.title(asLink=True)
+        self.fp_page.text += '\n* %s' % link
+        self.fp_page.save(summary=link, async=True)
+        self.whitelist.append(page.title())
 
     def init_page(self, page):
         if page.title() in self.whitelist:
@@ -114,6 +117,7 @@ class TypoBot(WikitextFixingBot):
         text = page.text
         done_replacements = []
         quickly = self.getOption('quick') is True
+        start = time.clock()
         if self.own_generator:
             text = self.currentrule.apply(page.text, done_replacements)
             if page.text == text:
@@ -124,7 +128,6 @@ class TypoBot(WikitextFixingBot):
             else:
                 self.replaced += 1
 
-        start = time.clock()
         for rule in self.typoRules:
             if rule == self.currentrule: # __eq__
                 continue
@@ -139,22 +142,28 @@ class TypoBot(WikitextFixingBot):
                 pywikibot.warning('Other typos exceeded 15s, skipping')
                 break
 
-        self.userPut(page, page.text, text, summary='oprava překlepů: %s' %
-                     ', '.join(done_replacements))
+        self.put_current(
+            text, summary='oprava překlepů: %s' % ', '.join(done_replacements))
 
     def user_confirm(self, question):
         if self.getOption('always'):
             return True
 
-        options = [('Yes', 'y'), ('No', 'n'), ('All', 'a'),
-                   ('open in browser', 'b'), ('Quit', 'q')]
+        options = [('yes', 'y'), ('no', 'n'), ('all', 'a'),
+                   ('open in browser', 'b'), ('quit', 'q')]
+        if self.own_generator:
+            options.insert(3, ('skip rule', 's'))
         if self.fp_page.exists():
-            options.insert(2, ('false positive', 'f'))
+            options.insert(3, ('false positive', 'f'))
 
         choice = pywikibot.input_choice(question, options, default='N',
                                         automatic_quit=False)
 
         if choice == 'n':
+            return False
+
+        if choice == 's':
+            self.skip_rule = True
             return False
 
         if choice == 'b':

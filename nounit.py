@@ -3,47 +3,24 @@ import pywikibot
 
 from pywikibot import pagegenerators
 
+from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
+
+# FIXME: broken
 
 class UnitsFixingBot(WikidataEntityBot):
 
     good_item = 'Q21027105'
 
+    def __init__(self, **kwargs):
+        super(UnitsFixingBot, self).__init__(**kwargs)
+        self.store = QueryStore()
+
     @property
     def generator(self):
-        QUERY = '''
-SELECT DISTINCT ?item WHERE {
-  {
-    ?pst rdf:type wdno:P2237 .
-  } UNION {
-    ?pst ps:P2237 wd:%s .
-  } .
-  ?prop p:P2237 ?pst;
-        wikibase:claim ?p;
-        wikibase:statementValue ?psv;
-        wikibase:qualifierValue ?pqv;
-        wikibase:referenceValue ?prv .
-  FILTER(?prop != wd:P1092) .
-  {
-    ?statement ?psv ?value .
-    ?value wikibase:quantityUnit ?unit .
-    FILTER(?unit != wd:Q199) .
-    ?item ?p ?statement .
-  } UNION {
-    ?statement1 ?pqv ?value .
-    ?value wikibase:quantityUnit ?unit .
-    FILTER(?unit != wd:Q199) .
-    ?item ?claim1 ?statement1 .
-  } UNION {
-    ?ref ?prv ?value .
-    ?value wikibase:quantityUnit ?unit .
-    FILTER(?unit != wd:Q199) .
-    ?statement2 prov:wasDerivedFrom ?ref .
-    ?item ?claim2 ?statement2 .
-  } .
-}'''.replace('\n', ' ') % self.good_item
+        query = self.store.build_query('units', good=self.good_item)
         return pagegenerators.PreloadingItemGenerator(
-            pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=self.repo))
+            pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo))
 
     def filterProperty(self, prop_page):
         if prop_page.type != 'quantity':
@@ -62,7 +39,6 @@ SELECT DISTINCT ?item WHERE {
 
     def treat_page(self):
         item = self.current_page
-        item.get() # fixme upstream
         for prop, claims in item.claims.items():
             for claim in claims:
                 if claim.type == 'quantity':
@@ -107,7 +83,7 @@ SELECT DISTINCT ?item WHERE {
         if target is None or target.unit == '1':
             return False
 
-        target.unit = '1'
+        target.unit = '1' # broken!
         return True
 
     def handle_snaks(self, snaks):
@@ -129,7 +105,8 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    bot = UnitsFixingBot(**options)
+    site = pywikibot.Site('wikidata', 'wikidata')
+    bot = UnitsFixingBot(site=site, **options)
     bot.run()
 
 if __name__ == '__main__':

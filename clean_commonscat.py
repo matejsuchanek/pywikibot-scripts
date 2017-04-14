@@ -5,6 +5,7 @@ import pywikibot
 import re
 
 from pywikibot import i18n, pagegenerators, textlib
+from pywikibot.exceptions from UnknownExtension
 
 from .deferred import DeferredCallbacksBot
 from .wikidata import WikidataEntityBot
@@ -72,7 +73,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
                                  'cleanup restricted')
                 return
             regex = r'(?:[\n\r]?|^)(?:\* *)?\{\{ *[Cc]ommons(?:cat|[_ ]?category) *'
-            if has_param is True:
+            if has_param:
                 regex += r'\| *' + re.escape(cat_name)
             regex += r'[^\}]*\}\}'
             page_replaced_text = re.sub(regex, '', page.text, flags=re.M | re.U,
@@ -88,9 +89,9 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
                     r'\n\n\1',
                     page_replaced_text, flags=re.M | re.U, count=1)
 
-            self.doWithCallback( # fixme
-                self.userPut, page, page.text, page_replaced_text,
-                summary=i18n.translate(self.site, save_summary))
+            # fixme
+            self.doWithCallback(self.put_current, page_replaced_text,
+                                summary=i18n.translate(self.site, save_summary))
         else:
             if self.getOption('noimport') is True:
                 pywikibot.output('Category exists on Commons, import restricted')
@@ -124,15 +125,16 @@ def main(*args):
     generator = genFactory.getCombinedGenerator()
     site = pywikibot.Site()
     if not generator:
-        repo = site.data_repository()
-        item = pywikibot.ItemPage(repo, 'Q11925744')
         try:
-            title = item.getSitelink(site)
-        except pywikibot.NoPage:
-            pywikibot.output('%r doesn\'t have an appropriate category' % site)
+            category = site.page_from_repository('Q11925744')
+        except (NotImplementedError, UnknownExtension) as e:
+            pywikibot.error(e)
             return
 
-        category = pywikibot.Category(site, title)
+        if not category:
+            pywikibot.output('%s doesn\'t have an appropriate category' % site)
+            return
+
         gen_articles = category.articles(namespaces=0)
         gen_subcats = category.subcategories()
         gen_combined = pagegenerators.CombinedPageGenerator([gen_articles,
@@ -142,5 +144,5 @@ def main(*args):
     bot = CommonscatCleaningBot(generator, site=site, **options)
     bot.run()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

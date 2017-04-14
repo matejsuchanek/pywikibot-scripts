@@ -51,13 +51,15 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
     def treat_page(self):
         summaries = []
         page = self.current_page
-        old_text = page.get()
+        old_text = page.text
         callbacks = self.applyFixes(page, summaries)
         if len(summaries) < 1:
             pywikibot.output('No replacements worth saving')
             return
         pywikibot.showDiff(old_text, page.text)
+        # todo: method
         callback = lambda _, exc: [cb() for cb in callbacks if not exc]
+        # todo: put_current
         self._save_page(page, page.save, callback=callback,
                         summary='; '.join(summaries))
 
@@ -91,6 +93,7 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         callbacks = self.applyFixes(page, summaries)
 
         kwargs['summary'] = '; '.join(summaries)
+        # todo: method
         kwargs['callback'] = lambda _, exc: [cb() for cb in callbacks
                                              if not exc]
         page.save(*data, **kwargs)

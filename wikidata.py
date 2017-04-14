@@ -23,6 +23,7 @@ class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
     '''
 
     def __init__(self, **kwargs):
+        # xxx: fixed
         pywikibot.output("Please help fix [[phab:T86074]] to make Wikidata scripts simpler")
         self.bad_cache = set(kwargs.pop('bad_cache', []))
         self.good_cache = set(kwargs.pop('good_cache', []))
@@ -32,10 +33,10 @@ class WikidataEntityBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
     def init_page(self, item): # fixme: neccessary (cf. superclasses)?
         try:
             item.get()
-        except pywikibot.IsRedirectPage:
-            raise SkipPageError(item, 'Redirect item')
         except pywikibot.NoPage:
             raise SkipPageError(item, 'Item doesn\'t exist')
+        except pywikibot.IsRedirectPage:
+            raise SkipPageError(item, 'Redirect item')
 
     def checkProperty(self, prop):
         if prop in self.good_cache:

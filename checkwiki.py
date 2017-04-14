@@ -99,14 +99,12 @@ class CheckWiki(object):
             'whitelists': {},
             #'special': {}
         }
-        repo = self.site.data_repository()
-        item = pywikibot.ItemPage(repo, 'Q10784379')
         try:
-            sitelink = item.getSitelink(self.site)
-        except pywikibot.NoPage:
+            set_page = self.site.page_from_repository('Q10784379')
+        except (NotImplementedError, UnknownExtension) as e:
+            pywikibot.error(e)
             return
-        set_page = pywikibot.Page(self.site, sitelink)
-        text = set_page.get()
+        text = set_page.text
         inside_setting = False
         setting = None
         setting_text = ''
@@ -219,8 +217,8 @@ class CheckWikiBot(WikitextFixingBot):
         fixed = []
         text = self.checkwiki.applyErrors(page.text, page, replaced, fixed)
         summary = 'opravy dle [[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced)
-        self.userPut(
-            page, page.text, text, summary=summary,
+        self.put_current(
+            text, summary=summary,
             callback=lambda *args: self.markAsFixedOnSuccess(fixed, *args))
 
     def markAsFixedOnSuccess(self, numbers, page, exc=None):

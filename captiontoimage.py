@@ -4,6 +4,7 @@ import pywikibot
 from pywikibot import pagegenerators
 from pywikibot.bot import SkipPageError
 
+from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 
 class CaptionToImageBot(WikidataEntityBot):
@@ -22,15 +23,15 @@ class CaptionToImageBot(WikidataEntityBot):
         self.availableOptions.update({
             'removeall': False
         })
-        kwargs['bad_cache'] = kwargs.get('bad_cache', []) + [self.caption_property]
+        kwargs.setdefault('bad_cache', []).append(self.caption_property)
         super(CaptionToImageBot, self).__init__(**kwargs)
+        self.store = QueryStore()
 
     @property
     def generator(self):
-        QUERY = ('SELECT DISTINCT ?item WHERE { ?item wdt:%s [] }'
-                 % self.caption_property)
+        query = self.store.build_query('captions', prop=self.caption_property)
         return pagegenerators.PreloadingItemGenerator(
-            pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=self.repo))
+            pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo))
 
     def filterProperty(self, prop_page):
         return prop_page.type == 'commonsMedia'
@@ -45,7 +46,6 @@ class CaptionToImageBot(WikidataEntityBot):
 
     def treat_page(self):
         item = self.current_page
-        item.get() # fixme upstream
         our_prop = self.image_property
         if our_prop not in item.claims.keys():
             our_prop = None

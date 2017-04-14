@@ -71,7 +71,7 @@ class TitlesMovingBot(WikitextFixingBot):
                 my_param = temp.get(self.param_after)
                 my_param.value = self.add_spaces(my_param.value, value)
 
-        if self.userPut(page, page.text, str(code), summary=self.summary):
+        if self.put_current(str(code), summary=self.summary):
             self.offset -= 1
 
     def add_spaces(self, new, pattern):

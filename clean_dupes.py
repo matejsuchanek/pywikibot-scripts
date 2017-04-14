@@ -5,40 +5,27 @@ from pywikibot import pagegenerators
 
 from pywikibot.bot import SkipPageError
 
+from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 from scripts.revertbot import BaseRevertBot
 
 class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
 
-    dupe_item = 'Q17362920'
+    dupe_item = ('Q17362920', 'Q28065731', )
 
     def __init__(self, offset=0, **kwargs):
         super(DupesMergingBot, self).__init__(**kwargs)
         self.offset = offset
         BaseRevertBot.__init__(self, self.site)
+        self.store = QueryStore()
 
     @property
     def generator(self):
-        QUERY = '''
-SELECT DISTINCT ?item WHERE {
-  ?item p:P31 ?statement .
-  ?statement ps:P31 wd:%s .
-  {
-    VALUES ?pq { pq:P460 pq:P642 } .
-    ?statement ?pq ?target .
-  } UNION {
-    ?item wdt:P460 ?target .
-  } .
-  MINUS {
-    ?target wdt:P31/wdt:P279* wd:Q16521 .
-  } .
-  ?item schema:dateModified ?mod .
-} ORDER BY ?mod OFFSET %s
-'''.strip().replace('\n', ' ') % (self.dupe_item, self.offset)
-
-        return pagegenerators.PreloadingGenerator(
-            pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=self.repo,
-                                                       result_type=tuple))
+        query = self.store.build_query(
+            'dupes', dupe=' wd:'.join(self.dupe_item), offset=self.offset)
+        return pagegenerators.PreloadingItemGenerator(
+            pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo,
+                                                       result_type=list))
 
     def init_page(self, item):
         self.offset += 1
@@ -53,7 +40,7 @@ SELECT DISTINCT ?item WHERE {
         for claim in item.claims['P31']:
             if claim.snaktype != 'value':
                 continue
-            if not claim.target_equals(self.dupe_item):
+            if claim.target.id not in self.dupe_item:
                 continue
             claims.append(claim)
             for prop in ['P460', 'P642']:
@@ -119,7 +106,7 @@ SELECT DISTINCT ?item WHERE {
         for claim in target.claims.get('P31', []):
             if claim.snaktype != 'value':
                 continue
-            if not claim.target_equals(self.dupe_item):
+            if claim.target.id not in self.dupe_item:
                 continue
             for prop in ['P460', 'P642']:
                 for snak in claim.qualifiers.get(prop, []):
@@ -179,7 +166,8 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    bot = DupesMergingBot(**options)
+    site = pywikibot.Site('wikidata', 'wikidata')
+    bot = DupesMergingBot(site=site, **options)
     bot.run()
 
 if __name__ == '__main__':
