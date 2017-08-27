@@ -10,7 +10,7 @@ class QualifiersFixingBot(WikidataEntityBot):
 
     blacklist = frozenset(['P143', 'P248', 'P459', 'P518', 'P577', 'P805',
                            'P972', 'P1065', 'P1135', 'P1480', 'P1545', 'P1932',
-                           'P2315', 'P2701', ])
+                           'P2315', 'P2701', 'P3274', ])
     whitelist = frozenset(['P17', 'P21', 'P39', 'P155', 'P156', 'P281', 'P580',
                            'P582', 'P585', 'P669', 'P708', 'P969', 'P1355',
                            'P1356', ])
@@ -41,10 +41,10 @@ class QualifiersFixingBot(WikidataEntityBot):
 
     @property
     def generator(self):
-        query = self.store.build_query('qualifiers',
-                                       item=self.good_item,
-                                       good=', wd:'.join(self.whitelist),
-                                       bad=', wd:'.join(self.blacklist))
+        query = self.store.build_query(
+            'qualifiers', item=self.good_item,
+            good=', wd:'.join(self.whitelist),
+            bad=', wd:'.join(self.blacklist))
         return pagegenerators.PreloadingItemGenerator(
             pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo))
 
@@ -59,8 +59,7 @@ class QualifiersFixingBot(WikidataEntityBot):
                     i += 1
                     for ref_prop in filter(self.checkProperty, source.keys()):
                         for snak in source[ref_prop]:
-                            json['qualifiers'] = json.get('qualifiers', {})
-                            json['qualifiers'][ref_prop] = json['qualifiers'].get(ref_prop, [])
+                            json.setdefault('qualifiers', {}).setdefault(ref_prop, [])
                             for qual in (pywikibot.Claim.qualifierFromJSON(self.repo, q)
                                          for q in json['qualifiers'][ref_prop]):
                                 if qual.target_equals(snak.getTarget()):
@@ -79,8 +78,8 @@ class QualifiersFixingBot(WikidataEntityBot):
 
                 if len(moved) > 0:
                     data = {'claims': [json]}
-                    self._save_page(item, self._save_entity, item.editEntity,
-                                    data, summary=self.makeSummary(prop, moved))
+                    self.user_edit_entity(item, data, summary=self.makeSummary(prop, moved),
+                                          asynchronous=True)
 
     def makeSummary(self, prop, props):
         props = list(map(lambda x: '[[Property:P%s]]' % x,
@@ -100,7 +99,6 @@ def main(*args):
                 options[arg[1:]] = True
 
     site = pywikibot.Site('wikidata', 'wikidata')
-
     bot = QualifiersFixingBot(site=site, **options)
     bot.run()
 

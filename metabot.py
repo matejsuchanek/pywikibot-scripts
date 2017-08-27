@@ -23,10 +23,11 @@ class MetadataHarvestingBot(WikidataEntityBot):
         'commonsMedia': re.compile(r'\b(?:[Ff]il|[Ii]mag)e:(?P<value>[^]|[{}]*\.\w{3,})\b'),
         #'coordinates': r'',
         #'monolingualtext': r'',
-        'quantity': re.compile(r'(?P<value>-?\b\d([\d.,]*\d)?\b)'),
+        'quantity': re.compile(r'(?P<value>-?\b\d([\d.,]*\d)?\b'
+                               r'(\s+[Qq]\W*[1-9]\d*\b)?)'), # ±
         'split-break': re.compile(r'\s*(?:<[^>\w]*br\b[^>]*> *|'
                                   '(?:^|\n+)[:;*#]+){1,2}'),
-        'split-comma': re.compile(r'(?:\s;\s|,\s*)'),
+        'split-comma': re.compile(r'\s*(?:[;/]\s+|,\s*)'),
         #'time': r'',
         'url': textlib.compileLinkR(),
         'wikibase-item': re.compile(r'\b[Qq]\W*(?P<value>[1-9]\d*)\b'),
@@ -47,11 +48,14 @@ class MetadataHarvestingBot(WikidataEntityBot):
             'corresponding template': self.get_data_as_item('P2667'),
             'example': self.example,
             'formatter URL': self.formatter,
+            'proposed by': self.proposed_by,
             'subject item': self.get_data_as_item('P1629', 'P1687'),
+            'subpage': self.subpage,
             'source': self.source,
             #'source': self.get_data_as_url('P1896'),
             #'embed URL': self.get_data_as_url('P2720'),
             #'allowed units': ...,
+            #'see also': ...,
             'track diff cat': self.get_data_as_item('P3709'),
             'track local yes-WD no': self.get_data_as_item('P3713'),
             'track same cat': self.get_data_as_item('P3734'),
@@ -71,8 +75,8 @@ class MetadataHarvestingBot(WikidataEntityBot):
                         self.repo, page.title(withNamespace=False))
         else:
             for page in pagegenerators.AllpagesPageGenerator(
-                start=self.getOption('start'), namespace=120,
-                site=self.repo, total=self.getOption('total')):
+                    start=self.getOption('start'), namespace=120,
+                    site=self.repo, total=self.getOption('total')):
                 if '/' in page.title():
                     continue
                 yield pywikibot.PropertyPage(
@@ -95,7 +99,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
     def treat_page(self):
         prop = self.current_page
         self.current_talk_page = page = prop.toggleTalkPage()
-        code = mwparserfromhell.parse(page.text)
+        code = mwparserfromhell.parse(page.text, skip_style_tags=True)
         for template in code.ifilter_templates():
             if not template.name.matches(self.template_metadata):
                 continue
@@ -108,7 +112,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
             return
 
         if (prop.type in ['commonsMedia', 'external-id', 'string', 'url']
-            and not prop.claims.get('P1793')):
+                and not prop.claims.get('P1793')):
             templates = textlib.extract_templates_and_params(
                 page.text, remove_disabled_parts=True, strip=True)
             for tmpl, fielddict in templates:
@@ -127,8 +131,6 @@ class MetadataHarvestingBot(WikidataEntityBot):
                                     summary=self.make_summary('P1793', regex))
                 except pywikibot.data.api.APIError as exc:
                     pywikibot.warning(exc)
-                else:
-                    prop.get(force=True)
                 break
 
         keys = set(self.func_dict.keys()) & set(params.keys())
@@ -159,7 +161,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 template.remove(par)
 
         self.current_page = self.current_talk_page
-        self.put_current(str(code), show_diff=True,
+        self.put_current(str(code), show_diff=True, asynchronous=True,
                          summary='removing migrated/obsolete parameters')
 
     def get_regex_from_prop(self, prop):
@@ -308,10 +310,21 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 while qual_target.isRedirectPage():
                     qual_target = pywikibot.FilePage(qual_target.getRedirectTarget())
             elif prop.type == 'quantity':
-                num = float(qual_target.replace(',', ''))
+                tgt, _, unit = qual_target.partition(' ')
+                # todo: +-
+                if unit:
+                    search = self.regexes['wikibase-item'].search(unit)
+                    unit = pywikibot.ItemPage(
+                        self.repo, 'Q%s' % search.group('value'))
+                    if unit.isRedirectPage():
+                        unit = unit.getRedirectTarget()
+                else:
+                    unit = None
+                num = float(tgt.replace(',', ''))
                 if num.is_integer():
                     num = int(num)
-                qual_target = pywikibot.WbQuantity(num, site=self.repo)
+                qual_target = pywikibot.WbQuantity(num, site=self.repo,
+                                                   unit=unit)
 
             claim = pywikibot.Claim(self.repo, 'P1855')
             claim.setTarget(target)
@@ -319,7 +332,8 @@ class MetadataHarvestingBot(WikidataEntityBot):
             qualifier.setTarget(qual_target)
             data = {'claims':[claim.toJSON()]}
             data['claims'][0]['qualifiers'] = {prop.getID(): [qualifier.toJSON()]}
-            prop.editEntity(data, summary=self.make_summary('P1855', target))
+            self.user_edit_entity(prop, data, summary=self.make_summary('P1855', target),
+                                  asynchronous=True)
         return remove
 
     def formatter(self, textvalue):
@@ -339,9 +353,9 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 continue # ???
             claim = pywikibot.Claim(self.repo, 'P1630')
             claim.setTarget(match)
-            prop.editEntity({'claims':[claim.toJSON()]},
-                            summary=self.make_summary('P1630', match))
-            prop.get(force=True)
+            self.user_edit_entity(prop, {'claims':[claim.toJSON()]},
+                                  summary=self.make_summary('P1630', match),
+                                  asynchronous=True)
         return True
 
     def get_data_as_item(self, prop_id, inverse=None):
@@ -360,7 +374,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 if target.isRedirectPage():
                     target = target.getRedirectTarget()
                 claim.setTarget(target)
-                prop.editEntity({'claims':[claim.toJSON()]},
+                prop.editEntity({'claims':[claim.toJSON()]}, asynchronous=True,
                                 summary=self.make_summary(prop_id, target))
 
                 if inverse:
@@ -374,6 +388,38 @@ class MetadataHarvestingBot(WikidataEntityBot):
             return True
 
         return get_item
+
+    def proposed_by(self, textvalue):
+        prop = self.current_page
+        if 'P3254' not in prop.claims:
+            try:
+                int(textvalue)
+            except:
+                pywikibot.exception()
+            else:
+                claim = pywikibot.Claim(self.repo, 'P3254')
+                target = ('https://www.wikidata.org/wiki/'
+                          'Wikidata:Property_proposal/Archive/%s#%s'
+                          ) % (textvalue, prop.id)
+                claim.setTarget(target)
+                self.user_edit_entity(
+                    prop, {'claims':[claim.toJSON()]}, asynchronous=True,
+                    summary=self.make_summary('P3254', target))
+        return False
+
+    def subpage(self, textvalue):
+        prop = self.current_page
+        if 'P3254' not in prop.claims:
+            title = 'Wikidata:Property_proposal/%s' % textvalue
+            page = pywikibot.Page(self.repo, title)
+            if page.exists():
+                claim = pywikibot.Claim(self.repo, 'P3254')
+                target = 'https://www.wikidata.org/wiki/%s' % title
+                claim.setTarget(target)
+                self.user_edit_entity(
+                    prop, {'claims':[claim.toJSON()]}, asynchronous=True,
+                    summary=self.make_summary('P3254', target))
+        return False
 
     def get_data_as_url(self, prop_id):
         pass # todo
@@ -401,8 +447,9 @@ class MetadataHarvestingBot(WikidataEntityBot):
             claim = pywikibot.Claim(self.repo, 'P1896')
             claim.setTarget(target)
             # XXX: qualifier 'title' but how to guess the language?
-            prop.editEntity({'claims':[claim.toJSON()]},
-                            summary=self.make_summary('P1896', target))
+            self.user_edit_entity(prop, {'claims':[claim.toJSON()]},
+                                  summary=self.make_summary('P1896', target),
+                                  asynchronous=True)
         return remove
 
 def main(*args):

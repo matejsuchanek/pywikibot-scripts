@@ -6,8 +6,6 @@ from pywikibot import pagegenerators
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 
-# FIXME: broken
-
 class UnitsFixingBot(WikidataEntityBot):
 
     good_item = 'Q21027105'
@@ -76,14 +74,13 @@ class UnitsFixingBot(WikidataEntityBot):
 
                 if changed is True:
                     data = {'claims': [json]}
-                    self._save_page(item, self._save_entity, item.editEntity,
-                                    data, summary='removing invalid unit(s)')
+                    self.user_edit_entity(item, data, summary='removing invalid unit(s)')
 
     def change_target(self, target):
-        if target is None or target.unit == '1':
+        if target is None or target._unit == '1':
             return False
 
-        target.unit = '1' # broken!
+        target._unit = '1'
         return True
 
     def handle_snaks(self, snaks):

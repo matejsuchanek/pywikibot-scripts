@@ -8,7 +8,7 @@ from pywikibot.pagegenerators import (
     WikidataSPARQLPageGenerator,
 )
 
-#from .query_store import QueryStore
+from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 
 class ExternalIdSlicingBot(WikidataEntityBot):
@@ -24,53 +24,28 @@ class ExternalIdSlicingBot(WikidataEntityBot):
         self.cache = {}
         self.failed = {}
         self.sparql = SparqlQuery(repo=self.repo)
+        self.store = QueryStore()
 
     @property
     def generator(self):
-        QUERY = '''SELECT ?item WITH {{
-  SELECT DISTINCT ?wdt {{
-    ?prop wikibase:propertyType wikibase:ExternalId;
-          wikibase:directClaim ?wdt;
-          wdt:P1630 [] .
-    FILTER( ?prop NOT IN ( wd:{} ) ) .
-  }}
-  ORDER BY xsd:integer( STRAFTER( STR( ?prop ), STR( wd:P ) ) )
-  OFFSET %i LIMIT %i
-}} AS %%predicates WHERE {{
-  INCLUDE %%predicates .
-  ?item ?wdt ?value .
-  FILTER( STRSTARTS( ?value, 'http' ) ) .
-}}'''.format(' wd:'.join(self.blacklist)).replace('\n', ' ')
-
-        ASK = '''ASK {{
-  {{
-    SELECT * {{
-      ?prop wikibase:propertyType wikibase:ExternalId;
-            wikibase:directClaim [];
-            wdt:P1630 [] .
-      FILTER( ?prop NOT IN ( wd:{} ) ) .
-    }}
-    ORDER BY xsd:integer( STRAFTER( STR( ?prop ), STR( wd:P ) ) )
-    OFFSET %i LIMIT %i
-  }}
-}}'''.format(' wd:'.join(self.blacklist)).replace('\n', ' ')
-
+        opts = dict(blacklist=' wd:'.join(self.blacklist),
+                    limit=self.getOption('limit'))
         offset = self.getOption('offset')
-        limit = self.getOption('limit')
         while True:
             pywikibot.output('\nLoading items (offset %i)...' % offset)
-            if not self.sparql.ask(ASK % (offset, limit)):
+            opts['offset'] = offset
+            ask = self.store.build_query('ask_externalid_props', **opts)
+            if not self.sparql.ask(ask):
                 break
+            query = self.store.build_query('external-ids', **opts)
             gen = PreloadingItemGenerator(
-                WikidataSPARQLPageGenerator(QUERY % (offset, limit),
-                                            site=self.repo))
+                WikidataSPARQLPageGenerator(query, site=self.repo))
             for item in gen:
                 yield item
             offset += limit
 
     def treat_page(self):
         item = self.current_page
-        item.get()
         for prop, claims in item.claims.items():
             if prop in self.blacklist:
                 continue

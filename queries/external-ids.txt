@@ -1,0 +1,14 @@
+SELECT ?item WITH {
+  SELECT DISTINCT ?wdt {
+    ?prop wikibase:propertyType wikibase:ExternalId;
+          wikibase:directClaim ?wdt;
+          wdt:P1630 [] .
+    FILTER( ?prop NOT IN ( wd:%(blacklist)s ) ) .
+  }
+  ORDER BY xsd:integer( STRAFTER( STR( ?prop ), STR( wd:P ) ) )
+  OFFSET %(offset)i LIMIT %(limit)i
+} AS %%predicates WHERE {
+  INCLUDE %%predicates .
+  ?item ?wdt ?value .
+  FILTER( STRSTARTS( ?value, 'http' ) ) .
+}

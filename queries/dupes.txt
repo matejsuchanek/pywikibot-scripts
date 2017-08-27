@@ -3,8 +3,7 @@ SELECT DISTINCT ?item WHERE {
   ?item p:P31 ?statement .
   ?statement ps:P31 ?dupe .
   {
-    VALUES ?pq { pq:P460 pq:P642 } .
-    ?statement ?pq ?target .
+    ?statement (pq:P460|pq:P642) ?target .
   } UNION {
     ?item wdt:P460 ?target .
   } .

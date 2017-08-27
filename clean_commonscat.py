@@ -27,6 +27,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
         self.generator = pagegenerators.PreloadingGenerator(generator)
         super(CommonscatCleaningBot, self).__init__(**kwargs)
         self.commons = pywikibot.Site('commons', 'commons')
+        self.cacheSources()
 
     def treat_page(self):
         page = self.current_page
@@ -59,10 +60,9 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
         if not exists:
             if not commons_cat.isEmptyCategory():
                 if self.getOption('createnew') is True:
-                    commons_cat.text = '{{Uncategorized}}'
                     exists = self.doWithCallback(
-                        self._save_page, commons_cat, commons_cat.save,
-                        async=False)
+                        self.userPut, commons_cat, '', '{{Uncategorized}}',
+                        asynchronous=False)
                 else:
                     pywikibot.warning('%s is not empty' % commons_cat.title())
                     return
@@ -80,33 +80,28 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
                                         count=1)
             if page_replaced_text != page.text:
                 templates = (
-                    '|'.join(map(re.escape, self.site.getmagicwords('defaultsort'))),
+                    '|'.join(map(re.escape, page.site.getmagicwords('defaultsort'))),
                     '[Pp]ahýl', '[Pp]osloupnost', '[Aa]utoritní data', '[Pp]ortály')
                 page_replaced_text = re.sub(
                     r'\s*==+ ?Externí odkazy ?==+ *$\s*^(==|\{\{'
                     '(?:' + '|'.join(templates) + ')'
-                    r'|\[\[(?:%s):)' % '|'.join(self.site.namespaces[14]),
+                    r'|\[\[(?:%s):)' % '|'.join(page.site.namespaces[14]),
                     r'\n\n\1',
                     page_replaced_text, flags=re.M | re.U, count=1)
 
             # fixme
-            self.doWithCallback(self.put_current, page_replaced_text,
-                                summary=i18n.translate(self.site, save_summary))
+            self.doWithCallback(
+                self.put_current, page_replaced_text,
+                summary=i18n.translate(page.site, save_summary))
         else:
             if self.getOption('noimport') is True:
                 pywikibot.output('Category exists on Commons, import restricted')
                 return
             claim = pywikibot.Claim(self.repo, 'P373')
             claim.setTarget(cat_name)
-            pywikibot.output('Importing P373 to %s' % item.getID())
-            if self._save_page(item, self._save_entity, item.addClaim, claim):
-                old = self.getOption('always')
-                self.options['always'] = True
-                ref = self.getSource()
-                self._save_page(item, self._save_entity, claim.addSource, ref)
-                self.options['always'] = old
-                self.addCallback(page.touch, botflag=True)
-            #else: todo
+            pywikibot.output('Category missing on Wikidata')
+            self.user_add_claim(item, claim, page.site, asynchronous=True)
+            self.addCallback(page.touch, botflag=True)
 
 def main(*args):
     options = {}

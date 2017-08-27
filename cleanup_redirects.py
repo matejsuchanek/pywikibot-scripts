@@ -78,6 +78,11 @@ class WikidataRedirectsBot(MultipleSitesBot, RedirectPageBot):
 
                 yield pywikibot.Page(site, row[3], ns=int(row[1]))
 
+    @property
+    def summary(self):
+        return 'based on [[toollabs:%s/%s/|Alphos\' reports]]' % (
+            self.sub_directory, self.getOption('date'))
+
     def user_confirm(self, *args):
         return True
 
@@ -97,14 +102,11 @@ class WikidataRedirectsBot(MultipleSitesBot, RedirectPageBot):
                             **self.ignore) # todo: summary
             return
 
-        summary = 'based on [[toollabs:%s/%s/|Alphos\' reports]]' % (
-            self.sub_directory, self.getOption('date'))
-
         Merger.sort_for_merge(items, key=['sitelinks', 'id'])
         if not self._save_page(items[1], Merger.clean_merge, items[1], items[0],
                                safe=not self.getOption('force'),
                                ignore_conflicts=['description'],
-                               summary=summary, **self.ignore):
+                               summary=self.summary, **self.ignore):
             return
 
         if self.getOption('touch') is True:

@@ -129,7 +129,7 @@ class TypoBot(WikitextFixingBot):
                 self.replaced += 1
 
         for rule in self.typoRules:
-            if rule == self.currentrule: # __eq__
+            if self.own_generator and rule == self.currentrule: # __eq__
                 continue
             if rule.matches(page.title()):
                 continue

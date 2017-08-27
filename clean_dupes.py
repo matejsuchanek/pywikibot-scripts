@@ -5,9 +5,10 @@ from pywikibot import pagegenerators
 
 from pywikibot.bot import SkipPageError
 
+from .merger import Merger
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
-from scripts.revertbot import BaseRevertBot
+from scripts.revertbot import BaseRevertBot # fixme: integrate to Merger
 
 class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
 
@@ -30,7 +31,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
     def init_page(self, item):
         self.offset += 1
         super(DupesMergingBot, self).init_page(item)
-        if 'P31' not in item.get().get('claims'):
+        if 'P31' not in item.claims:
             raise SkipPageError(item, 'Missing P31 property')
 
     def treat_page(self):
@@ -89,7 +90,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
                 target_sitelinks.append(site)
                 continue
             if (self.redirectsTo(page, target_page) or
-                self.redirectsTo(target_page, page)):
+                    self.redirectsTo(target_page, page)):
                 continue
 
             pywikibot.output('Target has a conflicting sitelink: %s'
@@ -124,28 +125,14 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
         if len(target_claims) > 0:
             self._save_page(target, self._save_entity, target.removeClaims, target_claims)
 
-        try:
-            self._save_page(item, self._save_entity, item.mergeInto, target,
-                            ignore_conflicts=['description'])
-        except pywikibot.data.api.APIError as e:
-            pywikibot.exception(e)
+        if not self._save_page(item, self._save_entity, Merger.clean_merge,
+                               item, target, ignore_conflicts=['description']):
             pywikibot.output('Reverting changes...')
             self.comment = 'Error occurred when attempting to merge with %s' % target.title(asLink=True)
             self.revert({'title': item.title()})
             self.comment = 'Error occurred when attempting to merge with %s' % item.title(asLink=True)
             self.revert({'title': target.title()})
             return
-
-        if not item.isRedirectPage(): # todo: migrate to Merger
-            item.get(force=True)
-            descriptions = {}
-            for lang in item.descriptions.keys():
-                descriptions[lang] = ''
-
-            self._save_page(item, self._save_entity, item.editDescriptions,
-                            descriptions, summary='Removing conflicting '
-                            'descriptions before merging')
-            item.mergeInto(target)
 
         self.offset -= 1
 
@@ -154,7 +141,8 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
 
     def exit(self):
         super(DupesMergingBot, self).exit()
-        pywikibot.output('\nCurrent offset: %s\n' % self.offset)
+        pywikibot.output('\nCurrent offset: %i (use %i)\n' % (
+            self.offset, self.offset - self.offset % 50))
 
 def main(*args):
     options = {}

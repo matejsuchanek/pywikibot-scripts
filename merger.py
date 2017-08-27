@@ -34,12 +34,14 @@ class Merger(object):
 
     @classmethod
     def clean_merge(cls, item_from, item_to, safe=False, quick=True, **kwargs):
+        kwargs.pop('asynchronous', None) # fixme
         if safe and not cls.can_merge(item_from, item_to, quick=quick):
             raise pywikibot.OtherPageSaveError(
                 item_from, 'Cannot merge %s with %s' % (item_from, item_to))
 
         cls.merge(item_from, item_to, **kwargs)
         if not item_from.isRedirectPage():
+            item_from.get(force=True)
             data = {'claims': [], 'descriptions': {}, 'sitelinks': []}
             for lang in item_from.descriptions:
                 data['descriptions'][lang] = '' # fixme upstream

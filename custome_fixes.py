@@ -882,9 +882,14 @@ class TemplateFix(LazyFix):
         template_name_norm = first_upper(template_name).partition('<!--')[0]
         if template_name_norm not in self.cache:
             template = pywikibot.Page(self.site, template_name_norm, ns=10)
-            if template.exists() and template.isRedirectPage():
+            try:
+                do_replace = template.exists() and template.isRedirectPage()
+            except pywikibot.exceptions.InconsistentTitleReceived:
+                do_replace = False
+            if do_replace:
                 target = template.getRedirectTarget()
-                self.cache[template_name_norm] = target.title(withNamespace=False)
+                self.cache[template_name_norm] = target.title(
+                    withNamespace=False)
             else:
                 self.cache[template_name_norm] = None
 
