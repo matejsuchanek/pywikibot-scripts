@@ -40,7 +40,7 @@ class TypoBot(WikitextFixingBot):
         if self.own_generator:
             self.generator = self.makeGenerator
         else:
-            self.generator = pagegenerators.PreloadingGenerator(generator)
+            self.generator = generator
 
         super(TypoBot, self).__init__(**kwargs)
         loader = TyposLoader(self.site, **kwargs) # fixme: too many args
@@ -209,7 +209,7 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    generator = genFactory.getCombinedGenerator()
+    generator = genFactory.getCombinedGenerator(preload=True)
     bot = TypoBot(generator, **options)
     bot.run()
 

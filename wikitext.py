@@ -112,7 +112,7 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    generator = genFactory.getCombinedGenerator()
+    generator = genFactory.getCombinedGenerator(preload=True)
     bot = WikitextFixingBot(generator=generator, **options)
     bot.run()
 

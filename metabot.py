@@ -39,6 +39,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
     def __init__(self, **kwargs):
         self.availableOptions.update({
             'always': False,
+            'importonly': False,
             'start': 'P1',
             'end': None,
             'total': None,
@@ -113,24 +114,24 @@ class MetadataHarvestingBot(WikidataEntityBot):
 
         if (prop.type in ['commonsMedia', 'external-id', 'string', 'url']
                 and not prop.claims.get('P1793')):
+            cleaned_text = textlib.removeDisabledParts(
+                page.text, include=['nowiki'])
             templates = textlib.extract_templates_and_params(
-                page.text, remove_disabled_parts=True, strip=True)
+                cleaned_text, remove_disabled_parts=False, strip=True)
             for tmpl, fielddict in templates:
                 if first_upper(tmpl) != self.template_regex:
                     continue
                 if 'pattern' not in fielddict:
                     continue
                 pywikibot.output('Found param "regex"')
-                regex = textlib.removeDisabledParts(fielddict['pattern'],
-                                                    include=['nowiki'])
-                regex = re.sub('</?nowiki>', '', regex)
+                regex = re.sub('</?nowiki>', '', fielddict['pattern'])
                 claim = pywikibot.Claim(self.repo, 'P1793')
                 claim.setTarget(regex.strip())
                 try:
                     prop.editEntity({'claims':[claim.toJSON()]},
                                     summary=self.make_summary('P1793', regex))
-                except pywikibot.data.api.APIError as exc:
-                    pywikibot.warning(exc)
+                except pywikibot.PageSaveRelatedError as e:
+                    pywikibot.exception(e)
                 break
 
         keys = set(self.func_dict.keys()) & set(params.keys())
@@ -153,6 +154,8 @@ class MetadataHarvestingBot(WikidataEntityBot):
                     remove = False
                 if remove:
                     clear_params.append(key)
+        if self.getOption('importonly'):
+            return
 
         if clear_params or (set(params.keys()) & set(self.obsolete_params)):
             for par in clear_params:
@@ -431,25 +434,26 @@ class MetadataHarvestingBot(WikidataEntityBot):
             if not match.strip():
                 continue
             regex = self.regexes['url'] # textlib.compileLinkR()
-            url_match = regex.search(match)
+            url_match = regex.findall(match)
             if not url_match:
                 pywikibot.output('Could not match source "%s"' % match)
                 remove = False
                 continue
 
-            target = url_match.group()
-            if any(map(methodcaller('target_equals', target),
-                       prop.claims.get('P1896', []))):
-                pywikibot.output('"%s" already has "%s" as the source'
-                                 '' % (prop.title(), target))
-                continue
+            for target in url_match:
+                if any(map(methodcaller('target_equals', target),
+                           prop.claims.get('P1896', []))):
+                    pywikibot.output('"%s" already has "%s" as the source'
+                                     '' % (prop.title(), target))
+                    continue
 
-            claim = pywikibot.Claim(self.repo, 'P1896')
-            claim.setTarget(target)
-            # XXX: qualifier 'title' but how to guess the language?
-            self.user_edit_entity(prop, {'claims':[claim.toJSON()]},
-                                  summary=self.make_summary('P1896', target),
-                                  asynchronous=True)
+                claim = pywikibot.Claim(self.repo, 'P1896')
+                claim.setTarget(target)
+                # XXX: qualifier 'title' but how to guess the language?
+                self.user_edit_entity(
+                    prop, {'claims':[claim.toJSON()]},
+                    summary=self.make_summary('P1896', target),
+                    asynchronous=True)
         return remove
 
 def main(*args):

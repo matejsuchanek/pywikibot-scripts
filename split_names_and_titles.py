@@ -25,11 +25,10 @@ class TitlesMovingBot(WikitextFixingBot):
 
     summary = 'přesun titulů do vlastních parametrů'
 
-    def __init__(self, template, generator, offset=0, **kwargs):
+    def __init__(self, template, offset=0, **kwargs):
         self.template = self.normalize(template)
         self.start_offset = offset
         self.offset = 0
-        self.generator = pagegenerators.PreloadingGenerator(generator)
         super(TitlesMovingBot, self).__init__(**kwargs)
 
     def normalize(self, template):
@@ -128,10 +127,10 @@ def main(*args):
         options['template'] = pywikibot.input(
             'Type the template you would like to work on:')
 
-    generator = genFactory.getCombinedGenerator()
+    generator = genFactory.getCombinedGenerator(preload=True)
     if not generator:
         genFactory.handleArg('-transcludes:%s' % options['template'])
-        generator = genFactory.getCombinedGenerator()
+        generator = genFactory.getCombinedGenerator(preload=True)
 
     bot = TitlesMovingBot(generator=generator, **options)
     bot.run()

@@ -244,7 +244,7 @@ def main(*args):
         elif arg.isdigit():
             numbers.append(int(arg))
 
-    generator = genFactory.getCombinedGenerator()
+    generator = genFactory.getCombinedGenerator(preload=True)
 
     bot = CheckWikiBot(numbers, generator, **options)
     bot.run()

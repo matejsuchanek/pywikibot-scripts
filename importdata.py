@@ -71,7 +71,7 @@ with open(direct, 'r') as file_data:
         for upToDateClaim in upToDateClaims:
             data['claims'].append(upToDateClaim.toJSON())
 
-        item.editEntity(data, asynchronous=True,
-                        summary='Adding [[Property:P1082]]: %s, '
-                        'based on data from [[Q3504917]], see [[%s]]' % (
-                            count, ref_item))
+        item.editEntity(
+            data, asynchronous=True,
+            summary='Adding [[Property:P1082]]: %s, data from [[Q3504917]], '
+            'see [[%s]]' % (count, ref_item))

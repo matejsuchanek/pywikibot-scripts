@@ -24,9 +24,6 @@ class CheckWikiError(object):
     def __init__(self, checkwiki):
         self.checkwiki = checkwiki
 
-    def __repr__(self):
-        return '%s(%r, %s)' % (self.__class__.__name__, self.site, self.priority)
-
     @property
     def site(self):
         return self.checkwiki.site

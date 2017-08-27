@@ -99,6 +99,8 @@ class LazyFix(BaseFix):
         'title': []
     }
     message = None
+    nocase = False
+    recursive = False
 
     def replacements(self):
         raise NotImplementedError(
@@ -108,9 +110,13 @@ class LazyFix(BaseFix):
     def dictForUserFixes(cls):
         fix = cls()
         return {
-            'regex': True,
-            'msg': { '_default': fix.message },
             'exceptions': fix.exceptions,
+            'msg': {
+                '_default': fix.message,
+            },
+            'nocase': fix.nocase,
+            'recursive': fix.recursive,
+            'regex': True,
             'replacements': FixGenerator(fix),
         }
 
@@ -216,7 +222,12 @@ class CategoriesFix(LazyFix):
     message = 'oprava řazení kategorií'
 
     def generator(self):
-        pass # incategory:Muži|Ženy|Žijící_lidé -insource:DEFAULTSORT insource:/\[\[Kategorie:[^]|[]+\|[^]]+,/
+        pass # incategory:"Muži|Ženy|Žijící lidé" insource:/\[\[Kategorie:[^]|[]+\|[^],]+,/
+
+    def load(self):
+        magic_words = map(re.escape, self.site.getmagicwords('defaultsort'))
+        self.defaultsortR = re.compile(
+            r'\{\{(?:%s)([^}]+)\}\}' % '|'.join(magic_words))
 
     def replacements(self):
         yield (FULL_ARTICLE_REGEX, self.duplicateSortKey)
@@ -264,59 +275,68 @@ class CategoriesFix(LazyFix):
 
         return index
 
+    def tidy_sortkey(self, sortkey):
+        if sortkey:
+            return ', '.join(re.split(r', *', sortkey.strip()))
+        return sortkey
+
     def duplicateSortKey(self, match):
         text = match.group()
-        matches = list(re.finditer(r'\{\{(?:%s)([^}]+)\}\}' % '|'.join(
-            map(re.escape, self.site.getmagicwords('defaultsort'))), text))
+        matches = list(self.defaultsortR.finditer(text))
         if not matches:
             return text
+
         defaultsort = matches.pop().group(1).strip()
         categories = textlib.getCategoryLinks(text, site=self.site)
         changed = False
         for category in categories:
-            if category.sortKey == defaultsort:
+            if self.tidy_sortkey(category.sortKey) == defaultsort:
                 category.sortKey = None
                 changed = True
 
         if changed:
             categories.sort(key=self.sort_category)
-            return textlib.replaceCategoryLinks(text, categories, self.site)
+            before, _, after = textlib.replaceCategoryLinks(
+                text, categories, self.site).rpartition('\n\n') # fixme: safer
+            return before + '\n' + after
         else:
             return text
 
     def harvestSortKey(self, match):
         text = match.group()
-        magic = self.site.getmagicwords('defaultsort')
-        if re.search(r'\{\{(?:%s)([^}]+)\}\}'
-                     % '|'.join(map(re.escape, magic)), text):
+        if self.defaultsortR.search(text):
             return text
 
         keys = {}
         categories = textlib.getCategoryLinks(text, site=self.site)
         if not any(category.title(withNamespace=False) in (
-            'Muži', 'Žijící lidé', 'Ženy') for category in categories):
+                'Muži', 'Žijící lidé', 'Ženy') for category in categories):
             return text
 
         for category in categories:
             key = category.sortKey
-            if key and key.strip():
-                keys[key.strip()] = keys.get(key.strip(), 0) + 1
+            if key:
+                key = self.tidy_sortkey(key)
+                if not key.strip():
+                    continue
+                keys.setdefault(key, 0.0)
+                keys[key] += 1
                 if len(keys) > 1:
                     return text
+
         if not keys:
             return text
 
+        if sum(keys.values()) < 4:
+            return text
+
         key = list(keys.keys()).pop()
-        if ', ' not in key: # temp
-            return text
-        if float(len(categories)) / sum(keys.values()) > 2:
-            return text
-
         for category in categories:
-            if category.sortKey == key:
-                category.sortKey = None
+            if category.sortKey is not None:
+                if self.tidy_sortkey(category.sortKey) == key:
+                    category.sortKey = None
 
-        categories.sort(key=self.sortCategories)
+        categories.sort(key=self.sort_category)
         text = textlib.removeCategoryLinks(text, self.site)
         text += '\n\n{{DEFAULTSORT:%s}}' % key
         before, _, after = textlib.replaceCategoryLinks(
@@ -543,9 +563,9 @@ class RedirectFix(LazyFix):
         return self.cache[link]
 
     def replacements(self):
-        yield (r'\[\[([^]|[]+)\|', self.replace1)
+        yield (r'\[\[([^]|[<>]+)\|', self.replace1)
         if self.onlypiped is False:
-            yield (r'\[\[([^]|[]+)\]\](%s)?' % self.site.linktrail(),
+            yield (r'\[\[([^]|[<>]+)\]\](%s)?' % self.site.linktrail(),
                    self.replace2)
 
     def replace1(self, match):
@@ -871,7 +891,7 @@ class TemplateFix(LazyFix):
         self.defaultsort = self.site.getmagicwords('defaultsort')
 
     def replacements(self):
-        yield (r'(?P<before>\{\{\s*)(?P<template>[^#{|}]+?)(?P<after>\s*[|}])',
+        yield (r'(?P<before>\{\{\s*)(?P<template>[^<>#{|}]+?)(?P<after>\s*[|}])',
                self.replace)
 
     def replace(self, match):
@@ -899,7 +919,7 @@ class TemplateFix(LazyFix):
 
         if template_name != first_upper(template_name):
             if all(map(methodcaller('islower'), filter(
-                methodcaller('isalpha'), target.partition(' ')[0][1:]))):
+                    methodcaller('isalpha'), target.partition(' ')[0][1:]))):
                 target = first_lower(target)
 
         return match.group('before') + target + match.group('after')
@@ -975,5 +995,5 @@ all_fixes = dict((fix.key, fix) for fix in [
     AdataFix, InterwikiFix, StyleFix])
 all_fixes.update(lazy_fixes)
 
-def main(*args):
+if __name__ == '__main__':
     pywikibot.error('Run wikitext.py instead')

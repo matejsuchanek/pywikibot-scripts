@@ -4,8 +4,7 @@ from __future__ import unicode_literals
 import datetime
 import codecs
 import pywikibot
-
-from threading import Timer
+import threading
 
 from pywikibot import pagegenerators
 from pywikibot.bot import BaseBot, SkipPageError
@@ -24,6 +23,8 @@ class ErrorReportingBot(BaseBot):
         super(ErrorReportingBot, self).__init__(**kwargs)
         self.open()
         self.timer = None
+        self.write_lock = threading.Lock()
+        self.timer_lock = threading.Lock()
 
     def run(self):
         self.load_page()
@@ -45,11 +46,14 @@ class ErrorReportingBot(BaseBot):
             self.log_page.text = ''
 
     def append(self, text):
+        self.write_lock.acquire()
         with codecs.open('..\\%s' % self.file_name, 'r+', 'utf-8') as f:
             f.read() # jump to the end
             f.write(text)
+        self.write_lock.release()
 
     def save_file(self):
+        self.write_lock.acquire()
         with codecs.open('..\\%s' % self.file_name, 'r+', 'utf-8') as f:
             f.seek(0) # jump to the beginning
             read = '\n'.join(f.read().splitlines()) # multi-platform
@@ -58,12 +62,17 @@ class ErrorReportingBot(BaseBot):
                 self.log_page.save(summary='update')
                 f.seek(0) # jump to the beginning
                 f.truncate() # and delete everything
-        self.timer = Timer(self.getOption('interval'), self.save_file)
+        self.write_lock.release()
+        self.timer_lock.acquire()
+        self.timer = threading.Timer(self.getOption('interval'), self.save_file)
         self.timer.start()
+        self.timer_lock.release()
 
     def exit(self):
+        self.timer_lock.acquire()
         if self.timer:
             self.timer.cancel()
+        self.timer_lock.release()
         super(ErrorReportingBot, self).exit()
 
 class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):

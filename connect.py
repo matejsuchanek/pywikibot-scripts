@@ -225,9 +225,9 @@ for project in tp_map.keys():
             continue
         genFactory.handleArg('-ns:%i' % ns)
     genFactory.handleArg('-unconnectedpages')
-    generator = genFactory.getCombinedGenerator()
+    generator = genFactory.getCombinedGenerator(preload=True)
 
-    for page in pagegenerators.PreloadingGenerator(generator):
+    for page in generator:
         if page.namespace() != 14 and page.isDisambig():
             continue
 
