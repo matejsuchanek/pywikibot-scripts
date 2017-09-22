@@ -13,6 +13,7 @@ from scripts.revertbot import BaseRevertBot # fixme: integrate to Merger
 class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
 
     dupe_item = ('Q17362920', 'Q28065731', )
+    use_from_page = False
 
     def __init__(self, offset=0, **kwargs):
         super(DupesMergingBot, self).__init__(**kwargs)
@@ -34,8 +35,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
         if 'P31' not in item.claims:
             raise SkipPageError(item, 'Missing P31 property')
 
-    def treat_page(self):
-        item = self.current_page
+    def treat_page_and_item(self, page, item):
         claims = []
         targets = set()
         for claim in item.claims['P31']:
@@ -55,6 +55,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
                 targets.add(claim.getTarget())
 
         if not targets:
+            # todo: if not target, try links
             pywikibot.output('No target found')
             return
 
@@ -117,11 +118,13 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
                         target_claims.append(claim)
 
         if len(sitelinks) > 0:
-            self._save_page(item, self._save_entity, item.removeSitelinks, sitelinks)
+            self._save_page(item, self._save_entity, item.removeSitelinks,
+                            sitelinks, summary='removing sitelink(s) to non-existing page(s)')
         if len(claims) > 0:
             self._save_page(item, self._save_entity, item.removeClaims, claims)
         if len(target_sitelinks) > 0:
-            self._save_page(target, self._save_entity, target.removeSitelinks, target_sitelinks)
+            self._save_page(target, self._save_entity, target.removeSitelinks, target_sitelinks,
+                            summary='removing sitelink(s) to non-existing page(s)')
         if len(target_claims) > 0:
             self._save_page(target, self._save_entity, target.removeClaims, target_claims)
 

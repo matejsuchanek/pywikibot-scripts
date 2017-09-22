@@ -7,8 +7,10 @@ SELECT DISTINCT ?item WHERE {
   } UNION {
     ?item wdt:P460 ?target .
   } .
+  MINUS { ?item wdt:P1889|^wdt:P1889 ?target } .
   MINUS {
     ?target wdt:P31/wdt:P279* wd:Q16521 .
+    ?item wikibase:sitelinks 0 .
   } .
   ?item schema:dateModified ?mod .
 } ORDER BY ?mod OFFSET %(offset)i

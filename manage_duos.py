@@ -39,6 +39,7 @@ class DuosManagingBot(WikidataEntityBot):
         'id': ' dan ',
         'it': ' e ',
         #'ja':
+        'ka': ' და ',
         'la': ' et ',
         'ms': ' dan ',
         'nb': ' og ',
@@ -58,16 +59,19 @@ class DuosManagingBot(WikidataEntityBot):
         #'war':
         #'zh':
     }
+    distribute_properties = ('P21', 'P22', 'P25', 'P27', 'P106',)
     relation_map = {
         #'partner': 'P451', todo
         'sibling': 'P3373',
         'spouse': 'P26',
         'twin': 'P3373',
     }
+    use_from_page = False
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
             'always': True,
+            'class': 'Q15618652',
             'min_labels': 1,
         })
         super(DuosManagingBot, self).__init__(**kwargs)
@@ -82,7 +86,8 @@ class DuosManagingBot(WikidataEntityBot):
 
     @property
     def generator(self):
-        query = self.store.get_query('duos')
+        kwargs = {'class': self.getOption('class')}
+        query = self.store.build_query('duos', **kwargs)
         return pagegenerators.PreloadingItemGenerator(
             pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo,
                                                        result_type=tuple))
@@ -120,9 +125,11 @@ class DuosManagingBot(WikidataEntityBot):
                     continue
                 split0 = split[0].split()
                 split1 = split[1].split()
+                if split1[0].islower():
+                    continue
                 if len(split1) > len(split0):
                     if len(split1) > 2 and split1[-2].islower():
-                        split1[-2:] = [' '.join(split[-2:])]
+                        split1[-2:] = [' '.join(split1[-2:])]
                     if len(split1) - len(split0) == 1:
                         # if items are in a relation, then they probably share
                         # their surname
@@ -136,26 +143,29 @@ class DuosManagingBot(WikidataEntityBot):
 
         return labels
 
-    def treat_page(self):
-        item = self.current_page
+    def treat_page_and_item(self, page, item):
         relation = self.get_relation(item, 'P31', [], 0)
         labels = self.get_labels(item, relation)
-        if sum(map(len, labels)) < self.getOption('min_labels'):
-            pywikibot.output('Too few labels (%i), skipping...'
-                             % sum(map(len, labels)))
+        count = max(map(len, labels))
+        if count < self.getOption('min_labels'):
+            pywikibot.output('Too few labels (%i), skipping...' % count)
             return
 
-        to_move = []
-        for prop in set(('P21', 'P27', 'P106')) & set(item.claims.keys()):
+        to_add = []
+        to_remove = []
+        for prop in set(self.distribute_properties) & set(item.claims.keys()):
             for claim in item.claims[prop]:
                 if claim.getTarget():
                     json = claim.toJSON()
+                    to_remove.append(json)
+                    json = json.copy()
                     json.pop('id')
-                    to_move.append(json)
+                    to_add.append(json)
 
         pywikibot.output('Creating items (relation "%s")...' % relation)
-        items = [self.create_item(data, relation, to_move) for data in labels]
-        if relation in self.relation_map:
+        items = [self.create_item(item, data, relation, to_add)
+                 for data in labels]
+        if self.relation_map.get(relation):
             for i in reversed(range(2)):
                 claim = pywikibot.Claim(self.repo, self.relation_map[relation])
                 claim.setTarget(items[1-i])
@@ -166,38 +176,39 @@ class DuosManagingBot(WikidataEntityBot):
             claim.setTarget(it)
             self.user_add_claim(item, claim)
 
-        for json in to_move:
+        for json in to_remove:
             json['remove'] = ''
             self.user_edit_entity(
                 item, {'claims':[json]},
                 summary='moved [[Property:%s]] to %s' % (
-                    prop, ' & '.join(map(methodcaller(
+                    json['mainsnak']['property'], ' & '.join(map(methodcaller(
                         'title', asLink=True, insite=self.repo), items))))
 
-    def create_item(self, labels, relation, to_move):
-        item = pywikibot.ItemPage(self.repo)
+    def create_item(self, item, labels, relation, to_add):
+        new_item = pywikibot.ItemPage(self.repo)
         data = {'labels': labels}
         self.user_edit_entity(
-            data, summary='based on data in %s' % self.current_page.title(
+            new_item, data, summary='based on data in %s' % item.title(
                 asLink=True, insite=self.repo))
 
         claim = pywikibot.Claim(self.repo, 'P31')
         claim.setTarget(pywikibot.ItemPage(self.repo, 'Q5'))
-        self.user_add_claim(claim)
+        self.user_add_claim(new_item, claim)
         if relation == 'twin':
             claim = pywikibot.Claim(self.repo, 'P31')
             claim.setTarget(pywikibot.ItemPage(self.repo, 'Q159979'))
-            self.user_add_claim(claim)
+            self.user_add_claim(new_item, claim)
 
         claim = pywikibot.Claim(self.repo, 'P361')
-        claim.setTarget(self.current_page)
-        self.user_add_claim(claim)
-        for json in to_move:
+        claim.setTarget(item)
+        self.user_add_claim(new_item, claim)
+        for json in to_add:
             self.user_edit_entity(
-                item, {'claims':[json]},
+                new_item, {'claims':[json]},
                 summary='moving [[Property:%s]] from %s' % (
-                    prop, item.title(asLink=True, insite=self.repo)))
-        return item
+                    json['mainsnak']['property'],
+                    item.title(asLink=True, insite=self.repo)))
+        return new_item
 
 def main(*args):
     options = {}

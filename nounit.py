@@ -9,6 +9,7 @@ from .wikidata import WikidataEntityBot
 class UnitsFixingBot(WikidataEntityBot):
 
     good_item = 'Q21027105'
+    use_from_page = False
 
     def __init__(self, **kwargs):
         super(UnitsFixingBot, self).__init__(**kwargs)
@@ -35,8 +36,7 @@ class UnitsFixingBot(WikidataEntityBot):
             return False
         return True
 
-    def treat_page(self):
-        item = self.current_page
+    def treat_page_and_item(self, page, item):
         for prop, claims in item.claims.items():
             for claim in claims:
                 if claim.type == 'quantity':

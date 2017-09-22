@@ -35,6 +35,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
     }
     template_metadata = 'Property documentation'
     template_regex = 'Constraint:Format'
+    use_from_page = False
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
@@ -97,8 +98,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
         if not page.exists() or page.isRedirectPage():
             raise SkipPageError(prop, 'Talk page doesn\'t exist')
 
-    def treat_page(self):
-        prop = self.current_page
+    def treat_page_and_item(self, page, prop):
         self.current_talk_page = page = prop.toggleTalkPage()
         code = mwparserfromhell.parse(page.text, skip_style_tags=True)
         for template in code.ifilter_templates():

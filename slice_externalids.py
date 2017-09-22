@@ -14,6 +14,7 @@ from .wikidata import WikidataEntityBot
 class ExternalIdSlicingBot(WikidataEntityBot):
 
     blacklist = ['P2013']
+    use_from_page = False
 
     def __init__(self, **options):
         self.availableOptions.update({
@@ -44,8 +45,7 @@ class ExternalIdSlicingBot(WikidataEntityBot):
                 yield item
             offset += limit
 
-    def treat_page(self):
-        item = self.current_page
+    def treat_page_and_item(self, page, item):
         for prop, claims in item.claims.items():
             if prop in self.blacklist:
                 continue

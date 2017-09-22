@@ -18,6 +18,7 @@ class ErrorReportingBot(BaseBot):
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
+            'clearonly': False,
             'interval': 5 * 60,
         })
         super(ErrorReportingBot, self).__init__(**kwargs)
@@ -29,7 +30,8 @@ class ErrorReportingBot(BaseBot):
     def run(self):
         self.load_page()
         self.save_file()
-        super(ErrorReportingBot, self).run()
+        if not self.getOption('clearonly'):
+            super(ErrorReportingBot, self).run()
 
     def open(self):
         try:
@@ -82,6 +84,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
     page_pattern = 'User:%s/Disambig_errors'
     skip = ['brwiki', 'enwiki', 'hakwiki', 'igwiki', 'mkwiki', 'mznwiki',
             'specieswiki', 'towiki']
+    use_from_page = False
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
@@ -122,8 +125,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
             pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=self.repo,
                                                        result_type=list))
 
-    def treat_page(self):
-        item = self.current_page
+    def treat_page_and_item(self, page, item):
         append_text = ''
         count = len(item.sitelinks)
         if count == 0:
@@ -174,11 +176,8 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    clearonly = options.pop('clearonly', False)
     site = pywikibot.Site('wikidata', 'wikidata')
     bot = DisambigsCheckingBot(site=site, **options)
-    if not clearonly:
-        bot.run()
 
 if __name__ == '__main__':
     main()

@@ -18,13 +18,12 @@ save_summary = {
 
 class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallbacksBot):
 
-    def __init__(self, generator, **kwargs):
+    def __init__(self, **kwargs):
         self.availableOptions.update({
             'createnew': False,
             'noclean': False,
             'noimport': False,
         })
-        self.generator = pagegenerators.PreloadingGenerator(generator)
         super(CommonscatCleaningBot, self).__init__(**kwargs)
         self.commons = pywikibot.Site('commons', 'commons')
         self.cacheSources()
@@ -41,7 +40,8 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
         cat_name = None
         has_param = False
         for template, fielddict in textlib.extract_templates_and_params(
-            page.text, remove_disabled_parts=True, strip=True):
+                page.text, remove_disabled_parts=True, strip=True):
+            # todo: l10n
             if template.lower() in ['commonscat', 'commons category']:
                 cat_name = page.title(withNamespace=False)
                 if '1' in fielddict:
@@ -79,6 +79,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
             page_replaced_text = re.sub(regex, '', page.text, flags=re.M | re.U,
                                         count=1)
             if page_replaced_text != page.text:
+                # todo: l10n etc.
                 templates = (
                     '|'.join(map(re.escape, page.site.getmagicwords('defaultsort'))),
                     '[Pp]ahýl', '[Pp]osloupnost', '[Aa]utoritní data', '[Pp]ortály')
@@ -117,7 +118,7 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    generator = genFactory.getCombinedGenerator()
+    generator = genFactory.getCombinedGenerator(preload=True)
     site = pywikibot.Site()
     if not generator:
         try:
@@ -130,10 +131,8 @@ def main(*args):
             pywikibot.output('%s doesn\'t have an appropriate category' % site)
             return
 
-        gen_articles = category.articles(namespaces=0)
-        gen_subcats = category.subcategories()
-        gen_combined = pagegenerators.CombinedPageGenerator([gen_articles,
-                                                             gen_subcats])
+        gen_combined = pagegenerators.CombinedPageGenerator(
+            [category.articles(namespaces=0), category.subcategories()])
         generator = pagegenerators.WikibaseItemFilterPageGenerator(gen_combined)
 
     bot = CommonscatCleaningBot(generator, site=site, **options)

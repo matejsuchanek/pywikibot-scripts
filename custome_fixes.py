@@ -522,9 +522,18 @@ class RedirectFix(LazyFix):
     }
     message = 'narovnání přesměrování'
 
-    def load(self):
-        self.redirects = [] # todo: set?
-        self.cache = {}
+    def generator(self):
+##        return chain.from_iterable(
+##            map(methodcaller('backlinks', followRedirects=False,
+##                             filterRedirects=False, namespaces=0),
+##                (pywikibot.Page(self.site, title) for title in self.redirects)))
+        for title in self.redirects:
+            for page in pywikibot.Page(self.site, title).backlinks(
+                    followRedirects=False, filterRedirects=False, namespaces=0):
+                yield page
+
+    def get_redirects(self):
+        redirects = [] # todo: set?
         pywikibot.output('Loading redirects')
         page = pywikibot.Page(self.site, self.page_title)
         text = page.text.partition('{{SHORTTOC}}\n')[2]
@@ -533,8 +542,13 @@ class RedirectFix(LazyFix):
                 continue
             if line.startswith('=='):
                 continue
-            self.redirects.append(line.strip())
+            redirects.append(line.strip())
 
+        return redirects
+
+    def load(self):
+        self.cache = {}
+        self.redirects = self.get_redirects()
         pywikibot.output('%s redirects loaded' % len(self.redirects))
 
     def from_cache(self, link):
@@ -616,6 +630,15 @@ class RedirectFix(LazyFix):
             choice = 1
 
         return options_list[int(choice)-1]
+
+class RedirectsFromFileFix(RedirectFix):
+
+    key = 'redirects-file'
+
+    def get_redirects(self):
+        return list(map(methodcaller('title'),
+                        pagegenerators.TextfilePageGenerator(site=self.site)))
+        
 
 class RefSortFix(LazyFix):
 
@@ -989,8 +1012,8 @@ class TypoFix(LazyFix):
             summaries.append(summary)
 
 lazy_fixes = dict((fix.key, fix) for fix in [
-    CategoriesFix, CheckWikiFix, FilesFix, RedirectFix, RefSortFix, SectionsFix,
-    TemplateFix, TypoFix])
+    CategoriesFix, CheckWikiFix, FilesFix, RedirectFix, RedirectsFromFileFix,
+    RefSortFix, SectionsFix, TemplateFix, TypoFix])
 all_fixes = dict((fix.key, fix) for fix in [
     AdataFix, InterwikiFix, StyleFix])
 all_fixes.update(lazy_fixes)

@@ -118,10 +118,3 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         kwargs.setdefault('show_diff', False)
         return super(WikidataEntityBot, self).user_edit_entity(
             item, data, **kwargs)
-
-    def treat(self, page):
-        self.current_page = page
-        self.treat_page()
-
-    def run(self):
-        Bot.run(self)

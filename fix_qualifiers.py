@@ -15,6 +15,7 @@ class QualifiersFixingBot(WikidataEntityBot):
                            'P582', 'P585', 'P669', 'P708', 'P969', 'P1355',
                            'P1356', ])
     good_item = 'Q15720608'
+    use_from_page = False
 
     def __init__(self, **kwargs):
         kwargs.update({
@@ -48,8 +49,7 @@ class QualifiersFixingBot(WikidataEntityBot):
         return pagegenerators.PreloadingItemGenerator(
             pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo))
 
-    def treat_page(self):
-        item = self.current_page
+    def treat_page_and_item(self, page, item):
         for prop in item.claims.keys():
             for claim in item.claims[prop]:
                 moved = set()

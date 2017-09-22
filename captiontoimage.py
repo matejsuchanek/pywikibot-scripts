@@ -18,6 +18,7 @@ class CaptionToImageBot(WikidataEntityBot):
 
     caption_property = 'P2096'
     image_property = 'P18'
+    use_from_page = False
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
@@ -40,12 +41,9 @@ class CaptionToImageBot(WikidataEntityBot):
         super(CaptionToImageBot, self).init_page(item)
         if self.caption_property not in item.claims.keys():
             raise SkipPageError(
-                item,
-                'Missing %s property' % self.caption_property
-            )
+                item, 'Missing %s property' % self.caption_property)
 
-    def treat_page(self):
-        item = self.current_page
+    def treat_page_and_item(self, page, item):
         our_prop = self.image_property
         if our_prop not in item.claims.keys():
             our_prop = None
@@ -81,7 +79,8 @@ class CaptionToImageBot(WikidataEntityBot):
                         has_same_lang = True
                         break
                 if has_same_lang:
-                    pywikibot.output('Property %s already has a caption in language %s' % (our_prop, language))
+                    pywikibot.output('Property %s already has a caption '
+                                     'in language %s' % (our_prop, language))
                     if remove_all:
                         remove_claims.append(caption)
                     continue

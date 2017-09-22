@@ -20,6 +20,7 @@ class WikidataRedirectsBot(MultipleSitesBot, RedirectPageBot):
     ignore = {'ignore_save_related_errors': True,
               'ignore_server_errors': True,
               }
+    treat_missing_item = False
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
@@ -86,13 +87,8 @@ class WikidataRedirectsBot(MultipleSitesBot, RedirectPageBot):
     def user_confirm(self, *args):
         return True
 
-    def treat_page(self):
-        page = self.current_page
-        items = []
-        try:
-            items.append(page.data_item())
-        except pywikibot.NoPage:
-            return
+    def treat_page_and_item(self, page, item):
+        items = [item]
 
         target = page.getRedirectTarget()
         try:

@@ -1,0 +1,15 @@
+SELECT DISTINCT ?item {
+  { ?st pq:P580 ?date1, ?date2 } UNION { ?st pq:P582 ?date1, ?date2 } .
+  MINUS { ?st prov:wasDerivedFrom [] } .
+  MINUS {
+    ?st ?pq [] .
+    FILTER( ?pq NOT IN ( pq:P580, pq:P582 ) ) .
+    ?pq ^wikibase:qualifier [] .
+  } .
+  MINUS { ?item ?p [ pq:P580|pq:P582 ?date ] . FILTER( YEAR( ?date ) < 1 ) } .
+  FILTER( !ISBLANK( ?date1 ) && !ISBLANK( ?date2 ) ) .
+  MINUS { ?date1 a/a owl:Class } .
+  MINUS { ?date2 a/a owl:Class } .
+  FILTER( ?date1 < ?date2 ) .
+  ?item ?p ?st .
+} LIMIT %(limit)i
