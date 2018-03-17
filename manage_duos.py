@@ -88,7 +88,7 @@ class DuosManagingBot(WikidataEntityBot):
     def generator(self):
         kwargs = {'class': self.getOption('class')}
         query = self.store.build_query('duos', **kwargs)
-        return pagegenerators.PreloadingItemGenerator(
+        return pagegenerators.PreloadingEntityGenerator(
             pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo,
                                                        result_type=tuple))
 
@@ -156,13 +156,11 @@ class DuosManagingBot(WikidataEntityBot):
         for prop in set(self.distribute_properties) & set(item.claims.keys()):
             for claim in item.claims[prop]:
                 if claim.getTarget():
+                    to_remove.append(claim)
                     json = claim.toJSON()
-                    to_remove.append(json)
-                    json = json.copy()
                     json.pop('id')
                     to_add.append(json)
 
-        pywikibot.output('Creating items (relation "%s")...' % relation)
         items = [self.create_item(item, data, relation, to_add)
                  for data in labels]
         if self.relation_map.get(relation):
@@ -176,20 +174,24 @@ class DuosManagingBot(WikidataEntityBot):
             claim.setTarget(it)
             self.user_add_claim(item, claim)
 
-        for json in to_remove:
+        for claim in to_remove:
+            pywikibot.output('Removing %s --> %s' % (
+                claim.id, claim.getTarget()))
+            json = claim.toJSON()
             json['remove'] = ''
             self.user_edit_entity(
                 item, {'claims':[json]},
                 summary='moved [[Property:%s]] to %s' % (
-                    json['mainsnak']['property'], ' & '.join(map(methodcaller(
+                    claim.id, ' & '.join(map(methodcaller(
                         'title', asLink=True, insite=self.repo), items))))
 
     def create_item(self, item, labels, relation, to_add):
+        pywikibot.output('Creating item (relation "%s")...' % relation)
         new_item = pywikibot.ItemPage(self.repo)
         data = {'labels': labels}
         self.user_edit_entity(
             new_item, data, summary='based on data in %s' % item.title(
-                asLink=True, insite=self.repo))
+                asLink=True, insite=self.repo), asynchronous=False)
 
         claim = pywikibot.Claim(self.repo, 'P31')
         claim.setTarget(pywikibot.ItemPage(self.repo, 'Q5'))
@@ -203,10 +205,13 @@ class DuosManagingBot(WikidataEntityBot):
         claim.setTarget(item)
         self.user_add_claim(new_item, claim)
         for json in to_add:
+            temp_claim = pywikibot.Claim.fromJSON(self.repo, json)
+            pywikibot.output('Adding %s --> %s' % (
+                temp_claim.id, temp_claim.getTarget()))
             self.user_edit_entity(
                 new_item, {'claims':[json]},
                 summary='moving [[Property:%s]] from %s' % (
-                    json['mainsnak']['property'],
+                    temp_claim.id,
                     item.title(asLink=True, insite=self.repo)))
         return new_item
 

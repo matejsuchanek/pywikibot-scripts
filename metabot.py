@@ -76,6 +76,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                     yield pywikibot.PropertyPage(
                         self.repo, page.title(withNamespace=False))
         else:
+            # todo: preload
             for page in pagegenerators.AllpagesPageGenerator(
                     start=self.getOption('start'), namespace=120,
                     site=self.repo, total=self.getOption('total')):

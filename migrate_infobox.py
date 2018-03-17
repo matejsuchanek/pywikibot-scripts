@@ -13,6 +13,8 @@ from pywikibot.tools import first_upper
 
 try:
     from .wikitext import WikitextFixingBot
+    # TODO: from .tools import .
+    from .custome_fixes import FilesFix
 except ImportError:
     from pywikibot.bot import SingleSiteBot, ExistingPageBot, NoRedirectPageBot
 
@@ -65,8 +67,20 @@ class InfoboxMigratingBot(WikitextFixingBot):
 
     summary = 'sjednocení infoboxu'
 
-    all_params = []
-    rename_params = {}
+    all_params = [
+        'název', image_param, image_size_param, caption_param, 'typ',
+        'materiálové zatřídění', 'použití', 'tepelný odpor',
+        'součinitel prostupu tepla', 'rozměry',
+    ]
+    rename_params = {
+        'Stavební materiály': 'název',
+        'Typ': 'typ',
+        'Zatřídění - materiálové': 'materiálové zatřídění',
+        'Použití': 'použití',
+        'Tepelný odpor': 'tepelný odpor',
+        'Součinitel prostupu tepla': 'součinitel prostupu tepla',
+        'Rozměry': 'rozměry',
+    }
     old_params = ()
     remove_params = ()
 
@@ -76,6 +90,8 @@ class InfoboxMigratingBot(WikitextFixingBot):
         self.start_offset = offset
         self.offset = 0
         super(InfoboxMigratingBot, self).__init__(**kwargs)
+        self.file_regex = re.compile(
+            textlib.FILE_LINK_REGEX % '|'.join(self.site.namespaces[6]), re.X)
         #self.parser = TemplateParser()
 
     def normalize(self, template):
@@ -91,26 +107,35 @@ class InfoboxMigratingBot(WikitextFixingBot):
             super(InfoboxMigratingBot, self).treat(page)
 
     def treat_page(self):
-        page = self.current_page
-        text = page.text
+        text = self.current_page.text
+        start = 0
+        while True:
+            before, after = text[:start], text[start:]
+            new, start = self.find_and_replace(after, start == 0)
+            text = before + new
+            if after == new:
+                break
+        self.put_current(text, summary=self.summary)
 
+    def find_and_replace(self, text, init):
         new_params = []
         old_params = []
         unknown_params = []
         removed_params = []
         changed = False
         for template, fielddict in textlib.extract_templates_and_params(
-            text, remove_disabled_parts=False, strip=False): # todo: support multiple boxes
-            if self.normalize(template) not in [self.template,
-                                                self.new_template]:
+                text, remove_disabled_parts=False, strip=False):
+            if self.normalize(template) not in (self.template,
+                                                self.new_template):
                 continue
 
             changed = self.normalize(template) != self.new_template
             start_match = re.search(r'\{\{\s*((%s)\s*:\s*)?%s\s*' % (
                 '|'.join(self.site.namespaces[10]), re.escape(template)), text)
             if not start_match:
-                pywikibot.error('Couldn\'t find the template')
-                return
+                if not init:
+                    pywikibot.error("Couldn't find the template")
+                return text, 0
 
             start = start_match.start()
             if len(fielddict) > 0:
@@ -129,7 +154,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
                          .strip())
 
                 try:
-                    new_name = self.handleParam(name)
+                    new_name = self.handle_param(name)
                 except OldParamException:
                     if textlib.removeDisabledParts(value, ['comments']).strip():
                         old_params.append(
@@ -148,7 +173,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
                         )
                 except AssertionError:
                     pywikibot.error('Couldn\'t handle parameter "%s"' % name)
-                    return
+                    return text, 0
                 except UnnamedParamException:
                     unnamed[value] = ''
                 else:
@@ -175,18 +200,18 @@ class InfoboxMigratingBot(WikitextFixingBot):
                 end = text[:end].rindex('}}') + len('}}')
 
             if (end < start or not text[start:end].endswith('}}') or
-                text[start:end].count('{{') != text[start:end].count('}}')):
-                pywikibot.error('Couldn\'t parse the template')
-                return
+                    text[start:end].count('{{') != text[start:end].count('}}')):
+                pywikibot.error("Couldn't parse the template")
+                return text, 0
             break
 
         else:
-            pywikibot.error('Couldn\'t parse the template')
-            return
+            pywikibot.error("Couldn't parse the template")
+            return text, 0
 
         if not changed:
             pywikibot.output('No parameters changed')
-            return
+            return text, 0
 
         while end < len(text) and text[end].isspace(): # todo: also before
             end += 1
@@ -202,9 +227,9 @@ class InfoboxMigratingBot(WikitextFixingBot):
         if len(lines) > 0 and choice(lines).startswith(' '):
             space_before = ' '
 
-        self.handleParams(new_params, old_params, removed_params, unknown_params)
+        self.handle_params(new_params, old_params, removed_params, unknown_params)
         self.deduplicate(new_params)
-        new_params.sort(key=self.keyForSort)
+        new_params.sort(key=self.key_for_sort)
 
         new_template = '{{%s' % self.new_template
         if len(new_params) > 0:
@@ -224,10 +249,9 @@ class InfoboxMigratingBot(WikitextFixingBot):
 
         new_template += '}}\n'
 
-        self.put_current(text[:start] + new_template + text[end:],
-                         summary=self.summary)
+        return text[:start] + new_template + text[end:], end
 
-    def keyForSort(self, value):
+    def key_for_sort(self, value):
         name = value[0]
         if name in self.old_params:
             return len(self.all_params) + self.old_params.index(name)
@@ -235,8 +259,8 @@ class InfoboxMigratingBot(WikitextFixingBot):
         if name in self.all_params:
             return self.all_params.index(name)
 
-        if self.endsWithDigit(name): # fixme: sort as tuple
-            name, digit = self.stripDigit(name)
+        if self.ends_with_digit(name): # fixme: sort as tuple
+            name, digit = self.strip_digit(name)
             digit = int(digit) + 1.0
             if name not in self.all_params:
                 return len(self.all_params) + digit
@@ -261,8 +285,8 @@ class InfoboxMigratingBot(WikitextFixingBot):
 ##        if name in self.all_params:
 ##            return self.all_params.index(name), 0
 ##
-##        if self.endsWithDigit(name): # fixme: sort as tuple
-##            name, digit = self.stripDigit(name)
+##        if self.ends_with_digit(name): # fixme: sort as tuple
+##            name, digit = self.strip_digit(name)
 ##            digit = int(digit)
 ##            if name not in self.all_params:
 ##                return len(self.all_params), digit
@@ -279,14 +303,14 @@ class InfoboxMigratingBot(WikitextFixingBot):
 ##
 ##        return len(self.all_params)
 
-    def endsWithDigit(self, text):
+    def ends_with_digit(self, text):
         return not text.isdigit() and text[-1].isdigit()
 
-    def stripDigit(self, text):
-        assert self.endsWithDigit(text)
+    def strip_digit(self, text):
+        assert self.ends_with_digit(text)
         return re.fullmatch(r'(.+?)(\d+)', text).groups()
 
-    def handleParam(self, name):
+    def handle_param(self, name):
         if not name:
             raise UnknownParamException
 
@@ -308,8 +332,8 @@ class InfoboxMigratingBot(WikitextFixingBot):
             raise UnnamedParamException
 
         new_name = name
-        if self.endsWithDigit(name):
-            new_name, digit = self.stripDigit(name)
+        if self.ends_with_digit(name):
+            new_name, digit = self.strip_digit(name)
             if new_name in self.all_params:
                 top_index = index = self.all_params.index(new_name)
                 while not self.all_params[top_index].endswith('#'):
@@ -331,10 +355,10 @@ class InfoboxMigratingBot(WikitextFixingBot):
         else:
             raise UnknownParamException
 
-    def handleParams(self, new, old, removed, unknown):
+    def handle_params(self, new, old, removed, unknown):
         # fixme: list of tuples is too complicated
         params = {}
-        for key, value in new + old + removed + unknown:
+        for key, value in chain(new, old, removed, unknown):
             # todo: if key in params: ...
             params[key] = value
 
@@ -342,7 +366,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
             new.remove(
                 (self.image_param, params[self.image_param])
             )
-            image, size, caption = self.handleImage(params[self.image_param])
+            image, size, caption = self.handle_image(params[self.image_param])
             new.append(
                 (self.image_param, image)
             )
@@ -357,7 +381,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
                 )
                 params[self.caption_param] = caption
             if (size and not params.get(self.image_size_param, '')
-                and self.image_size_param in self.all_params):
+                    and self.image_size_param in self.all_params):
                 if self.image_size_param in params:
                     new.remove(
                         (self.image_size_param,
@@ -368,19 +392,18 @@ class InfoboxMigratingBot(WikitextFixingBot):
                 )
                 params[self.image_size_param] = size
 
-    def handleImage(self, image):
+    def handle_image(self, image):
+        # TODO: merge with .tools.parse_image
         caption = ''
         size = ''
-        from .custome_fixes import FilesFix # fixme: textlib
-        regex = re.compile(FilesFix.regex % '|'.join(self.site.namespaces[6]))
-        match = regex.fullmatch(image)
+        match = self.file_regex.fullmatch(image)
         if match:
             image, _, rest = match.group().partition('|')
             image = image.lstrip('[').strip()
             for x in rest[:-2].split('|'):
                 if size and caption:
                     break
-                if x.startswith('alt='): # todo: l10n
+                if x.startswith('alt='):  # todo: l10n
                     continue
                 if x.startswith('link='):
                     continue
@@ -394,7 +417,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
                     caption = x
                     continue
 
-        if not regex.search(image):
+        if not self.file_regex.search(image):
             image = pywikibot.page.url2unicode(image)
             image = re.sub('[ _]+', ' ', image).strip()
 
@@ -410,10 +433,12 @@ class InfoboxMigratingBot(WikitextFixingBot):
         if duplicates:
             pywikibot.warning('Duplicate arguments %s' % duplicates)
             for dupe in duplicates:
-                values = list(filter(lambda x: x[0] == dupe, params))
-                while '' in values:
+                values = list(y for x, y in params if x == dupe)
+                #print(dupe)
+                #print(values)
+                if '' in values:
                     params.remove((dupe, ''))
-                    values.remove('')
+                    #values.remove('')
                 #while len(set(values)) < len(values): todo
 
     def exit(self):

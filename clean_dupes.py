@@ -25,7 +25,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
     def generator(self):
         query = self.store.build_query(
             'dupes', dupe=' wd:'.join(self.dupe_item), offset=self.offset)
-        return pagegenerators.PreloadingItemGenerator(
+        return pagegenerators.PreloadingEntityGenerator(
             pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo,
                                                        result_type=list))
 

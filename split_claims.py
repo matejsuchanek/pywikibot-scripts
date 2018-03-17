@@ -24,7 +24,7 @@ class ClaimsSplittingBot(WikidataEntityBot):
     def generator(self):
         query = self.store.build_query(
             'mixed_claims', limit=self.getOption('limit'))
-        return pagegenerators.PreloadingItemGenerator(
+        return pagegenerators.PreloadingEntityGenerator(
             pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo))
 
     def has_multiple(self, claim):
@@ -40,9 +40,8 @@ class ClaimsSplittingBot(WikidataEntityBot):
                 and all(qual.snaktype == 'value' for qual in qualifiers))
 
     def sort_key(self, claim):
-        return (claim.target.toTimestamp(),
-                {self.start_prop: 1, self.end_prop: 0}.get(claim.id),
-                )
+        return claim.target.toTimestamp()
+            #{self.start_prop: 1, self.end_prop: 0}.get(claim.id)
 
     def get_qualifier_pairs(self, claim):
         qualifiers = (claim.qualifiers.get(self.start_prop, [])
@@ -96,7 +95,10 @@ class ClaimsSplittingBot(WikidataEntityBot):
                     pairs = self.get_qualifier_pairs(claim)
                     for start, end in pairs:
                         new_claim = pywikibot.Claim(self.repo, claim.id)
-                        new_claim.setTarget(claim.target)
+                        if claim.target:
+                            new_claim.setTarget(claim.target)
+                        else:
+                            new_claim.setSnakType(claim.snaktype)
                         item.addClaim(new_claim)
                         if new_claim.rank != claim.rank:
                             new_claim.changeRank(claim.rank)
@@ -112,7 +114,9 @@ class ClaimsSplittingBot(WikidataEntityBot):
                                 sources.extend(snaks)
                             new_claim.addSources(sources)
         if to_remove:
-            item.removeClaims(to_remove, summary=self.summary)
+            data = {'claims': [
+                {'id': cl.toJSON()['id'], 'remove': ''} for cl in to_remove]}
+            self.user_edit_entity(item, data, summary=self.summary)
 
 def main(*args):
     options = {}

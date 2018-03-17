@@ -19,10 +19,10 @@ from pywikibot.textlib import mwparserfromhell
 from pywikibot.tools import first_lower, first_upper
 from pywikibot.tools.formatter import color_format
 
-from .checkwiki_errors import CheckWikiError, deduplicate
+from .checkwiki_errors import CheckWikiError
+from .tools import deduplicate, FULL_ARTICLE_REGEX
 from .typoloader import TypoRule, TyposLoader
 
-FULL_ARTICLE_REGEX = '(?s)^.*$'
 
 class FixGenerator(object):
 
@@ -436,7 +436,7 @@ class FilesFix(LazyFix):
 
         deduplicate(split)
 
-        return '[[' + '|'.join(split) + ']]'
+        return '[[%s]]' % '|'.join(split)
 
 class CheckWikiFix(LazyFix): # todo: make abstract and split
 
@@ -914,8 +914,10 @@ class TemplateFix(LazyFix):
         self.defaultsort = self.site.getmagicwords('defaultsort')
 
     def replacements(self):
-        yield (r'(?P<before>\{\{\s*)(?P<template>[^<>#{|}]+?)(?P<after>\s*[|}])',
-               self.replace)
+        yield (
+            r'(?P<before>\{\{\s*)(?P<template>[^<>#{|}]+?)(?P<after>\s*[|}])',
+            self.replace,
+        )
 
     def replace(self, match):
         template_name = match.group('template').replace('_', ' ').strip()
@@ -927,6 +929,8 @@ class TemplateFix(LazyFix):
             template = pywikibot.Page(self.site, template_name_norm, ns=10)
             try:
                 do_replace = template.exists() and template.isRedirectPage()
+            except pywikibot.exceptions.InvalidTitle:
+                do_replace = False
             except pywikibot.exceptions.InconsistentTitleReceived:
                 do_replace = False
             if do_replace:

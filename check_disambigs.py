@@ -1,81 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import datetime
-import codecs
 import pywikibot
-import threading
 
 from pywikibot import pagegenerators
-from pywikibot.bot import BaseBot, SkipPageError
+from pywikibot.bot import SkipPageError
 
+from .error_reporting import ErrorReportingBot
 from .wikidata import WikidataEntityBot
-
-class ErrorReportingBot(BaseBot):
-
-    file_name = None
-    page_pattern = None
-
-    def __init__(self, **kwargs):
-        self.availableOptions.update({
-            'clearonly': False,
-            'interval': 5 * 60,
-        })
-        super(ErrorReportingBot, self).__init__(**kwargs)
-        self.open()
-        self.timer = None
-        self.write_lock = threading.Lock()
-        self.timer_lock = threading.Lock()
-
-    def run(self):
-        self.load_page()
-        self.save_file()
-        if not self.getOption('clearonly'):
-            super(ErrorReportingBot, self).run()
-
-    def open(self):
-        try:
-            open('..\\%s' % self.file_name, 'x').close()
-        except OSError:
-            pass
-
-    def load_page(self):
-        self.log_page = pywikibot.Page(
-            self.repo, self.page_pattern % self.repo.username())
-        try:
-            self.log_page.get()
-        except pywikibot.NoPage:
-            self.log_page.text = ''
-
-    def append(self, text):
-        self.write_lock.acquire()
-        with codecs.open('..\\%s' % self.file_name, 'r+', 'utf-8') as f:
-            f.read() # jump to the end
-            f.write(text)
-        self.write_lock.release()
-
-    def save_file(self):
-        self.write_lock.acquire()
-        with codecs.open('..\\%s' % self.file_name, 'r+', 'utf-8') as f:
-            f.seek(0) # jump to the beginning
-            read = '\n'.join(f.read().splitlines()) # multi-platform
-            if read:
-                self.log_page.text += read
-                self.log_page.save(summary='update')
-                f.seek(0) # jump to the beginning
-                f.truncate() # and delete everything
-        self.write_lock.release()
-        self.timer_lock.acquire()
-        self.timer = threading.Timer(self.getOption('interval'), self.save_file)
-        self.timer.start()
-        self.timer_lock.release()
-
-    def exit(self):
-        self.timer_lock.acquire()
-        if self.timer:
-            self.timer.cancel()
-        self.timer_lock.release()
-        super(ErrorReportingBot, self).exit()
 
 class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
 
@@ -121,7 +53,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
 } ORDER BY ?hash''' % (self.disambig_item, self.getOption('min_sitelinks'),
                        self.getOption('offset'), self.getOption('limit'))
 
-        return pagegenerators.PreloadingItemGenerator(
+        return pagegenerators.PreloadingEntityGenerator(
             pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=self.repo,
                                                        result_type=list))
 
@@ -178,6 +110,7 @@ def main(*args):
 
     site = pywikibot.Site('wikidata', 'wikidata')
     bot = DisambigsCheckingBot(site=site, **options)
+    bot.run()
 
 if __name__ == '__main__':
     main()

@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import pywikibot
 
 from pywikibot import pagegenerators
-from pywikibot.bot import SkipPageError
 
 from itertools import chain
 
@@ -18,21 +19,37 @@ class FakeReferencesBot(WikidataEntityBot):
     whitelist_props = ['P813']
 
     def __init__(self, **kwargs):
-        self.availableOptions.update({})
+        self.availableOptions.update({
+            'limit': 1000,
+            'offset': 0,
+        })
         super(FakeReferencesBot, self).__init__(**kwargs)
         self.store = QueryStore()
 
     def subgenerator(self):
+        limit = self.getOption('limit')
         for prop in self.ref_props:
+            if not limit:
+                break
+            # TODO: item_ids
             query = self.store.build_query(
-                'fake_references', limit=1000, offset=0, prop=prop)
+                'fake_references',
+                limit=limit,
+                offset=self.getOption('offset'),
+                prop=prop)
             for item in pagegenerators.WikidataSPARQLPageGenerator(
                     query, site=self.repo):
                 yield item
+                limit -= 1
 
     @property
     def generator(self):
-        return pagegenerators.PreloadingItemGenerator(self.query_generator)
+        return pagegenerators.PreloadingEntityGenerator(self.subgenerator())
+
+    @property
+    def summary(self):
+        return ('update reference per [[Wikidata:Requests for permissions/'
+                'Bot/MatSuBot 8|RfPB]]')
 
     def init_page(self, item):
         super(FakeReferencesBot, self).init_page(item)
@@ -56,21 +73,21 @@ class FakeReferencesBot(WikidataEntityBot):
             keys = set(source.keys())
             if not (keys & set([prop])):
                 continue
-            if keys - (self.whitelist_props | set([prop])):
+            if keys - (set(self.whitelist_props) | set([prop])):
                 continue
             if len(source[prop]) > 1:
                 #continue?
                 return
 
             fake = next(iter(source[prop]))
-            items = list(item_ids) + [target]
+            items = list(self.item_ids) + [target]
             if any(fake.target_equals(tgt) for tgt in items):
                 good_sources = list(chain.from_iterable(
                     source[p] for p in keys - set([prop])))
                 snak = pywikibot.Claim(self.repo, self.inferred_from,
                                        isReference=True)
                 snak.setTarget(target)
-                claim.addSources(good_sources + [snak])
+                claim.addSources(good_sources + [snak], summary=self.summary)
                 claim.removeSources(good_sources + [fake])
 
 def main(*args):

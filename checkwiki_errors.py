@@ -6,11 +6,8 @@ import re
 import requests
 
 from pywikibot import textlib
+from .tools import deduplicate
 
-def deduplicate(array): # todo: move elsewhere
-    for index, member in enumerate(array, start=1):
-        while member in array[index:]:
-            array.pop(array.index(member, index))
 
 class CheckWikiError(object):
 

@@ -27,5 +27,4 @@ SELECT DISTINCT ?item WHERE {
     ?statement2 prov:wasDerivedFrom ?ref .
     ?item ?claim2 ?statement2 .
   } .
-  MINUS { ?item wikibase:propertyType [] } .
 }

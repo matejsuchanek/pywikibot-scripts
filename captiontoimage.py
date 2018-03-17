@@ -31,7 +31,7 @@ class CaptionToImageBot(WikidataEntityBot):
     @property
     def generator(self):
         query = self.store.build_query('captions', prop=self.caption_property)
-        return pagegenerators.PreloadingItemGenerator(
+        return pagegenerators.PreloadingEntityGenerator(
             pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo))
 
     def filterProperty(self, prop_page):

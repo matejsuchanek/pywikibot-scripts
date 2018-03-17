@@ -5,9 +5,9 @@ import pywikibot
 import re
 
 from pywikibot import pagegenerators, textlib
+from pywikibot.tools import first_upper
 
 from pywikibot.textlib import mwparserfromhell
-from pywikibot.tools import first_upper
 
 try:
     from .wikitext import WikitextFixingBot

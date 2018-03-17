@@ -4,7 +4,7 @@ import re
 
 from pywikibot.data.sparql import SparqlQuery
 from pywikibot.pagegenerators import (
-    PreloadingItemGenerator,
+    PreloadingEntityGenerator,
     WikidataSPARQLPageGenerator,
 )
 
@@ -18,7 +18,7 @@ class ExternalIdSlicingBot(WikidataEntityBot):
 
     def __init__(self, **options):
         self.availableOptions.update({
-            'limit': 10,
+            'step': 10,
             'offset': 0,
         })
         super(ExternalIdSlicingBot, self).__init__(**options)
@@ -29,8 +29,8 @@ class ExternalIdSlicingBot(WikidataEntityBot):
 
     @property
     def generator(self):
-        opts = dict(blacklist=' wd:'.join(self.blacklist),
-                    limit=self.getOption('limit'))
+        step = self.getOption('step')
+        opts = dict(blacklist=' wd:'.join(self.blacklist), limit=step)
         offset = self.getOption('offset')
         while True:
             pywikibot.output('\nLoading items (offset %i)...' % offset)
@@ -39,11 +39,11 @@ class ExternalIdSlicingBot(WikidataEntityBot):
             if not self.sparql.ask(ask):
                 break
             query = self.store.build_query('external-ids', **opts)
-            gen = PreloadingItemGenerator(
+            gen = PreloadingEntityGenerator(
                 WikidataSPARQLPageGenerator(query, site=self.repo))
             for item in gen:
                 yield item
-            offset += limit
+            offset += step
 
     def treat_page_and_item(self, page, item):
         for prop, claims in item.claims.items():
@@ -56,24 +56,20 @@ class ExternalIdSlicingBot(WikidataEntityBot):
                     continue
                 formatter, regex = self.get_formatter_and_regex(prop)
                 if not formatter:
-                    pywikibot.output('%s doesn\'t have a formatter' % prop)
+                    pywikibot.output("%s doesn't have a formatter" % prop)
                     break
                 value = self.find_value(cl.target, formatter)
                 if not value:
                     pywikibot.output('Value not found in "%s" for property %s' % (
                         cl.target, prop))
-                    if prop not in self.failed:
-                        self.failed[prop] = set()
-                    self.failed[prop].add(item)
+                    self.failed.setdefault(prop, set()).add(item)
                     continue
                 if regex:
                     match = re.match('(%s)' % regex, value)
                     if not match:
-                        pywikibot.output('Value "%s" not matched by regex "%s"' % (
-                            value, regex))
-                        if prop not in self.failed:
-                            self.failed[prop] = set()
-                        self.failed[prop].add(item)
+                        pywikibot.output('Value "%s" not matched by regex '
+                                         '"%s"' % (value, regex))
+                        self.failed.setdefault(prop, set()).add(item)
                         continue
                     value = match.group()
                 summary = 'harvested the identifier based on [[Property:P1630]]'
