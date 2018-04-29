@@ -16,13 +16,13 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
     cc = True
     lang_map = {
         'als': 'gsw',
-        'be-x-old': 'be-tarask',
+        'be_x_old': 'be-tarask',
         'bh': 'bho',
         'no': 'nb',
         'simple': None,
         'zh-classical': 'lzh',
-        'zh-min-nan': 'nan',
-        'zh-yue': 'yue',
+        'zh_min_nan': 'nan',
+        'zh_yue': 'yue',
     }
 
     def __init__(self, **kwargs):
@@ -58,12 +58,9 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
             '%s.filterProperty needs overriding in a subclass' % self.__class__
         )
 
-    def _save_entity(self, func, *args, **kwargs):
-        if not kwargs.pop('async_force', False) and 'asynchronous' in kwargs:
-            kwargs.pop('asynchronous')
-        func(*args, **kwargs)
-
     def _move_alias_to_label(self, item, data):
+        if data is None:
+            return False
         labels = {}
         aliases = {}
         keys = set(item.aliases.keys())
@@ -80,58 +77,82 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
             data.setdefault('aliases', {}).update(aliases)
         return bool(labels) and bool(aliases)
 
-    def _add_missing_labels(self, item, data):
+    def normalize_lang(self, lang):
+        lang = self.lang_map.get(lang, lang)
+        if lang:
+            return lang.replace('_', '-')
+        else:
+            return None
+
+    def _get_missing_labels(self, item, skip):
         labels = {}
         dont = set(item.descriptions.keys()) | set(item.labels.keys())
-        dont |= set(data.get('labels', {}).keys())
+        dont |= set(skip)
         for dbname, title in item.sitelinks.items():
             parts = dbname.partition('wiki')
             if parts[0] in ('commons', 'wikidata', 'species', 'media', 'meta'):
                 continue
-            lang = self.lang_map.get(parts[0], parts[0])
+            if set(title) & set(',:'):
+                continue
+            lang = self.normalize_lang(parts[0])
             if lang and lang not in dont:
                 if lang in labels:
                     dont.add(lang)
                     labels.pop(lang)
                 else:
                     labels[lang] = title.partition(' (')[0]
+        return labels
+
+    def _add_missing_labels(self, item, data):
+        if data is None:
+            skip = set()
+        else:
+            skip = set(data.get('labels', {}).keys())
+        labels = self._get_missing_labels(item, skip)
         if labels:
-            data.setdefault('labels', {}).update(labels)
-            pywikibot.output(labels)
+            print(list(labels.keys()))
+            if data is None:
+                for lang, label in labels.items():
+                    item.labels[lang] = label
+            else:
+                data.setdefault('labels', {}).update(labels)
         return bool(labels)
 
+    def _fix_quantity(self, snak):
+        if snak.type == 'quantity' and snak.snaktype == 'value':
+            if snak.target.upperBound == snak.target.amount:
+                snak.target.upperBound = None
+                snak.target.lowerBound = None
+                return True
+        return False
+
     def _fix_quantities(self, item, data):
+        if data is None:
+            return False
         all_claims = set()
         for prop, claims in item.claims.items():
             for claim in claims:
-                if claim.type == 'quantity' and claim.snaktype == 'value':
-                    if claim.target.upperBound == claim.target.amount:
-                        claim.target.upperBound = None
-                        claim.target.lowerBound = None
-                        all_claims.add(claim)
+                if self._fix_quantity(claim):
+                    all_claims.add(claim)
                 for qprop, snaks in claim.qualifiers.items():
                     for snak in snaks:
-                        if snak.type == 'quantity' and snak.snaktype == 'value':
-                            if snak.target.upperBound == snak.target.amount:
-                                snak.target.upperBound = None
-                                snak.target.lowerBound = None
-                                all_claims.add(claim)
+                        if self._fix_quantity(snak):
+                            all_claims.add(claim)
         if all_claims:
             data.setdefault('claims', []).extend(
                 cl.toJSON() for cl in all_claims)
         return bool(all_claims)
 
     def user_edit_entity(self, item, data=None, **kwargs):
-        if data:
-            cleanup = False
-            if self.cc and hasattr(item, 'labels'):
-                cleanup = self._move_alias_to_label(item, data) or cleanup
-            if self.cc and hasattr(item, 'sitelinks'):
-                cleanup = self._add_missing_labels(item, data) or cleanup
-            if self.cc and hasattr(item, 'claims'):
-                cleanup = self._fix_quantities(item, data) or cleanup
-            kwargs.setdefault('show_diff', False)
-            if cleanup and kwargs.get('summary'):
-                kwargs['summary'] += '; cleanup'
+        cleanup = False
+        if self.cc and hasattr(item, 'labels'):
+            cleanup = self._move_alias_to_label(item, data) or cleanup
+        if self.cc and hasattr(item, 'sitelinks'):
+            cleanup = self._add_missing_labels(item, data) or cleanup
+        if self.cc and hasattr(item, 'claims'):
+            cleanup = self._fix_quantities(item, data) or cleanup
+        if cleanup and kwargs.get('summary'):
+            kwargs['summary'] += '; cleanup'
+        kwargs.setdefault('show_diff', False)
         return super(WikidataEntityBot, self).user_edit_entity(
             item, data, **kwargs)

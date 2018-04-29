@@ -67,20 +67,8 @@ class InfoboxMigratingBot(WikitextFixingBot):
 
     summary = 'sjednocení infoboxu'
 
-    all_params = [
-        'název', image_param, image_size_param, caption_param, 'typ',
-        'materiálové zatřídění', 'použití', 'tepelný odpor',
-        'součinitel prostupu tepla', 'rozměry',
-    ]
-    rename_params = {
-        'Stavební materiály': 'název',
-        'Typ': 'typ',
-        'Zatřídění - materiálové': 'materiálové zatřídění',
-        'Použití': 'použití',
-        'Tepelný odpor': 'tepelný odpor',
-        'Součinitel prostupu tepla': 'součinitel prostupu tepla',
-        'Rozměry': 'rozměry',
-    }
+    all_params = []
+    rename_params = {}
     old_params = ()
     remove_params = ()
 

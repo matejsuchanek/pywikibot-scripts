@@ -5,6 +5,9 @@ from pywikibot import pagegenerators
 
 from pywikibot.bot import SkipPageError
 
+from queue import Queue
+from threading import Lock, Thread
+
 from .merger import Merger
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
@@ -16,10 +19,15 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
     use_from_page = False
 
     def __init__(self, offset=0, **kwargs):
+        self.availableOptions.update({
+            'threads': 1,
+        })
         super(DupesMergingBot, self).__init__(**kwargs)
-        self.offset = offset
         BaseRevertBot.__init__(self, self.site)
+        self.offset = offset
         self.store = QueryStore()
+        self.lock = Lock()
+        self.init_workers()
 
     @property
     def generator(self):
@@ -29,6 +37,23 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
             pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo,
                                                        result_type=list))
 
+    def init_workers(self):
+        count = self.getOption('threads')
+        self.queue = Queue(count)
+        self.workers = []
+        for i in range(count):
+            thread = Thread(target=self.work)
+            thread.start()
+            self.workers.append(thread)
+
+    def work(self):
+        while True:
+            item = self.queue.get()
+            if item is None:
+                break
+            self.process_item(item)
+            self.queue.task_done()
+
     def init_page(self, item):
         self.offset += 1
         super(DupesMergingBot, self).init_page(item)
@@ -36,6 +61,9 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
             raise SkipPageError(item, 'Missing P31 property')
 
     def treat_page_and_item(self, page, item):
+        self.queue.put(item)
+
+    def process_item(self, item):
         claims = []
         targets = set()
         for claim in item.claims['P31']:
@@ -118,8 +146,8 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
                         target_claims.append(claim)
 
         if len(sitelinks) > 0:
-            self._save_page(item, self._save_entity, item.removeSitelinks,
-                            sitelinks, summary='removing sitelink(s) to non-existing page(s)')
+            self._save_page(item, self._save_entity, item.removeSitelinks, sitelinks,
+                            summary='removing sitelink(s) to non-existing page(s)')
         if len(claims) > 0:
             self._save_page(item, self._save_entity, item.removeClaims, claims)
         if len(target_sitelinks) > 0:
@@ -128,8 +156,8 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
         if len(target_claims) > 0:
             self._save_page(target, self._save_entity, target.removeClaims, target_claims)
 
-        if not self._save_page(item, self._save_entity, Merger.clean_merge,
-                               item, target, ignore_conflicts=['description']):
+        if not self._save_page(item, self._save_entity, Merger.clean_merge, item, target,
+                               ignore_conflicts=['description']):
             pywikibot.output('Reverting changes...')
             self.comment = 'Error occurred when attempting to merge with %s' % target.title(asLink=True)
             self.revert({'title': item.title()})
@@ -142,10 +170,22 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
     def redirectsTo(self, page, target):
         return page.isRedirectPage() and page.getRedirectTarget() == target
 
+    def _save_entity(self, callback, *args, **kwargs):
+        with self.lock:
+            if 'asynchronous' in kwargs:
+                kwargs.pop('asynchronous')
+            return callback(*args, **kwargs)
+
     def exit(self):
+        count = len(self.workers)
+        for i in range(count):
+            self.queue.put(None)
+        for worker in self.workers:
+            worker.join()
         super(DupesMergingBot, self).exit()
         pywikibot.output('\nCurrent offset: %i (use %i)\n' % (
             self.offset, self.offset - self.offset % 50))
+
 
 def main(*args):
     options = {}

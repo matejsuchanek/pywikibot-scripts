@@ -16,7 +16,6 @@ class LabelSettingBot(WikidataEntityBot):
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
-            'always': False,
             'create': False,
         })
         super(LabelSettingBot, self).__init__(**kwargs)

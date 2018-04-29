@@ -21,7 +21,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
     def __init__(self, **kwargs):
         self.availableOptions.update({
             'limit': 1000,
-            'min_sitelinks': 0,
+            'min_sitelinks': 1,
             'offset': 0,
             #'only': None, todo
         })
@@ -44,7 +44,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
         QUERY = '''SELECT ?item WITH {
   SELECT DISTINCT ?item {
     ?item wdt:P31 wd:%s; wikibase:sitelinks ?links .
-    FILTER( ?links > %i ) .
+    FILTER( ?links >= %i ) .
     MINUS { ?item wdt:P31 wd:Q101352 } .
   } OFFSET %i LIMIT %i
 } AS %%disambig WHERE {

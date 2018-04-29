@@ -1,0 +1,6 @@
+SELECT DISTINCT ?item {
+  ?item ^schema:about [
+    schema:isPartOf <https://%(hostname)s/>; schema:name ?title
+  ]; wdt:P31 wd:Q5 .
+  MINUS { ?item schema:description ?desc FILTER( LANG( ?desc ) = '%(lang)s' ) } .
+}

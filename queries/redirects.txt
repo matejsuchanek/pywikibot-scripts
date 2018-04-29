@@ -1,0 +1,17 @@
+SELECT DISTINCT ?item {
+  ?item owl:sameAs ?target; schema:dateModified ?date .
+  {
+    ?entity ?p [ ?pred ?item; wikibase:rank [] ] .
+  } UNION {
+    ?entity ?p1 [ ?predv [ wikibase:quantityUnit ?item ]; wikibase:rank [] ] .
+  } UNION {
+    ?ref ?pr ?item .
+    ?st2 prov:wasDerivedFrom ?ref .
+    ?entity ?p2 ?st2 .
+  } UNION {
+    ?ref1 ?prv [ wikibase:quantityUnit ?item ] .
+    ?st3 prov:wasDerivedFrom ?ref .
+    ?entity ?p3 ?st3 .
+  } .
+  FILTER( NOW() - ?date > %(days)d ) .
+} ORDER BY ?date
