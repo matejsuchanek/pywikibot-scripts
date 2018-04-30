@@ -14,8 +14,18 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
     disambig_item = 'Q4167410'
     file_name = 'log_disambigs.txt'
     page_pattern = 'User:%s/Disambig_errors'
-    skip = ['brwiki', 'enwiki', 'hakwiki', 'igwiki', 'mkwiki', 'mznwiki',
-            'specieswiki', 'towiki']
+    skip = [
+        'brwiki',
+        'enwiki',
+        'hakwiki',
+        'igwiki',
+        'mkwiki',
+        'mznwiki',
+        'simplewikibooks',  # T180404
+        'simplewikiquote',  # T180404
+        'specieswiki',
+        'towiki',
+    ]
     use_from_page = False
 
     def __init__(self, **kwargs):

@@ -26,7 +26,9 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
         BaseRevertBot.__init__(self, self.site)
         self.offset = offset
         self.store = QueryStore()
-        self.lock = Lock()
+        self.save_lock = Lock()
+        self.access_lock = Lock()
+        self.site_locks = {}
         self.init_workers()
 
     @property
@@ -105,26 +107,29 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
         sitelinks = []
         for page in item.iterlinks():
             site = page.site
-            try:
-                target_link = target.getSitelink(site)
-            except pywikibot.NoPage:
-                continue
+            with self.access_lock:
+                lock = self.site_locks.setdefault(site, Lock())
+            with lock:
+                try:
+                    target_link = target.getSitelink(site)
+                except pywikibot.NoPage:
+                    continue
 
-            if not page.exists():
-                sitelinks.append(site)
-                continue
+                if not page.exists():
+                    sitelinks.append(site)
+                    continue
 
-            target_page = pywikibot.Page(site, target_link)
-            if not target_page.exists():
-                target_sitelinks.append(site)
-                continue
-            if (self.redirectsTo(page, target_page) or
-                    self.redirectsTo(target_page, page)):
-                continue
+                target_page = pywikibot.Page(site, target_link)
+                if not target_page.exists():
+                    target_sitelinks.append(site)
+                    continue
+                if (self.redirectsTo(page, target_page) or
+                        self.redirectsTo(target_page, page)):
+                    continue
 
-            pywikibot.output('Target has a conflicting sitelink: %s'
-                             % site.dbName())
-            return
+                pywikibot.output('Target has a conflicting sitelink: %s'
+                                 % site.dbName())
+                return
 
         target_claims = []
         for claim in target.claims.get('P460', []):
@@ -171,7 +176,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
         return page.isRedirectPage() and page.getRedirectTarget() == target
 
     def _save_entity(self, callback, *args, **kwargs):
-        with self.lock:
+        with self.save_lock:
             if 'asynchronous' in kwargs:
                 kwargs.pop('asynchronous')
             return callback(*args, **kwargs)
