@@ -17,12 +17,12 @@ class ErrorReportingBot(BaseBot):
             'interval': 5 * 60,
         })
         super(ErrorReportingBot, self).__init__(**kwargs)
-        self.open()
         self.timer = None
         self.file_lock = threading.Lock()
         self.timer_lock = threading.Lock()
 
     def run(self):
+        self.open()
         self.load_page()
         self.save_file()
         if not self.getOption('clearonly'):
@@ -44,11 +44,13 @@ class ErrorReportingBot(BaseBot):
 
     def append(self, text):
         with self.file_lock:
+            # xxx: os.path
             with open('..\\%s' % self.file_name, 'a', encoding='utf-8') as f:
                 f.write(text)
 
     def save_file(self):
         with self.file_lock:
+            # xxx: os.path
             with open('..\\%s' % self.file_name, 'r+', encoding='utf-8') as f:
                 f.seek(0) # jump to the beginning
                 text = '\n'.join(f.read().splitlines()) # multi-platform

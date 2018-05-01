@@ -8,11 +8,11 @@ import pywikibot
 from operator import methodcaller
 from urllib.request import urlopen
 
-from pywikibot.bot import MultipleSitesBot, RedirectPageBot
+from pywikibot.bot import RedirectPageBot, WikidataBot
 
 from .merger import Merger
 
-class WikidataRedirectsBot(MultipleSitesBot, RedirectPageBot):
+class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
 
     labs_url = 'https://tools.wmflabs.org'
     sub_directory = 'wikidata-redirects-conflicts-reports/reports'
@@ -62,7 +62,7 @@ class WikidataRedirectsBot(MultipleSitesBot, RedirectPageBot):
                 pywikibot.exception(e)
                 continue
 
-            pywikibot.output('Working on \'%s\'' % dbname)
+            pywikibot.output("Working on '%s'" % dbname)
             resp = urlopen(url + file_name)
             lines = resp.readlines()
             if not lines:
@@ -108,6 +108,7 @@ class WikidataRedirectsBot(MultipleSitesBot, RedirectPageBot):
         if self.getOption('touch') is True:
             self._save_page(target, target.touch, **self.ignore)
 
+
 def main(*args):
     options = {}
     skip = []
@@ -124,6 +125,7 @@ def main(*args):
 
     bot = WikidataRedirectsBot(skip=skip, **options)
     bot.run()
+
 
 if __name__ == '__main__':
     main()

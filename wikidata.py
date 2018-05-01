@@ -73,7 +73,7 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
                 aliases[lang] = {'language': lang, 'remove': '',
                                  'value': item.aliases[lang][0]}
         if labels and aliases:
-            data['labels'].update(labels)
+            data.setdefault('labels', {}).update(labels)
             data.setdefault('aliases', {}).update(aliases)
         return bool(labels) and bool(aliases)
 
@@ -89,7 +89,7 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         dont = set(item.descriptions.keys()) | set(item.labels.keys())
         dont |= set(skip)
         for dbname, title in item.sitelinks.items():
-            parts = dbname.partition('wiki')
+            parts = dbname.partition('wik')
             if parts[0] in ('commons', 'wikidata', 'species', 'media', 'meta'):
                 continue
             if set(title) & set(',:'):
@@ -110,7 +110,7 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
             skip = set(data.get('labels', {}).keys())
         labels = self._get_missing_labels(item, skip)
         if labels:
-            print(list(labels.keys()))
+            #print(list(labels.keys()))
             if data is None:
                 for lang, label in labels.items():
                     item.labels[lang] = label

@@ -8,7 +8,7 @@ class QueryStore(object):
     def __init__(self, path=None):
         if path is None:
             dirname = os.path.dirname(os.path.realpath(__file__))
-            path = os.join.path(dirname, 'queries')
+            path = os.path.join(dirname, 'queries')
         self.path = path
 
     def get_query(self, name):

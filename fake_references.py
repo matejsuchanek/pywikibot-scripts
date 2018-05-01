@@ -10,6 +10,7 @@ from itertools import chain
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 
+
 class FakeReferencesBot(WikidataEntityBot):
 
     item_ids = ['Q2013', 'Q20651139']
@@ -20,27 +21,36 @@ class FakeReferencesBot(WikidataEntityBot):
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
-            'limit': 1000,
-            'offset': 0,
+            'limit': None,
         })
         super(FakeReferencesBot, self).__init__(**kwargs)
         self.store = QueryStore()
 
     def subgenerator(self):
         limit = self.getOption('limit')
+        from_item = pywikibot.ItemPage(self.repo, 'Q20651139')
+        for item in pagegenerators.WikibaseItemGenerator(from_item.backlinks(
+                total=limit, filterRedirects=False, namespaces=[0])):
+            yield item
+            if limit is not None:
+                limit -= 1
+
+        if limit == 0:
+            return
+
         for prop in self.ref_props:
-            if not limit:
+            if limit == 0:
                 break
             # TODO: item_ids
             query = self.store.build_query(
                 'fake_references',
-                limit=limit,
-                offset=self.getOption('offset'),
+                limit=limit or 10000,
                 prop=prop)
             for item in pagegenerators.WikidataSPARQLPageGenerator(
                     query, site=self.repo):
                 yield item
-                limit -= 1
+                if limit is not None:
+                    limit -= 1
 
     @property
     def generator(self):
@@ -51,44 +61,52 @@ class FakeReferencesBot(WikidataEntityBot):
         return ('update reference per [[Wikidata:Requests for permissions/'
                 'Bot/MatSuBot 8|RfPB]]')
 
-    def init_page(self, item):
-        super(FakeReferencesBot, self).init_page(item)
-
     def treat_page_and_item(self, page, item):
+        all_claims = set()
         for prop, claims in item.claims.items():
             for claim in claims:
-                self.handle_claim(claim)
+                if self.handle_claim(claim):
+                    all_claims.add(claim)
+        if all_claims:
+            data = {'claims': [cl.toJSON() for cl in all_claims]}
+            self.user_edit_entity(item, data, summary=self.summary)
 
     def handle_claim(self, claim):
+        ret = False
         if not claim.sources or claim.type != 'wikibase-item':
-            return
+            return ret
         target = claim.getTarget()
         if not target:
-            return
+            return ret
         for source in claim.sources:
-            self.handle_source(claim, source, target)
+            ret = self.handle_source(claim, source, target) or ret
+        return ret
 
     def handle_source(self, claim, source, target):
+        ret = False
         for prop in self.ref_props:
             keys = set(source.keys())
-            if not (keys & set([prop])):
+            if prop not in keys:
                 continue
             if keys - (set(self.whitelist_props) | set([prop])):
                 continue
             if len(source[prop]) > 1:
                 #continue?
-                return
+                return ret
 
             fake = next(iter(source[prop]))
             items = list(self.item_ids) + [target]
             if any(fake.target_equals(tgt) for tgt in items):
                 good_sources = list(chain.from_iterable(
                     source[p] for p in keys - set([prop])))
-                snak = pywikibot.Claim(self.repo, self.inferred_from,
-                                       isReference=True)
+                snak = pywikibot.Claim(
+                    self.repo, self.inferred_from, isReference=True)
                 snak.setTarget(target)
-                claim.addSources(good_sources + [snak], summary=self.summary)
-                claim.removeSources(good_sources + [fake])
+                source.setdefault(self.inferred_from, []).append(snak)
+                source.pop(prop)
+                ret = True
+        return ret
+
 
 def main(*args):
     options = {}
@@ -102,6 +120,7 @@ def main(*args):
 
     bot = FakeReferencesBot(**options)
     bot.run()
+
 
 if __name__ == '__main__':
     main()

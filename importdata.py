@@ -12,11 +12,12 @@ site = pywikibot.Site('wikidata', 'wikidata')
 repo = site.data_repository()
 
 direct = pywikibot.input('File directory: ')
-date = pywikibot.WbTime(year=2017, month=1, day=1, site=repo)
+date = pywikibot.WbTime(year=2018, month=1, day=1, site=repo)
 
-ref_item = 'Q29678797'
+ref_item = 'Q52417047'
 
-with open(direct, 'r') as file_data:
+with open(direct, 'r', encoding='utf-8') as file_data:
+    next(file_data)
     for line in file_data:
         split = line.split('\t')
         item = pywikibot.ItemPage(repo, split[0])
@@ -73,5 +74,5 @@ with open(direct, 'r') as file_data:
 
         item.editEntity(
             data, asynchronous=True,
-            summary='Adding [[Property:P1082]]: %s, data from [[Q3504917]], '
+            summary='Adding [[Property:P1082]]: %d, data from [[Q3504917]], '
             'see [[%s]]' % (count, ref_item))
