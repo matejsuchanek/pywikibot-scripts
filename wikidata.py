@@ -16,11 +16,14 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
     cc = True
     lang_map = {
         'als': 'gsw',
+        'bat_smg': 'sgs',
         'be_x_old': 'be-tarask',
         'bh': 'bho',
+        'fiu_vro': 'vro',
         'no': 'nb',
+        'roa_rup': 'rup',
         'simple': None,
-        'zh-classical': 'lzh',
+        'zh_classical': 'lzh',
         'zh_min_nan': 'nan',
         'zh_yue': 'yue',
     }
@@ -103,6 +106,14 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
                     labels[lang] = title.partition(' (')[0]
         return labels
 
+    def _fix_languages(self, item, data):
+        ret = False
+##        if hasattr(item, 'labels'):
+##            data.setdefault('labels', {})
+##        if hasattr(item, 'descriptions'):
+##            data.setdefault('descriptions', {})
+        return ret
+
     def _add_missing_labels(self, item, data):
         if data is None:
             skip = set()
@@ -145,6 +156,8 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
 
     def user_edit_entity(self, item, data=None, **kwargs):
         cleanup = False
+        if self.cc:
+            cleanup = self._fix_languages(item, data) or cleanup
         if self.cc and hasattr(item, 'labels'):
             cleanup = self._move_alias_to_label(item, data) or cleanup
         if self.cc and hasattr(item, 'sitelinks'):
