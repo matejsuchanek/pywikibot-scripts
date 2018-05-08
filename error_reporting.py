@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import os
 import pywikibot
 import threading
 
@@ -30,7 +31,7 @@ class ErrorReportingBot(BaseBot):
 
     def open(self):
         try:
-            open('..\\%s' % self.file_name, 'x', encoding='utf-8').close()
+            open(os.path.join('..', self.file_name), 'x', encoding='utf-8').close()
         except OSError:
             pass
 
@@ -44,14 +45,12 @@ class ErrorReportingBot(BaseBot):
 
     def append(self, text):
         with self.file_lock:
-            # xxx: os.path
-            with open('..\\%s' % self.file_name, 'a', encoding='utf-8') as f:
+            with open(os.path.join('..', self.file_name), 'a', encoding='utf-8') as f:
                 f.write(text)
 
     def save_file(self):
         with self.file_lock:
-            # xxx: os.path
-            with open('..\\%s' % self.file_name, 'r+', encoding='utf-8') as f:
+            with open(os.path.join('..', self.file_name), 'r+', encoding='utf-8') as f:
                 f.seek(0) # jump to the beginning
                 text = '\n'.join(f.read().splitlines()) # multi-platform
                 if text:

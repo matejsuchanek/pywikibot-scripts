@@ -18,6 +18,7 @@ class FakeReferencesBot(WikidataEntityBot):
     ref_props = ['P143', 'P248']
     use_from_page = False
     whitelist_props = ['P813']
+    # todo: P854
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
@@ -28,15 +29,17 @@ class FakeReferencesBot(WikidataEntityBot):
 
     def subgenerator(self):
         limit = self.getOption('limit')
-        from_item = pywikibot.ItemPage(self.repo, 'Q20651139')
-        for item in pagegenerators.WikibaseItemGenerator(from_item.backlinks(
-                total=limit, filterRedirects=False, namespaces=[0])):
-            yield item
-            if limit is not None:
-                limit -= 1
+        for ident in self.item_ids:
+            from_item = pywikibot.ItemPage(self.repo, ident)
+            for item in pagegenerators.WikibaseItemGenerator(
+                    from_item.backlinks(
+                        total=limit, filterRedirects=False, namespaces=[0])):
+                yield item
+                if limit is not None:
+                    limit -= 1
 
-        if limit == 0:
-            return
+            if limit == 0:
+                return
 
         for prop in self.ref_props:
             if limit == 0:
@@ -44,7 +47,7 @@ class FakeReferencesBot(WikidataEntityBot):
             # TODO: item_ids
             query = self.store.build_query(
                 'fake_references',
-                limit=limit or 10000,
+                limit=10 if limit is None else min(10, limit),
                 prop=prop)
             for item in pagegenerators.WikidataSPARQLPageGenerator(
                     query, site=self.repo):
