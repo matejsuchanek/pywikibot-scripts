@@ -8,7 +8,6 @@ from operator import methodcaller
 from pywikibot import pagegenerators
 from pywikibot.bot import SkipPageError
 from pywikibot.data.sparql import SparqlQuery
-from pywikibot.tools import OrderedDict
 
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot

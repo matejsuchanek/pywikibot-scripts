@@ -1,0 +1,10 @@
+SELECT DISTINCT ?item {
+  ?item p:%(prop)s ?statement1, ?statement2 FILTER( ?statement2 != ?statement1 ) .
+  ?statement1 psv:%(prop)s [ wikibase:timeValue ?val1; wikibase:timePrecision ?prec1 ] .
+  ?statement2 psv:%(prop)s [ wikibase:timeValue ?val2; wikibase:timePrecision ?prec2 ] .
+  FILTER( ?prec1 < ?prec2 ) .
+  FILTER( YEAR( ?val1 ) = YEAR( ?val2 ) ) .
+  FILTER( ?prec1 = 9 || MONTH( ?val1 ) = MONTH( ?val2 ) ) .
+  MINUS { ?statement1 prov:wasDerivedFrom/!pr:P143 [] } .
+  MINUS { ?item p:%(prop)s [ wikibase:rank wikibase:PreferredRank, wikibase:DeprecatedRank ] } .
+}
