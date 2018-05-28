@@ -16,7 +16,7 @@ class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
 
     labs_url = 'https://tools.wmflabs.org'
     sub_directory = 'wikidata-redirects-conflicts-reports/reports'
-    namespaces = set((0, 10, 14))
+    namespaces = {0, 10, 14}
     ignore = {'ignore_save_related_errors': True,
               'ignore_server_errors': True,
               }

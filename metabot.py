@@ -137,7 +137,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
 
         keys = set(self.func_dict.keys()) & set(params.keys())
         # formatter URL must go before example
-        if set(['formatter URL', 'example']) <= keys:
+        if {'formatter URL', 'example'} <= keys:
             keys = list(keys)
             keys.remove('formatter URL')
             keys.insert(0, 'formatter URL')

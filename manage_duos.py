@@ -6,11 +6,13 @@ import pywikibot
 from operator import methodcaller
 
 from pywikibot import pagegenerators
-
 from pywikibot.bot import SkipPageError
+from pywikibot.data.sparql import SparqlQuery
+from pywikibot.tools import OrderedDict
 
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
+
 
 class DuosManagingBot(WikidataEntityBot):
 
@@ -20,8 +22,8 @@ class DuosManagingBot(WikidataEntityBot):
         'bg': ' и ',
         'br': ' ha ',
         'ca': ' i ',
-        #'ceb':
         'cs': ' a ',
+        'cy': ' a ',
         'da': ' og ',
         'de': ' und ',
         'el': ' και ',
@@ -34,17 +36,20 @@ class DuosManagingBot(WikidataEntityBot):
         'fi': ' ja ',
         'fr': ' et ',
         'fy': ' en ',
+        'gl': ' e ',
         'hr': ' i ',
         'hu': ' és ',
         'id': ' dan ',
         'it': ' e ',
-        #'ja':
         'ka': ' და ',
         'la': ' et ',
+        'lt': ' ir ',
+        'lv': ' un ',
         'ms': ' dan ',
         'nb': ' og ',
         'nl': ' en ',
-        #'nn':
+        'nn': ' og ',
+        'oc': ' e ',
         'pl': ' i ',
         'pt': ' e ',
         'ro': ' și ',
@@ -54,12 +59,16 @@ class DuosManagingBot(WikidataEntityBot):
         'sr': ' и ',
         'sv': ' och ',
         'tr': ' ve ',
-        #'uk':
+        'uk': ' і ',
         'vi': ' và ',
-        #'war':
-        #'zh':
+        'war': ' ngan ',
     }
     distribute_properties = ('P21', 'P22', 'P25', 'P27', 'P106',)
+    class_to_relation = [
+        ('Q14756018', 'twin'),
+        ('Q14073567', 'sibling'),
+        ('Q3046146', 'spouse'),
+    ]
     relation_map = {
         #'partner': 'P451', todo
         'sibling': 'P3373',
@@ -76,6 +85,7 @@ class DuosManagingBot(WikidataEntityBot):
         })
         super(DuosManagingBot, self).__init__(**kwargs)
         self.store = QueryStore()
+        self.sparql = SparqlQuery(repo=self.repo)
 
     def init_page(self, item):
         super(DuosManagingBot, self).init_page(item)
@@ -92,26 +102,12 @@ class DuosManagingBot(WikidataEntityBot):
             pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo,
                                                        result_type=tuple))
 
-    def get_relation(self, item, prop, cache, step):
-        # TODO: use ASK query
-        if step > 6:
-            return None
-        for claim in item.get()['claims'].get(prop, []):
-            if claim.target_equals('Q15618652'):
-                continue
-            if claim.target_equals('Q14756018'):
-                return 'twin'
-            if claim.target_equals('Q3046146'):
-                return 'spouse'
-            if claim.target_equals('Q14073567'):
-                return 'sibling'
-            target = claim.getTarget()
-            if target in cache:
-                return None
-            cache.append(target)
-            relation = self.get_relation(target, 'P279', cache, step + 1)
-            if relation:
-                return relation
+    def get_relation(self, item):
+        ask_pattern = 'ASK { wd:%s wdt:P31/wdt:P279* wd:%%s }' % item.id
+        for key, rel in self.class_to_relation:
+            if self.sparql.ask(ask_pattern % rel):
+                return rel
+        return None
 
     def get_labels(self, item, relation):
         labels = [{}, {}]
@@ -144,9 +140,13 @@ class DuosManagingBot(WikidataEntityBot):
         return labels
 
     def treat_page_and_item(self, page, item):
-        relation = self.get_relation(item, 'P31', [], 0)
+        relation = self.get_relation(item)
         labels = self.get_labels(item, relation)
         count = max(map(len, labels))
+        if count == 0:
+            pywikibot.output('No labels, skipping...')
+            return
+
         if count < self.getOption('min_labels'):
             pywikibot.output('Too few labels (%i), skipping...' % count)
             return
@@ -164,7 +164,7 @@ class DuosManagingBot(WikidataEntityBot):
         items = [self.create_item(item, data, relation, to_add)
                  for data in labels]
         if self.relation_map.get(relation):
-            for i in reversed(range(2)):
+            for i in [1, 0]:
                 claim = pywikibot.Claim(self.repo, self.relation_map[relation])
                 claim.setTarget(items[1-i])
                 self.user_add_claim(items[i], claim)
@@ -215,6 +215,7 @@ class DuosManagingBot(WikidataEntityBot):
                     item.title(asLink=True, insite=self.repo)))
         return new_item
 
+
 def main(*args):
     options = {}
     for arg in pywikibot.handle_args(args):
@@ -227,6 +228,7 @@ def main(*args):
 
     bot = DuosManagingBot(**options)
     bot.run()
+
 
 if __name__ == '__main__':
     main()

@@ -243,7 +243,7 @@ class SingleLineCategories(CCHandledError):
 
 class NoEndSquareBrackets(CheckWikiError): # fixme
 
-    exceptions = list(set(CheckWikiError.exceptions) - set(['startspace']))
+    exceptions = list(set(CheckWikiError.exceptions) - {'startspace'})
     needsFirst = [86, 103]
     number = 10
     summary = 'oprava syntaxe odkazu'
@@ -623,7 +623,7 @@ class SelfLink(CheckWikiError):
 
     def apply(self, text, page):
         exceptions = list(set(self.exceptions + [
-            'imagemap', 'includeonly', 'timeline']) - set(['startspace']))
+            'imagemap', 'includeonly', 'timeline']) - {'startspace'})
         title = page.title()
         return textlib.replaceExcept(
             text, r"(?P<before>''')?\[\[(?P<inside>[^]]+)\]\](?P<after>''')?",
@@ -1090,7 +1090,7 @@ class InternalLink(CCHandledError):
 
 class DoubleHttp(CheckWikiError):
 
-    exceptions = list(set(CheckWikiError.exceptions) - set(['startspace']))
+    exceptions = list(set(CheckWikiError.exceptions) - {'startspace'})
     number = 93
     summary = 'oprava externího odkazu'
 

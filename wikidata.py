@@ -63,7 +63,7 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
 
     def _move_alias_to_label(self, item, data):
         if data is None:
-            return False
+            return False  # fixme
         labels = {}
         aliases = {}
         keys = set(item.aliases.keys())
@@ -92,12 +92,13 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         dont = set(item.descriptions.keys()) | set(item.labels.keys())
         dont |= set(skip)
         for dbname, title in item.sitelinks.items():
+            if set(title) & set(',/:'):  # fixme
+                continue
             parts = dbname.partition('wik')
-            if parts[0] in ('commons', 'wikidata', 'species', 'media', 'meta'):
+            lang = parts[0]
+            if lang in ('commons', 'wikidata', 'species', 'media', 'meta'):
                 continue
-            if set(title) & set(',:'):
-                continue
-            lang = self.normalize_lang(parts[0])
+            lang = self.normalize_lang(lang)
             if lang and lang not in dont:
                 if lang in labels:
                     dont.add(lang)
@@ -106,7 +107,9 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
                     labels[lang] = title.partition(' (')[0]
         return labels
 
-    def _fix_languages(self, item, data):
+    #def _get_invalid_labels
+
+    def _fix_languages(self, item, data):  # todo
         ret = False
 ##        if hasattr(item, 'labels'):
 ##            data.setdefault('labels', {})
@@ -138,8 +141,6 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         return False
 
     def _fix_quantities(self, item, data):
-        if data is None:
-            return False
         all_claims = set()
         for prop, claims in item.claims.items():
             for claim in claims:
@@ -149,7 +150,7 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
                     for snak in snaks:
                         if self._fix_quantity(snak):
                             all_claims.add(claim)
-        if all_claims:
+        if data is not None and all_claims:
             data.setdefault('claims', []).extend(
                 cl.toJSON() for cl in all_claims)
         return bool(all_claims)

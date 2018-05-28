@@ -93,7 +93,7 @@ class FakeReferencesBot(WikidataEntityBot):
             keys = set(source.keys())
             if prop not in keys:
                 continue
-            if keys - (set(self.whitelist_props) | set([prop])):
+            if keys - (set(self.whitelist_props) | {prop}):
                 continue
             if len(source[prop]) > 1:
                 #continue?
@@ -103,7 +103,7 @@ class FakeReferencesBot(WikidataEntityBot):
             items = list(self.item_ids) + [target]
             if any(fake.target_equals(tgt) for tgt in items):
                 good_sources = list(chain.from_iterable(
-                    source[p] for p in keys - set([prop])))
+                    source[p] for p in keys - {prop}))
                 snak = pywikibot.Claim(
                     self.repo, self.inferred_from, isReference=True)
                 snak.setTarget(target)

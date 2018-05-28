@@ -493,7 +493,7 @@ class InterwikiFix(Fix):
             return
 
         sitelinks = item.iterlinks(family=page.site.family)
-        new_sites = set(iw_links.keys()) - set(page.site for page in sitelinks)
+        new_sites = set(iw_links.keys()) - {page.site for page in sitelinks}
         if len(new_sites) == len(iw_links):
             return
 
@@ -811,8 +811,7 @@ class SectionsFix(LazyFix):
 
     def check_levels(self, sections, code):
         do_more = False
-        mixed_levels = set([2, 3]) <= set(sect['nodes'][0].level
-                                          for sect in sections)
+        mixed_levels = {2, 3} <= {sect['nodes'][0].level for sect in sections}
         if mixed_levels:
             if self.root_header not in map(itemgetter('name'), sections):
                 new_header = '== %s ==\n' % self.root_header

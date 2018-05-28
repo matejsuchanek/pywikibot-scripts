@@ -11,6 +11,7 @@ from pywikibot.pagegenerators import (
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 
+
 class ExternalIdSlicingBot(WikidataEntityBot):
 
     blacklist = ['P2013']
@@ -117,7 +118,7 @@ class ExternalIdSlicingBot(WikidataEntityBot):
         value = pywikibot.page.url2unicode(url)
         split = formatter.split('$1')
         if not value.startswith(split[0]):
-            return
+            return None
         if not split[1]:
             return value[len(split[0]):].rstrip('/')
 
@@ -126,18 +127,21 @@ class ExternalIdSlicingBot(WikidataEntityBot):
         try:
             index = value.index(split[1], len(split[0]))
         except ValueError:
-            return
+            return None
         else:
             return value[len(split[0]):index].rstrip('/')
 
     def exit(self):
-        super(ExternalIdSlicingBot, self).exit()
         if self.failed:
-            pywikibot.output('\nFailed items:')
             for prop, items in self.failed.items():
-                pywikibot.output('* [[Property:%s]]:' % prop)
+                text += '* [[Property:%s]]:\n' % prop
                 for item in items:
-                    pywikibot.output('** [[%s]]' % item.title())
+                    text += '** [[%s]]\n' % item.title()
+            page = pywikibot.Page(
+                self.repo, 'User:%s/Wrong external ids' % self.repo.username())
+            page.put(text)
+        super(ExternalIdSlicingBot, self).exit()
+
 
 def main(*args):
     options = {}
@@ -152,6 +156,7 @@ def main(*args):
     site = pywikibot.Site('wikidata', 'wikidata')
     bot = ExternalIdSlicingBot(site=site, **options)
     bot.run()
+
 
 if __name__ == '__main__':
     main()
