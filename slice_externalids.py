@@ -133,6 +133,7 @@ class ExternalIdSlicingBot(WikidataEntityBot):
 
     def exit(self):
         if self.failed:
+            text = ''
             for prop, items in self.failed.items():
                 text += '* [[Property:%s]]:\n' % prop
                 for item in items:

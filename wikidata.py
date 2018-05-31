@@ -20,9 +20,11 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         'be_x_old': 'be-tarask',
         'bh': 'bho',
         'fiu_vro': 'vro',
+        'meta': 'en',
         'no': 'nb',
         'roa_rup': 'rup',
         'simple': None,
+        'species': 'en',
         'zh_classical': 'lzh',
         'zh_min_nan': 'nan',
         'zh_yue': 'yue',
@@ -89,14 +91,15 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
 
     def _get_missing_labels(self, item, skip):
         labels = {}
-        dont = set(item.descriptions.keys()) | set(item.labels.keys())
+        dont = set(item.labels.keys()) | set(item.descriptions.keys())
         dont |= set(skip)
         for dbname, title in item.sitelinks.items():
-            if set(title) & set(',/:'):  # fixme
+            has_colon = ':' in title
+            if not has_colon and '/' in title:
                 continue
             parts = dbname.partition('wik')
             lang = parts[0]
-            if lang in ('commons', 'wikidata', 'species', 'media', 'meta'):
+            if lang in {'commons', 'wikidata', 'media'}:
                 continue
             lang = self.normalize_lang(lang)
             if lang and lang not in dont:
@@ -104,7 +107,9 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
                     dont.add(lang)
                     labels.pop(lang)
                 else:
-                    labels[lang] = title.partition(' (')[0]
+                    if not has_colon and title.endswith(')'):
+                        title = title.partition(' (')[0]
+                    labels[lang] = title
         return labels
 
     #def _get_invalid_labels
