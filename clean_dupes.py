@@ -15,7 +15,7 @@ from scripts.revertbot import BaseRevertBot # fixme: integrate to Merger
 
 class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
 
-    dupe_item = ('Q17362920', 'Q28065731', )
+    dupe_item = {'Q17362920', 'Q28065731'}
     use_from_page = False
 
     def __init__(self, offset=0, **kwargs):
@@ -74,7 +74,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
             if claim.target.id not in self.dupe_item:
                 continue
             claims.append(claim)
-            for prop in ['P460', 'P642']:
+            for prop in {'P460', 'P642'}:
                 for snak in claim.qualifiers.get(prop, []):
                     if snak.snaktype == 'value':
                         targets.add(snak.getTarget())
@@ -143,7 +143,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
                 continue
             if claim.target.id not in self.dupe_item:
                 continue
-            for prop in ['P460', 'P642']:
+            for prop in {'P460', 'P642'}:
                 for snak in claim.qualifiers.get(prop, []):
                     if snak.snaktype != 'value':
                         continue
@@ -205,6 +205,7 @@ def main(*args):
     site = pywikibot.Site('wikidata', 'wikidata')
     bot = DupesMergingBot(site=site, **options)
     bot.run()
+
 
 if __name__ == '__main__':
     main()

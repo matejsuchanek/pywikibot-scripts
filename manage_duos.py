@@ -62,7 +62,9 @@ class DuosManagingBot(WikidataEntityBot):
         'vi': ' và ',
         'war': ' ngan ',
     }
-    distribute_properties = ('P21', 'P22', 'P25', 'P27', 'P106',)
+    distribute_properties = {
+        'P21', 'P22', 'P25', 'P27', 'P40', 'P53', 'P106', 'P1412',
+    }
     class_to_relation = [
         ('Q14756018', 'twin'),
         ('Q14073567', 'sibling'),
@@ -98,8 +100,7 @@ class DuosManagingBot(WikidataEntityBot):
         kwargs = {'class': self.getOption('class')}
         query = self.store.build_query('duos', **kwargs)
         return pagegenerators.PreloadingEntityGenerator(
-            pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo,
-                                                       result_type=tuple))
+            pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo))
 
     def get_relation(self, item):
         ask_pattern = 'ASK { wd:%s wdt:P31/wdt:P279* wd:%%s }' % item.id

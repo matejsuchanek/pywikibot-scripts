@@ -37,7 +37,7 @@ class DuplicateDatesBot(WikidataEntityBot):
     @staticmethod
     def first_inside_second(first, second):
         if first.precision > second.precision:
-            if second.precision in (9, 10):
+            if second.precision in {9, 10}:
                 if first.year == second.year:
                     if second.precision == 9:
                         return True

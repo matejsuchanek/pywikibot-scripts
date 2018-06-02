@@ -106,20 +106,42 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
                 if lang in labels:
                     dont.add(lang)
                     labels.pop(lang)
-                else:
-                    if not has_colon and title.endswith(')'):
-                        title = title.partition(' (')[0]
-                    labels[lang] = title
+                    continue
+                if not has_colon:
+                    if title.endswith(')'):
+                        left, sep, right = title.rpartition(' (')
+                        if left and not (set(left) & set('()')):
+                            title = left
+                labels[lang] = title
         return labels
-
-    #def _get_invalid_labels
 
     def _fix_languages(self, item, data):  # todo
         ret = False
-##        if hasattr(item, 'labels'):
-##            data.setdefault('labels', {})
-##        if hasattr(item, 'descriptions'):
-##            data.setdefault('descriptions', {})
+        terms = {'labels': {}, 'descriptions': {}, 'aliases': {}}
+        if hasattr(item, 'labels'):
+            for lang, norm in lang_map.items():
+                label = item.labels.get(lang)
+                if label:
+                    if norm in item.labels:
+                        pass  # todo: to aliases
+                    else:
+                        terms['labels'][norm] = label
+                        terms['labels'][lang] = ''
+                        ret = True
+        if hasattr(item, 'descriptions'):
+            for lang, norm in lang_map.items():
+                description = item.descriptions.get(lang)
+                if description:
+                    if norm not in item.descriptions:
+                        terms['description'][norm] = description
+                    terms['description'][lang] = ''
+                        ret = True
+        if data is None:
+            item.labels.update(terms['labels'])
+            item.descriptions.update(terms['descriptions'])
+        else:
+            data.setdefault('labels', {}).update(terms['labels'])
+            data.setdefault('descriptions', {}).update(terms['descriptions'])
         return ret
 
     def _add_missing_labels(self, item, data):
@@ -129,7 +151,35 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
             skip = set(data.get('labels', {}).keys())
         labels = self._get_missing_labels(item, skip)
         if labels:
-            #print(list(labels.keys()))
+            if data is None:
+                for lang, label in labels.items():
+                    item.labels[lang] = label
+            else:
+                data.setdefault('labels', {}).update(labels)
+        return bool(labels)
+
+    def _get_labels_to_update(self, item, skip):
+        labels = {}
+        dont = set(item.labels.keys()) | set(skip)
+        for lang, label in item.labels.items():
+            if lang in dont:
+                continue
+            description = item.descriptions.get(lang)
+            if not description:
+                continue
+            left, sep, right = label.rpartition(' (')
+            if left and not (set(left) & set('()')):
+                if right.rstrip(')') in description:
+                    labels[lang] = left.strip()
+        return labels
+
+    def _clean_up_labels(self, item, data):
+        if data is None:
+            skip = set()
+        else:
+            skip = set(data.get('labels', {}).keys())
+        labels = self._get_labels_to_update(item, skip)
+        if labels:
             if data is None:
                 for lang, label in labels.items():
                     item.labels[lang] = label
@@ -165,9 +215,11 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         if self.cc:
             cleanup = self._fix_languages(item, data) or cleanup
         if self.cc and hasattr(item, 'labels'):
-            cleanup = self._move_alias_to_label(item, data) or cleanup
+            pass  # cleanup = self._move_alias_to_label(item, data) or cleanup
         if self.cc and hasattr(item, 'sitelinks'):
             cleanup = self._add_missing_labels(item, data) or cleanup
+        if self.cc and hasattr(item, 'labels'):
+            cleanup = self._clean_up_labels(item, data) or cleanup
         if self.cc and hasattr(item, 'claims'):
             cleanup = self._fix_quantities(item, data) or cleanup
         if cleanup and kwargs.get('summary'):
