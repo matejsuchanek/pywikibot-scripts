@@ -19,12 +19,15 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         'bat_smg': 'sgs',
         'be_x_old': 'be-tarask',
         'bh': 'bho',
+        'commons': None,
         'fiu_vro': 'vro',
+        'media': None,
         'meta': 'en',
         'no': 'nb',
         'roa_rup': 'rup',
         'simple': None,
         'species': 'en',
+        'wikidata': None,
         'zh_classical': 'lzh',
         'zh_min_nan': 'nan',
         'zh_yue': 'yue',
@@ -65,7 +68,7 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
 
     def _move_alias_to_label(self, item, data):
         if data is None:
-            return False  # fixme
+            return False  # fixme: T194512
         labels = {}
         aliases = {}
         keys = set(item.aliases.keys())
@@ -75,15 +78,17 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         for lang in keys:
             if len(item.aliases[lang]) == 1:
                 labels[lang] = item.aliases[lang][0]
-                aliases[lang] = {'language': lang, 'remove': '',
-                                 'value': item.aliases[lang][0]}
+                aliases[lang] = {
+                    'language': lang, 'remove': '',
+                    'value': item.aliases[lang][0]}  # fixme: T194512
         if labels and aliases:
             data.setdefault('labels', {}).update(labels)
             data.setdefault('aliases', {}).update(aliases)
         return bool(labels) and bool(aliases)
 
-    def normalize_lang(self, lang):
-        lang = self.lang_map.get(lang, lang)
+    @classmethod
+    def normalize_lang(cls, lang):
+        lang = cls.lang_map.get(lang, lang)
         if lang:
             return lang.replace('_', '-')
         else:
@@ -91,57 +96,68 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
 
     def _get_missing_labels(self, item, skip):
         labels = {}
-        dont = set(item.labels.keys()) | set(item.descriptions.keys())
-        dont |= set(skip)
+        dont = set(item.labels.keys()) | set(skip)
         for dbname, title in item.sitelinks.items():
             has_colon = ':' in title
             if not has_colon and '/' in title:
                 continue
             parts = dbname.partition('wik')
-            lang = parts[0]
-            if lang in {'commons', 'wikidata', 'media'}:
-                continue
-            lang = self.normalize_lang(lang)
+            lang = self.normalize_lang(parts[0])
             if lang and lang not in dont:
                 if lang in labels:
                     dont.add(lang)
                     labels.pop(lang)
                     continue
-                if not has_colon:
+                if not has_colon:  # todo: refact. with _get_labels_to_update
                     if title.endswith(')'):
                         left, sep, right = title.rpartition(' (')
-                        if left and not (set(left) & set('()')):
+                        if left and not (set(left) & set('(:)')):
                             title = left
                 labels[lang] = title
         return labels
 
-    def _fix_languages(self, item, data):  # todo
+    def _fix_languages(self, item, data):
         ret = False
         terms = {'labels': {}, 'descriptions': {}, 'aliases': {}}
         if hasattr(item, 'labels'):
-            for lang, norm in lang_map.items():
+            for lang, norm in self.lang_map.items():
                 label = item.labels.get(lang)
-                if label:
-                    if norm in item.labels:
-                        pass  # todo: to aliases
-                    else:
-                        terms['labels'][norm] = label
-                        terms['labels'][lang] = ''
-                        ret = True
+                if not label:
+                    continue
+                if norm in item.labels:
+                    terms['aliases'].setdefault(norm, []).append(label)
+                else:
+                    terms['labels'][norm] = label
+                terms['labels'][lang] = ''
+                ret = True
         if hasattr(item, 'descriptions'):
-            for lang, norm in lang_map.items():
+            for lang, norm in self.lang_map.items():
                 description = item.descriptions.get(lang)
                 if description:
                     if norm not in item.descriptions:
-                        terms['description'][norm] = description
-                    terms['description'][lang] = ''
-                        ret = True
+                        terms['descriptions'][norm] = description
+                    terms['descriptions'][lang] = ''
+                    ret = True
+##        if hasattr(item, 'aliases'):  # fixme: T194512
+##            for lang, norm in self.lang_map.items():
+##                aliases = item.aliases.get(lang)
+##                if aliases:
+##                    terms['aliases'].setdefault(norm, []).extend(aliases)
+##                    ret = True
         if data is None:
-            item.labels.update(terms['labels'])
-            item.descriptions.update(terms['descriptions'])
+            cur_labels = item.labels
+            cur_descriptions = item.descriptions
+            cur_aliases = item.aliases
         else:
-            data.setdefault('labels', {}).update(terms['labels'])
-            data.setdefault('descriptions', {}).update(terms['descriptions'])
+            cur_labels = item.setdefault('labels', {})
+            cur_descriptions = item.setdefault('descriptions', {})
+            cur_aliases = item.setdefault('aliases', {})
+        cur_labels.update(terms['labels'])
+        cur_descriptions.update(terms['descriptions'])
+        for lang, aliases in terms['aliases'].items():
+            for alias in aliases:
+                if alias not in cur_aliases.get(lang, []):
+                    cur_aliases.setdefault(lang, []).append(alias)
         return ret
 
     def _add_missing_labels(self, item, data):
@@ -158,18 +174,27 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
                 data.setdefault('labels', {}).update(labels)
         return bool(labels)
 
+    @staticmethod
+    def can_strip(part, description):
+        if part not in description:  # todo: word to word, not just substring
+            for sub in part.split(', '):
+                if sub not in description:
+                    return False
+        return True
+
     def _get_labels_to_update(self, item, skip):
         labels = {}
-        dont = set(item.labels.keys()) | set(skip)
         for lang, label in item.labels.items():
-            if lang in dont:
+            if lang in skip:
                 continue
             description = item.descriptions.get(lang)
             if not description:
                 continue
-            left, sep, right = label.rpartition(' (')
-            if left and not (set(left) & set('()')):
-                if right.rstrip(')') in description:
+            left, sep, right = label.rstrip(')').rpartition(' (')
+            if not sep:
+                left, sep, right = label.partition(', ')
+            if sep and not (set(left) & set('(:)')):
+                if self.can_strip(right, description):
                     labels[lang] = left.strip()
         return labels
 
