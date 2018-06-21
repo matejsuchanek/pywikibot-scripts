@@ -16,6 +16,7 @@ save_summary = {
     'en': 'removed link to a non-existing Commons category',
 }
 
+
 class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallbacksBot):
 
     def __init__(self, **kwargs):
@@ -26,9 +27,12 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
         })
         super(CommonscatCleaningBot, self).__init__(**kwargs)
         self.commons = pywikibot.Site('commons', 'commons')
+
+    def setup(self):
+        super(CommonscatCleaningBot, self).setup()
         self.cacheSources()
 
-    def treat_page(self):
+    def treat_page(self):  # todo: treat_page_and_item
         page = self.current_page
         item = page.data_item()
         item.get()
@@ -104,6 +108,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
             self.user_add_claim(item, claim, page.site, asynchronous=True)
             self.addCallback(page.touch, botflag=True)
 
+
 def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
@@ -128,7 +133,7 @@ def main(*args):
             return
 
         if not category:
-            pywikibot.output('%s doesn\'t have an appropriate category' % site)
+            pywikibot.output("%s doesn't have an appropriate category" % site)
             return
 
         gen_combined = pagegenerators.CombinedPageGenerator(
@@ -137,6 +142,7 @@ def main(*args):
 
     bot = CommonscatCleaningBot(generator, site=site, **options)
     bot.run()
+
 
 if __name__ == '__main__':
     main()

@@ -78,7 +78,7 @@ class FakeReferencesBot(WikidataEntityBot):
         ret = False
         if not claim.sources or claim.type != 'wikibase-item':
             return ret
-        if claim.id == 'P1343' and 'P805' in claim.qualifiers.keys():
+        if claim.id == 'P1343' and 'P805' in claim.qualifiers:
             return ret  # todo
         target = claim.getTarget()
         if not target:

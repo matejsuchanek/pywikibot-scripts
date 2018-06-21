@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
+"""This script is obsolete!"""
 import pywikibot
 
 from pywikibot import pagegenerators
 
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
+
 
 class UnitsFixingBot(WikidataEntityBot):
 
@@ -18,14 +20,14 @@ class UnitsFixingBot(WikidataEntityBot):
     @property
     def generator(self):
         query = self.store.build_query('units', good=self.good_item)
-        return pagegenerators.PreloadingItemGenerator(
+        return pagegenerators.PreloadingEntityGenerator(
             pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo))
 
     def filterProperty(self, prop_page):
         if prop_page.type != 'quantity':
             return False
         prop_page.get()
-        if 'P2237' not in prop_page.claims.keys():
+        if 'P2237' not in prop_page.claims:
             return False
         for claim in prop_page.claims['P2237']:
             if claim.snaktype == 'novalue':
@@ -92,6 +94,7 @@ class UnitsFixingBot(WikidataEntityBot):
                 snak.setTarget(target)
         return changed
 
+
 def main(*args):
     options = {}
     for arg in pywikibot.handle_args(args):
@@ -105,6 +108,7 @@ def main(*args):
     site = pywikibot.Site('wikidata', 'wikidata')
     bot = UnitsFixingBot(site=site, **options)
     bot.run()
+
 
 if __name__ == '__main__':
     main()

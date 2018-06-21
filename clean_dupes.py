@@ -13,6 +13,7 @@ from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 from scripts.revertbot import BaseRevertBot # fixme: integrate to Merger
 
+
 class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
 
     dupe_item = {'Q17362920', 'Q28065731'}
@@ -29,7 +30,6 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
         self.save_lock = Lock()
         self.access_lock = Lock()
         self.site_locks = {}
-        self.init_workers()
 
     @property
     def generator(self):
@@ -39,7 +39,8 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
             pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo,
                                                        result_type=list))
 
-    def init_workers(self):
+    def setup(self):
+        super(DupesMergingBot, self).setup()
         count = self.getOption('threads')
         self.queue = Queue(count)
         self.workers = []
@@ -58,9 +59,11 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
 
     def init_page(self, item):
         self.offset += 1
-        super(DupesMergingBot, self).init_page(item)
-        if 'P31' not in item.claims:
-            raise SkipPageError(item, 'Missing P31 property')
+        return super(DupesMergingBot, self).init_page(item)
+
+    def skip_page(self, item):
+        return super(DupesMergingBot, self).skip_page(item) or (
+            'P31' not in item.claims)
 
     def treat_page_and_item(self, page, item):
         self.queue.put(item)
@@ -98,7 +101,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
             pywikibot.warning('Target %s is redirect' % target.getID())
             target = target.getRedirectTarget()
 
-        if item.getID() == target.getID():
+        if item == target:
             self._save_page(item, self._save_entity, item.removeClaims, claims)
             return
 
@@ -181,12 +184,15 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
                 kwargs.pop('asynchronous')
             return callback(*args, **kwargs)
 
-    def exit(self):
+    def teardown(self):
         count = len(self.workers)
         for i in range(count):
             self.queue.put(None)
         for worker in self.workers:
             worker.join()
+        super(DupesMergingBot, self).teardown()
+
+    def exit(self):
         super(DupesMergingBot, self).exit()
         pywikibot.output('\nCurrent offset: %i (use %i)\n' % (
             self.offset, self.offset - self.offset % 50))

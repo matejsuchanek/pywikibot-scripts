@@ -9,12 +9,13 @@ from pywikibot.bot import SkipPageError
 from .error_reporting import ErrorReportingBot
 from .wikidata import WikidataEntityBot
 
+
 class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
 
     disambig_item = 'Q4167410'
     file_name = 'log_disambigs.txt'
     page_pattern = 'User:%s/Disambig_errors'
-    skip = [
+    skip = {
         'brwiki',
         'enwiki',
         'hakwiki',
@@ -25,7 +26,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
         'simplewikiquote',  # T180404
         'specieswiki',
         'towiki',
-    ]
+    }
     use_from_page = False
 
     def __init__(self, **kwargs):
@@ -37,16 +38,16 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
         })
         super(DisambigsCheckingBot, self).__init__(**kwargs)
 
-    def init_page(self, item):
-        super(DisambigsCheckingBot, self).init_page(item)
-        if item.title(asLink=True, insite=self.repo) in self.log_page.text:
-            raise SkipPageError(item, 'Already reported page')
+    def skip_page(self):
+        return super(DisambigsCheckingBot, self).skip_page(item) or (
+            item.title(asLink=True, insite=self.repo) in self.log_page.text or
+            not self.is_disambig(item))
 
+    def is_disambig(self, item):
         for claim in item.claims.get('P31', []):
             if claim.target_equals(self.disambig_item):
-                return
-
-        raise SkipPageError(item, 'Item is not a disambiguation')
+                return True
+        return False
 
     @property
     def generator(self):
@@ -78,7 +79,6 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
             apisite = pywikibot.site.APISite.fromDBName(dbname)
             page = pywikibot.Page(apisite, item.sitelinks[dbname])
             if not page.exists():
-                args = []
                 append_text += '\n** {} – {} – doesn\'t exist'.format(
                     dbname, page.title(asLink=True, insite=self.repo))
                 continue
@@ -108,6 +108,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
             append_text = prep + append_text
             self.append(append_text)
 
+
 def main(*args):
     options = {}
     for arg in pywikibot.handle_args(args):
@@ -121,6 +122,7 @@ def main(*args):
     site = pywikibot.Site('wikidata', 'wikidata')
     bot = DisambigsCheckingBot(site=site, **options)
     bot.run()
+
 
 if __name__ == '__main__':
     main()

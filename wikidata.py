@@ -3,6 +3,7 @@ import pywikibot
 
 from pywikibot.bot import NoRedirectPageBot, WikidataBot
 
+
 class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
 
     '''
@@ -149,9 +150,9 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
             cur_descriptions = item.descriptions
             cur_aliases = item.aliases
         else:
-            cur_labels = item.setdefault('labels', {})
-            cur_descriptions = item.setdefault('descriptions', {})
-            cur_aliases = item.setdefault('aliases', {})
+            cur_labels = data.setdefault('labels', {})
+            cur_descriptions = data.setdefault('descriptions', {})
+            cur_aliases = data.setdefault('aliases', {})
         cur_labels.update(terms['labels'])
         cur_descriptions.update(terms['descriptions'])
         for lang, aliases in terms['aliases'].items():

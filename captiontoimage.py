@@ -7,6 +7,7 @@ from pywikibot.bot import SkipPageError
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 
+
 class CaptionToImageBot(WikidataEntityBot):
 
     '''
@@ -37,17 +38,15 @@ class CaptionToImageBot(WikidataEntityBot):
     def filterProperty(self, prop_page):
         return prop_page.type == 'commonsMedia'
 
-    def init_page(self, item):
-        super(CaptionToImageBot, self).init_page(item)
-        if self.caption_property not in item.claims.keys():
-            raise SkipPageError(
-                item, 'Missing %s property' % self.caption_property)
+    def skip_page(self, item):
+        return super(CaptionToImageBot, self).skip_page(item) or (
+            self.caption_property not in item.claims)
 
     def treat_page_and_item(self, page, item):
         our_prop = self.image_property
-        if our_prop not in item.claims.keys():
+        if our_prop not in item.claims:
             our_prop = None
-            for prop in item.claims.keys():
+            for prop in item.claims:
                 if self.checkProperty(prop):
                     if our_prop is None:
                         our_prop = prop
@@ -71,7 +70,7 @@ class CaptionToImageBot(WikidataEntityBot):
             return
 
         for caption in item.claims[self.caption_property]:
-            if self.caption_property in media_claim.qualifiers.keys():
+            if self.caption_property in media_claim.qualifiers:
                 language = caption.getTarget().language
                 has_same_lang = False
                 for claim in media_claim.qualifiers[self.caption_property]:
@@ -94,6 +93,7 @@ class CaptionToImageBot(WikidataEntityBot):
             self._save_page(item, self._save_entity, item.removeClaims,
                             remove_claims, summary='removing redundant property')
 
+
 def main(*args):
     options = {}
     for arg in pywikibot.handle_args(args):
@@ -106,6 +106,7 @@ def main(*args):
 
     bot = CaptionToImageBot(**options)
     bot.run()
+
 
 if __name__ == '__main__':
     main()

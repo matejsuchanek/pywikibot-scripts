@@ -7,6 +7,7 @@ import threading
 
 from pywikibot.bot import BaseBot
 
+
 class ErrorReportingBot(BaseBot):
 
     file_name = None
@@ -50,21 +51,22 @@ class ErrorReportingBot(BaseBot):
 
     def save_file(self):
         with self.file_lock:
-            with open(os.path.join('..', self.file_name), 'r+', encoding='utf-8') as f:
-                f.seek(0) # jump to the beginning
-                text = '\n'.join(f.read().splitlines()) # multi-platform
+            with open(os.path.join('..', self.file_name),
+                      'r+', encoding='utf-8') as f:
+                f.seek(0)  # jump to the beginning
+                text = '\n'.join(f.read().splitlines())  # multi-platform
                 if text:
                     self.log_page.text += text
                     self.log_page.save(summary='update')
-                    f.seek(0) # jump to the beginning
-                    f.truncate() # and delete everything
+                    f.seek(0)  # jump to the beginning
+                    f.truncate()  # and delete everything
         with self.timer_lock:
             self.timer = threading.Timer(
                 self.getOption('interval'), self.save_file)
             self.timer.start()
 
-    def exit(self):
+    def teardown(self):
         with self.timer_lock:
             if self.timer:
                 self.timer.cancel()
-        super(ErrorReportingBot, self).exit()
+        super(ErrorReportingBot, self).teardown()

@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
+"""This script is obsolete!"""
 import pywikibot
 
 from pywikibot import pagegenerators
 
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
+
 
 class QualifiersFixingBot(WikidataEntityBot):
 
@@ -30,7 +32,7 @@ class QualifiersFixingBot(WikidataEntityBot):
             return False
 
         prop_page.get()
-        if 'P31' not in prop_page.claims.keys():
+        if 'P31' not in prop_page.claims:
             pywikibot.warning('%s is not classified' % prop_page.getID())
             return False
 
@@ -88,6 +90,7 @@ class QualifiersFixingBot(WikidataEntityBot):
             prop, 's' if len(props) > 1 else '', '%s and %s' % (
                 ', '.join(props[:-1]), props[-1]) if len(props) > 1 else props[0])
 
+
 def main(*args):
     options = {}
     for arg in pywikibot.handle_args(args):
@@ -101,6 +104,7 @@ def main(*args):
     site = pywikibot.Site('wikidata', 'wikidata')
     bot = QualifiersFixingBot(site=site, **options)
     bot.run()
+
 
 if __name__ == '__main__':
     main()

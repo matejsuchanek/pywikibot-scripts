@@ -14,7 +14,7 @@ from .wikidata import WikidataEntityBot
 
 class ExternalIdSlicingBot(WikidataEntityBot):
 
-    blacklist = ['P2013']
+    blacklist = {'P2013'}
     use_from_page = False
 
     def __init__(self, **options):
@@ -53,7 +53,7 @@ class ExternalIdSlicingBot(WikidataEntityBot):
             if claims[0].type != 'external-id':
                 continue
             for cl in claims:
-                if not cl.target.startswith('http'):
+                if not cl.target or not cl.target.startswith('http'):
                     continue
                 formatter, regex = self.get_formatter_and_regex(prop)
                 if not formatter:
@@ -61,12 +61,16 @@ class ExternalIdSlicingBot(WikidataEntityBot):
                     break
                 value = self.find_value(cl.target, formatter)
                 if not value:
-                    pywikibot.output('Value not found in "%s" for property %s' % (
-                        cl.target, prop))
+                    pywikibot.output('Value not found in "%s" for property %s'
+                                     % (cl.target, prop))
                     self.failed.setdefault(prop, set()).add(item)
                     continue
                 if regex:
-                    match = re.match('(%s)' % regex, value)
+                    try:
+                        match = re.match('(%s)' % regex, value)
+                    except re.error:
+                        pywikibot.output('Couldn\'t apply regex "%s"' % regex)
+                        break
                     if not match:
                         pywikibot.output('Value "%s" not matched by regex '
                                          '"%s"' % (value, regex))
@@ -134,13 +138,13 @@ class ExternalIdSlicingBot(WikidataEntityBot):
     def exit(self):
         if self.failed:
             text = ''
-            for prop, items in self.failed.items():
+            for prop in sorted(self.failed):
                 text += '* [[Property:%s]]:\n' % prop
-                for item in items:
+                for item in sorted(self.failed[prop]):
                     text += '** [[%s]]\n' % item.title()
             page = pywikibot.Page(
                 self.repo, 'User:%s/Wrong external ids' % self.repo.username())
-            page.put(text)
+            page.put(text, summary='update')
         super(ExternalIdSlicingBot, self).exit()
 
 
