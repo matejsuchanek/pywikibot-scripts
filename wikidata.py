@@ -35,16 +35,19 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
     }
 
     def __init__(self, **kwargs):
+        self.availableOptions.update({
+            'nocleanup': False,
+        })
         self.bad_cache = set(kwargs.pop('bad_cache', []))
         self.good_cache = set(kwargs.pop('good_cache', []))
         super(WikidataEntityBot, self).__init__(**kwargs)
 
     def init_page(self, item):
-        super(WikidataEntityBot, self).init_page(item)
         try:
             item.get()
         except (pywikibot.NoPage, pywikibot.IsRedirectPage):
             pass
+        return super(WikidataEntityBot, self).init_page(item)
 
     def checkProperty(self, prop):
         if prop in self.good_cache:
@@ -80,8 +83,8 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
             if len(item.aliases[lang]) == 1:
                 labels[lang] = item.aliases[lang][0]
                 aliases[lang] = {
-                    'language': lang, 'remove': '',
-                    'value': item.aliases[lang][0]}  # fixme: T194512
+                    'language': lang, 'value': item.aliases[lang][0],
+                    'remove': ''}  # fixme: T194512
         if labels and aliases:
             data.setdefault('labels', {}).update(labels)
             data.setdefault('aliases', {}).update(aliases)
@@ -169,8 +172,7 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         labels = self._get_missing_labels(item, skip)
         if labels:
             if data is None:
-                for lang, label in labels.items():
-                    item.labels[lang] = label
+                item.labels.update(labels)
             else:
                 data.setdefault('labels', {}).update(labels)
         return bool(labels)
@@ -207,8 +209,7 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         labels = self._get_labels_to_update(item, skip)
         if labels:
             if data is None:
-                for lang, label in labels.items():
-                    item.labels[lang] = label
+                item.labels.update(labels)
             else:
                 data.setdefault('labels', {}).update(labels)
         return bool(labels)
@@ -238,15 +239,16 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
 
     def user_edit_entity(self, item, data=None, **kwargs):
         cleanup = False
-        if self.cc:
+        do_cleanup = self.cc and not self.getOption('nocleanup')
+        if do_cleanup:
             cleanup = self._fix_languages(item, data) or cleanup
-        if self.cc and hasattr(item, 'labels'):
+        if do_cleanup and hasattr(item, 'labels'):
             pass  # cleanup = self._move_alias_to_label(item, data) or cleanup
-        if self.cc and hasattr(item, 'sitelinks'):
+        if do_cleanup and hasattr(item, 'sitelinks'):
             cleanup = self._add_missing_labels(item, data) or cleanup
-        if self.cc and hasattr(item, 'labels'):
+        if do_cleanup and hasattr(item, 'labels'):
             cleanup = self._clean_up_labels(item, data) or cleanup
-        if self.cc and hasattr(item, 'claims'):
+        if do_cleanup and hasattr(item, 'claims'):
             cleanup = self._fix_quantities(item, data) or cleanup
         if cleanup and kwargs.get('summary'):
             kwargs['summary'] += '; cleanup'

@@ -5,8 +5,6 @@ import pywikibot
 
 from pywikibot import pagegenerators
 
-from itertools import chain
-
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 
@@ -18,7 +16,6 @@ class FakeReferencesBot(WikidataEntityBot):
     ref_props = ['P143', 'P248']
     use_from_page = False
     whitelist_props = ['P813']
-    # todo: P854
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
@@ -26,6 +23,7 @@ class FakeReferencesBot(WikidataEntityBot):
         })
         super(FakeReferencesBot, self).__init__(**kwargs)
         self.store = QueryStore()
+        self.url_start = self.repo.base_url(self.repo.article_path)
 
     def subgenerator(self):
         limit = self.getOption('limit')
@@ -76,18 +74,23 @@ class FakeReferencesBot(WikidataEntityBot):
 
     def handle_claim(self, claim):
         ret = False
-        if not claim.sources or claim.type != 'wikibase-item':
+        if not claim.sources:
             return ret
-        if claim.id == 'P1343' and 'P805' in claim.qualifiers:
-            return ret  # todo
-        target = claim.getTarget()
-        if not target:
-            return ret
-        for source in claim.sources:
-            ret = self.handle_source(claim, source, target) or ret
+        if claim.type == 'wikibase-item':
+            if claim.id == 'P1343' and 'P805' in claim.qualifiers:
+                target = claim.qualifiers['P805'][0].getTarget()
+            else:
+                target = claim.getTarget()
+            if not target:
+                return ret
+            for source in claim.sources:
+                ret = self.handle_source_item(source, target) or ret
+        else:
+            for source in claim.sources:
+                ret = self.handle_source_url(source) or ret
         return ret
 
-    def handle_source(self, claim, source, target):
+    def handle_source_item(self, source, target):
         ret = False
         for prop in self.ref_props:
             keys = set(source.keys())
@@ -102,8 +105,35 @@ class FakeReferencesBot(WikidataEntityBot):
             fake = next(iter(source[prop]))
             items = list(self.item_ids) + [target]
             if any(fake.target_equals(tgt) for tgt in items):
-                good_sources = list(chain.from_iterable(
-                    source[p] for p in keys - {prop}))
+                snak = pywikibot.Claim(
+                    self.repo, self.inferred_from, isReference=True)
+                snak.setTarget(target)
+                source.setdefault(self.inferred_from, []).append(snak)
+                source.pop(prop)
+                ret = True
+        return ret
+
+    def handle_source_url(self, source):
+        ret = False
+        for prop, snaks in list(source.items()):
+            if len(snaks) > 1:
+                continue
+            if snaks[0].type != 'url':
+                continue
+            url = snaks[0].getTarget()
+            if not url:
+                continue
+            target = None
+            try:
+                if url.startswith(self.url_start):
+                    target = pywikibot.ItemPage(
+                        self.repo, url[len(self.url_start):])
+                elif url.startswith(self.repo.concept_base_uri):
+                    target = pywikibot.ItemPage(
+                        self.repo, url[len(self.repo.concept_base_uri):])
+            except pywikibot.InvalidTitle:
+                pass
+            if target:
                 snak = pywikibot.Claim(
                     self.repo, self.inferred_from, isReference=True)
                 snak.setTarget(target)

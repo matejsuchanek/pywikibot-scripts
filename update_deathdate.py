@@ -7,7 +7,7 @@ import re
 from itertools import chain
 
 from pywikibot import i18n, textlib
-from pywikibot.bot import ExistingPageBot
+from pywikibot.bot import ExistingPageBot, SingleSiteBot, NoRedirectPageBot
 from pywikibot.pagegenerators import (
     PreloadingGenerator,
     SearchPageGenerator,
@@ -28,25 +28,24 @@ death = {
 replace_pattern = '[[{inside}]] ({left}{year1}{right}–{left}{year2}{right})'
 
 
-class DeathDateUpdatingBot(ExistingPageBot):
+class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
-            'always': True,
-            'year': 2018,
+            'year': 2018,  # todo: the current one
         })
         super(DeathDateUpdatingBot, self).__init__(**kwargs)
         self.categoryR = re.compile(i18n.translate(self.site, birth))
+        self.year = self.getOption('year')
 
     @property
     def generator(self):
-        year = self.getOption('year')
         while True:
             category = pywikibot.Category(
-                self.site, i18n.translate(self.site, death) % year)
+                self.site, i18n.translate(self.site, death) % self.year)
             for page in category.articles(content=True):
                 yield page
-            year -= 1
+            self.year -= 1
 
     def treat_page(self):
         page = self.current_page
@@ -85,7 +84,8 @@ class DeathDateUpdatingBot(ExistingPageBot):
             inside, left, year1, right = match.groups('')
             new_text = text[:match.start()]
             new_text += replace_pattern.format(
-                inside=inside, left=left, right=right, year1=year1, year2=year)
+                inside=inside, left=left, right=right, year1=year1,
+                year2=self.year)
             new_text += text[match.end():]
             self.userPut(ref_page, ref_page.text, new_text,
                          summary='doplnění data úmrtí')

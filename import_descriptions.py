@@ -116,11 +116,11 @@ class MissingDescriptionBot(BaseDescriptionBot):
                 break
 
 
-class MappingDescripitonBot(BaseDescriptionBot):
+class MappingDescriptionBot(BaseDescriptionBot):
 
     def __init__(self, **kwargs):
         super(MappingDescripitonBot, self).__init__(**kwargs)
-        self.regex = self.get_regex_for_title(r'[^\|\]]+')
+        self.regex = self.get_regex_for_title(r'[^\[\|\]]+')
 
     def get_pages_with_descriptions(self, text):
         data = {}
@@ -163,7 +163,7 @@ def main(*args):
 
     generator = genFactory.getCombinedGenerator(preload=True)
     if generator:
-        bot = MappingDescripitonBot(generator=generator, site=site, **options)
+        bot = MappingDescriptionBot(generator=generator, site=site, **options)
     else:
         bot = MissingDescriptionBot(site=site, **options)
     bot.run()
