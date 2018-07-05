@@ -1,0 +1,5 @@
+SELECT DISTINCT ?item {
+  VALUES ?host { <http://www.wikidata.org/> <https://www.wikidata.org/> } .
+  ?item ?p [ prov:wasDerivedFrom/pr:%(prop)s ?url ] .
+  FILTER( STRSTARTS( STR( ?url ), STR( ?host ) ) ) .
+} LIMIT %(limit)i

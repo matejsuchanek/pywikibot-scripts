@@ -14,6 +14,7 @@ class FakeReferencesBot(WikidataEntityBot):
     item_ids = ['Q2013', 'Q20651139']
     inferred_from = 'P3452'
     ref_props = ['P143', 'P248']
+    url_props = ['P854']
     use_from_page = False
     whitelist_props = ['P813']
 
@@ -39,19 +40,35 @@ class FakeReferencesBot(WikidataEntityBot):
             if limit == 0:
                 return
 
+        for prop in self.url_props:
+            ok = True
+            while ok and limit != 0:
+                ok = False
+                query = self.store.build_query(
+                    'fake_references_url',
+                    limit=100 if limit is None else min(100, limit),
+                    prop=prop)
+                for item in pagegenerators.WikidataSPARQLPageGenerator(
+                        query, site=self.repo):
+                    ok = True
+                    yield item
+                    if limit is not None:
+                        limit -= 1
+
         for prop in self.ref_props:
-            if limit == 0:
-                break
-            # TODO: item_ids
-            query = self.store.build_query(
-                'fake_references',
-                limit=10 if limit is None else min(10, limit),
-                prop=prop)
-            for item in pagegenerators.WikidataSPARQLPageGenerator(
-                    query, site=self.repo):
-                yield item
-                if limit is not None:
-                    limit -= 1
+            ok = True
+            while ok and limit != 0:
+                ok = False
+                query = self.store.build_query(
+                    'fake_references',
+                    limit=10 if limit is None else min(10, limit),
+                    prop=prop)
+                for item in pagegenerators.WikidataSPARQLPageGenerator(
+                        query, site=self.repo):
+                    ok = True
+                    yield item
+                    if limit is not None:
+                        limit -= 1
 
     @property
     def generator(self):
@@ -81,13 +98,11 @@ class FakeReferencesBot(WikidataEntityBot):
                 target = claim.qualifiers['P805'][0].getTarget()
             else:
                 target = claim.getTarget()
-            if not target:
-                return ret
-            for source in claim.sources:
-                ret = self.handle_source_item(source, target) or ret
-        else:
-            for source in claim.sources:
-                ret = self.handle_source_url(source) or ret
+            if target:
+                for source in claim.sources:
+                    ret = self.handle_source_item(source, target) or ret
+        for source in claim.sources:
+            ret = self.handle_source_url(source) or ret
         return ret
 
     def handle_source_item(self, source, target):
@@ -132,6 +147,8 @@ class FakeReferencesBot(WikidataEntityBot):
                     target = pywikibot.ItemPage(
                         self.repo, url[len(self.repo.concept_base_uri):])
             except pywikibot.InvalidTitle:
+                pass
+            except ValueError:
                 pass
             if target:
                 snak = pywikibot.Claim(

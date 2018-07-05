@@ -1,4 +1,5 @@
 SELECT DISTINCT ?item {
   ?item ?p [ prov:wasDerivedFrom/pr:%(prop)s ?target; ?ps ?target ] .
   ?ps ^wikibase:statementProperty [] .
+  ?target ?p [ ?ps ?item ] .
 } LIMIT %(limit)i

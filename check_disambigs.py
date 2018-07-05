@@ -73,13 +73,13 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
         count = len(item.sitelinks)
         if count == 0:
             append_text += '\n** no sitelinks'
-        for dbname in item.sitelinks.keys():
+        for dbname in item.sitelinks:
             if dbname in self.skip:
                 continue
             apisite = pywikibot.site.APISite.fromDBName(dbname)
             page = pywikibot.Page(apisite, item.sitelinks[dbname])
             if not page.exists():
-                append_text += '\n** {} – {} – doesn\'t exist'.format(
+                append_text += "\n** {} – {} – doesn't exist".format(
                     dbname, page.title(asLink=True, insite=self.repo))
                 continue
             if page.isRedirectPage():
@@ -92,7 +92,6 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
                     link = target_item.title(asLink=True, insite=self.repo)
                 if not target.isDisambig():
                     link += ', not a disambiguation'
-                sitename = apisite.sitename()
                 append_text += '\n** {} – {} – redirects to {} ({})'.format(
                     dbname, page.title(asLink=True, insite=self.repo),
                     target.title(asLink=True, insite=self.repo), link)
