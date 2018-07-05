@@ -16,7 +16,7 @@ class FakeReferencesBot(WikidataEntityBot):
     ref_props = ['P143', 'P248']
     url_props = ['P854']
     use_from_page = False
-    whitelist_props = ['P813']
+    whitelist_props = {'P813', 'P4656'}
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
@@ -46,7 +46,7 @@ class FakeReferencesBot(WikidataEntityBot):
                 ok = False
                 query = self.store.build_query(
                     'fake_references_url',
-                    limit=100 if limit is None else min(100, limit),
+                    limit=250 if limit is None else min(250, limit),
                     prop=prop)
                 for item in pagegenerators.WikidataSPARQLPageGenerator(
                         query, site=self.repo):
@@ -111,7 +111,7 @@ class FakeReferencesBot(WikidataEntityBot):
             keys = set(source.keys())
             if prop not in keys:
                 continue
-            if keys - (set(self.whitelist_props) | {prop}):
+            if keys - (self.whitelist_props | {prop}):
                 continue
             if len(source[prop]) > 1:
                 #continue?
@@ -130,12 +130,17 @@ class FakeReferencesBot(WikidataEntityBot):
 
     def handle_source_url(self, source):
         ret = False
-        for prop, snaks in list(source.items()):
-            if len(snaks) > 1:
+        for prop in self.url_props:
+            keys = set(source.keys())
+            if prop not in keys:
                 continue
-            if snaks[0].type != 'url':
+            if keys - (self.whitelist_props | {prop}):
                 continue
-            url = snaks[0].getTarget()
+            if len(source[prop]) > 1:
+                #continue?
+                return ret
+
+            url = next(iter(source[prop])).getTarget()
             if not url:
                 continue
             target = None
