@@ -11,7 +11,7 @@ from .wikidata import WikidataEntityBot
 
 class FakeReferencesBot(WikidataEntityBot):
 
-    item_ids = ['Q2013', 'Q20651139']
+    item_ids = ['Q2013']
     inferred_from = 'P3452'
     ref_props = ['P143', 'P248']
     url_props = ['P854']
@@ -46,7 +46,7 @@ class FakeReferencesBot(WikidataEntityBot):
                 ok = False
                 query = self.store.build_query(
                     'fake_references_url',
-                    limit=250 if limit is None else min(250, limit),
+                    limit=500 if limit is None else min(500, limit),
                     prop=prop)
                 for item in pagegenerators.WikidataSPARQLPageGenerator(
                         query, site=self.repo):
@@ -61,7 +61,7 @@ class FakeReferencesBot(WikidataEntityBot):
                 ok = False
                 query = self.store.build_query(
                     'fake_references',
-                    limit=10 if limit is None else min(10, limit),
+                    limit=100 if limit is None else min(100, limit),
                     prop=prop)
                 for item in pagegenerators.WikidataSPARQLPageGenerator(
                         query, site=self.repo):
