@@ -16,7 +16,7 @@ from scripts.revertbot import BaseRevertBot  # fixme: integrate to Merger
 
 class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
 
-    dupe_item = {'Q1263068', 'Q17362920', 'Q20511493', 'Q28065731'}
+    dupe_items = {'Q1263068', 'Q17362920', 'Q20511493', 'Q28065731'}
     use_from_page = False
 
     def __init__(self, offset=0, **kwargs):
@@ -34,7 +34,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
     @property
     def generator(self):
         query = self.store.build_query(
-            'dupes', dupe=' wd:'.join(self.dupe_item), offset=self.offset)
+            'dupes', dupe=' wd:'.join(self.dupe_items), offset=self.offset)
         return PreloadingEntityGenerator(WikidataSPARQLPageGenerator(
             query, site=self.repo, result_type=list))
 
@@ -47,6 +47,10 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
             thread = Thread(target=self.work)
             thread.start()
             self.workers.append(thread)
+
+    def get_lock_for(self, site):
+        with self.access_lock:
+            return self.site_locks.setdefault(site, Lock())
 
     def work(self):
         while True:
@@ -73,10 +77,10 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
         for claim in item.claims['P31']:
             if claim.snaktype != 'value':
                 continue
-            if claim.target.id not in self.dupe_item:
+            if claim.target.id not in self.dupe_items:
                 continue
             claims.append(claim)
-            for prop in {'P460', 'P642'}:
+            for prop in ['P460', 'P642']:
                 for snak in claim.qualifiers.get(prop, []):
                     if snak.snaktype == 'value':
                         targets.add(snak.getTarget())
@@ -86,8 +90,23 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
                 claims.append(claim)
                 targets.add(claim.getTarget())
 
+        sitelinks = []
         if not targets:
-            # todo: if not target, try links
+            for page in item.iterlinks():
+                site = page.site
+                with self.get_lock_for(site):
+                    if not page.exists():
+                        sitelinks.append(site)
+                        continue
+                    if page.isRedirectPage():
+                        try:
+                            target = page.getRedirectTarget().data_item()
+                        except pywikibot.NoPage:
+                            pass
+                        else:
+                            targets.add(target)
+
+        if not target:
             pywikibot.output('No target found')
             return
 
@@ -104,14 +123,11 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
             self._save_page(item, self._save_entity, item.removeClaims, claims)
             return
 
-        target.get()
         target_sitelinks = []
-        sitelinks = []
+        target.get()
         for page in item.iterlinks():
             site = page.site
-            with self.access_lock:
-                lock = self.site_locks.setdefault(site, Lock())
-            with lock:
+            with self.get_lock_for(site):
                 try:
                     target_link = target.getSitelink(site)
                 except pywikibot.NoPage:
@@ -143,9 +159,9 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
         for claim in target.claims.get('P31', []):
             if claim.snaktype != 'value':
                 continue
-            if claim.target.id not in self.dupe_item:
+            if claim.target.id not in self.dupe_items:
                 continue
-            for prop in {'P460', 'P642'}:
+            for prop in ['P460', 'P642']:
                 for snak in claim.qualifiers.get(prop, []):
                     if snak.snaktype != 'value':
                         continue

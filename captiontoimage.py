@@ -2,7 +2,6 @@
 import pywikibot
 
 from pywikibot import pagegenerators
-from pywikibot.bot import SkipPageError
 
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot

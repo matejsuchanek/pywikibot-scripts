@@ -19,7 +19,7 @@ class WikidataLabelsBot(WikidataEntityBot):
         return pagegenerators.PreloadingEntityGenerator(self._generator)
 
     def treat_page_and_item(self, page, item):
-        data = None
+        data = {}
         if self._add_missing_labels(item, data):
             self.user_edit_entity(item, data, summary='add missing labels')
 

@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 import pywikibot
 
 from pywikibot import pagegenerators
-from pywikibot.bot import SkipPageError
 
 from .error_reporting import ErrorReportingBot
 from .wikidata import WikidataEntityBot

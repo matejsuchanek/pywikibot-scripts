@@ -8,11 +8,11 @@ from operator import methodcaller
 
 from pywikibot import pagegenerators, textlib
 
-from pywikibot.bot import SkipPageError
 from pywikibot.textlib import mwparserfromhell
 from pywikibot.tools import first_upper, OrderedDict
 
 from .wikidata import WikidataEntityBot
+
 
 class MetadataHarvestingBot(WikidataEntityBot):
 
@@ -93,11 +93,9 @@ class MetadataHarvestingBot(WikidataEntityBot):
             pywikibot.output('Info: Own generator')
             self._generator = value
 
-    def init_page(self, prop):
-        super(MetadataHarvestingBot, self).init_page(prop)
-        page = prop.toggleTalkPage()
-        if not page.exists() or page.isRedirectPage():
-            raise SkipPageError(prop, 'Talk page doesn\'t exist')
+    def skip_page(self, prop):
+        return super(MetadataHarvestingBot, self).skip_page(prop) or (
+            not page.exists() or page.isRedirectPage())
 
     def treat_page_and_item(self, page, prop):
         self.current_talk_page = page = prop.toggleTalkPage()
@@ -457,6 +455,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                     asynchronous=True)
         return remove
 
+
 def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
@@ -477,6 +476,7 @@ def main(*args):
 
     bot = MetadataHarvestingBot(site=site, **options)
     bot.run()
+
 
 if __name__ == '__main__':
     if isinstance(mwparserfromhell, Exception):

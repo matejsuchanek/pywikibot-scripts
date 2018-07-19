@@ -6,7 +6,6 @@ import pywikibot
 from operator import methodcaller
 
 from pywikibot import pagegenerators
-from pywikibot.bot import SkipPageError
 from pywikibot.data.sparql import SparqlQuery
 
 from .query_store import QueryStore
@@ -88,12 +87,16 @@ class DuosManagingBot(WikidataEntityBot):
         self.store = QueryStore()
         self.sparql = SparqlQuery(repo=self.repo)
 
-    def init_page(self, item):
-        super(DuosManagingBot, self).init_page(item)
+    def skip_page(self, item):
+        if super(DuosManagingBot, self).skip_page(item):
+            return True
         if 'P31' not in item.claims:
-            raise SkipPageError(item, 'Missing P31 property')
+            pywikibot.output('%s is missing P31 property' % item)
+            return True
         if 'P527' in item.claims:
-            raise SkipPageError(item, 'Has P527 property')
+            pywikibot.output('%s already has P527 property' % item)
+            return True
+        return False
 
     @property
     def generator(self):
