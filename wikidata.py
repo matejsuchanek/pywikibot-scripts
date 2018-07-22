@@ -2,6 +2,7 @@
 import pywikibot
 
 from pywikibot.bot import NoRedirectPageBot, WikidataBot
+from pywikibot.tools import first_lower
 
 
 class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
@@ -117,6 +118,12 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
                         left, sep, right = title.rpartition(' (')
                         if left and not (set(left) & set('(:)')):
                             title = left
+                # [[d:Topic:Uhdjlv9aae6iijuc]]
+                # todo: create a lib for this
+                if lang == 'fr' and title.startswith(
+                        ('Abbaye ', 'Cathédrale ', 'Chapelle ', 'Cloître ',
+                         'Couvent ', 'Monastère ', 'Église ')):
+                    title = first_lower(title)
                 labels[lang] = title
         return labels
 

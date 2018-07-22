@@ -106,7 +106,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
                         else:
                             targets.add(target)
 
-        if not target:
+        if not targets:
             pywikibot.output('No target found')
             return
 
