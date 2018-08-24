@@ -108,7 +108,7 @@ class DuosManagingBot(WikidataEntityBot):
     def get_relation(self, item):
         ask_pattern = 'ASK { wd:%s wdt:P31/wdt:P279* wd:%%s }' % item.id
         for key, rel in self.class_to_relation:
-            if self.sparql.ask(ask_pattern % rel):
+            if self.sparql.ask(ask_pattern % key):
                 return rel
         return None
 

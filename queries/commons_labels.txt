@@ -1,0 +1,8 @@
+SELECT DISTINCT ?item {
+  ?item ^schema:about [
+    schema:isPartOf/^wdt:P856 wd:Q565; schema:name ?name
+  ]; rdfs:label ?label FILTER( LANG( ?label ) = 'en' ) .
+  FILTER( STRSTARTS( STR( ?name ), 'Category:' ) ) .
+  FILTER( STRSTARTS( STR( ?label ), 'Category:' ) ) .
+  MINUS { ?item wdt:P31/wdt:P279* wd:Q4167836 } .
+} LIMIT %(limit)s

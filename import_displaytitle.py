@@ -21,6 +21,12 @@ class LabelSettingBot(WikidataEntityBot):
         super(LabelSettingBot, self).__init__(**kwargs)
         self.create_missing_item = self.getOption('create') is True
 
+    def stripped(self, title):
+        if title.endswith(')'):
+            return title.partition(' (')[0]
+        else:
+            return title
+
     def treat_page_and_item(self, page, item):
         title = page.properties().get('displaytitle')
         if not title:
@@ -30,11 +36,11 @@ class LabelSettingBot(WikidataEntityBot):
             return
         lang = page.site.lang
         label = item.labels.get(lang)
-        if not label or label == page_title:
-            item.labels[lang] = title
+        if not label or self.stripped(label) == self.stripped(page_title):
+            item.labels[lang] = first_lower(label) if label else title
             summary = 'importing [%s] label from displaytitle in %s' % (
                 lang, page.title(asLink=True, insite=item.site))
-            self.user_edit_entity(item, summary=summary, show_diff=False)
+            self.user_edit_entity(item, summary=summary)
 
 
 def main(*args):

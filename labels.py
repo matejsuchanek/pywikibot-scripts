@@ -4,6 +4,7 @@ import pywikibot
 from pywikibot import pagegenerators
 
 from .wikidata import WikidataEntityBot
+from .wikidata_cleanup import WikidataCleanupToolkit
 
 
 class WikidataLabelsBot(WikidataEntityBot):
@@ -13,6 +14,7 @@ class WikidataLabelsBot(WikidataEntityBot):
     def __init__(self, generator, **kwargs):
         super(WikidataLabelsBot, self).__init__(**kwargs)
         self._generator = generator
+        self.my_kit = WikidataCleanupToolkit(['add_missing_labels'])
 
     @property
     def generator(self):
@@ -20,7 +22,7 @@ class WikidataLabelsBot(WikidataEntityBot):
 
     def treat_page_and_item(self, page, item):
         data = {}
-        if self._add_missing_labels(item, data):
+        if self.my_kit.cleanup(item, data):
             self.user_edit_entity(item, data, summary='add missing labels')
 
 

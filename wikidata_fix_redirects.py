@@ -11,6 +11,7 @@ from itertools import chain
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 
+
 class WikidataRedirectsFixingBot(WikidataEntityBot):
 
     summary = 'fixed redirect'
@@ -23,12 +24,15 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
         })
         super(WikidataRedirectsFixingBot, self).__init__(**kwargs)
         self.store = QueryStore()
+        self._generator = generator or self.custom_generator()
 
     @property
     def generator(self):
+        return PreloadingEntityGenerator(self._generator)
+
+    def custom_generator(self):
         query = self.store.build_query('redirects', days=self.getOption('days'))
-        return PreloadingEntityGenerator(
-            WikidataSPARQLPageGenerator(query, site=self.repo))
+        return WikidataSPARQLPageGenerator(query, site=self.repo)
 
     def update_snak(self, snak, old):
         if snak.snaktype != 'value':
@@ -78,7 +82,12 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
 
 def main(*args):
     options = {}
-    for arg in pywikibot.handle_args(args):
+    local_args = pywikibot.handle_args(args)
+    site = pywikibot.Site('wikidata', 'wikidata')
+    genFactory = pagegenerators.GeneratorFactory(site=site)
+    for arg in local_args:
+        if genFactory.handleArg(arg):
+            continue
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':
@@ -86,7 +95,8 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    bot = WikidataRedirectsFixingBot(**options)
+    generator = genFactory.getCombinedGenerator()
+    bot = WikidataRedirectsFixingBot(generator=generator, site=site, **options)
     bot.run()
 
 
