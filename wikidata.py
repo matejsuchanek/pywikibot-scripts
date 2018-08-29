@@ -3,7 +3,7 @@ import pywikibot
 
 from pywikibot.bot import NoRedirectPageBot, WikidataBot
 
-from .wikidata_cleanup import WikidataCleanupToolkit
+from .wikidata_cleanup_toolkit import WikidataCleanupToolkit
 
 
 class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
