@@ -18,12 +18,13 @@ class FakeReferencesBot(WikidataEntityBot):
     use_from_page = False
     whitelist_props = {'P813', 'P4656'}
 
-    def __init__(self, **kwargs):
+    def __init__(self, generator, **kwargs):
         self.availableOptions.update({
             'limit': None,
         })
         super(FakeReferencesBot, self).__init__(**kwargs)
         self.store = QueryStore()
+        self._generator = generator or self.subgenerator()
         self.url_start = self.repo.base_url(self.repo.article_path)
 
     def subgenerator(self):
@@ -72,7 +73,7 @@ class FakeReferencesBot(WikidataEntityBot):
 
     @property
     def generator(self):
-        return pagegenerators.PreloadingEntityGenerator(self.subgenerator())
+        return pagegenerators.PreloadingEntityGenerator(self._generator)
 
     @property
     def summary(self):
@@ -167,7 +168,12 @@ class FakeReferencesBot(WikidataEntityBot):
 
 def main(*args):
     options = {}
-    for arg in pywikibot.handle_args(args):
+    local_args = pywikibot.handle_args(args)
+    site = pywikibot.Site()
+    genFactory = pagegenerators.GeneratorFactory(site=site)
+    for arg in local_args:
+        if genFactory.handleArg(arg):
+            continue
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':
@@ -175,7 +181,8 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    bot = FakeReferencesBot(**options)
+    generator = genFactory.getCombinedGenerator()
+    bot = FakeReferencesBot(generator=generator, site=site, **options)
     bot.run()
 
 

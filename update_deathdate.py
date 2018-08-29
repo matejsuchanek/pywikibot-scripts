@@ -51,8 +51,8 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         page = self.current_page
         categories = textlib.getCategoryLinks(page.text, site=self.site)
         titles = map(
-            lambda cat: cat.title(withNamespace=False, withSection=False,
-                                  allowInterwiki=False, insite=self.site),
+            lambda cat: cat.title(with_ns=False, with_section=False,
+                                  allow_interwiki=False, insite=self.site),
             categories)
         matches = list(filter(bool, map(self.categoryR.fullmatch, titles)))
         if not matches:

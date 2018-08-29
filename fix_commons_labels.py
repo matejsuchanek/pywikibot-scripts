@@ -43,7 +43,7 @@ class LabelsFixingBot(WikidataEntityBot):
 def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
-    site = pywikibot.Site('wikidata', 'wikidata')
+    site = pywikibot.Site()
     genFactory = pagegenerators.GeneratorFactory(site=site)
     for arg in local_args:
         if genFactory.handleArg(arg):

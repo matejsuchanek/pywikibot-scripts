@@ -248,7 +248,7 @@ class CategoriesFix(LazyFix):
         if category.sortKey == ' ':
             return MAIN_CATEGORY
 
-        title = category.title(withNamespace=False, insite=category.site)
+        title = category.title(with_ns=False, insite=category.site)
         split = title.split()
         if title.startswith('Údržba:'):
             return MAINTENANCE_CATEGORY
@@ -309,7 +309,7 @@ class CategoriesFix(LazyFix):
 
         keys = {}
         categories = textlib.getCategoryLinks(text, site=self.site)
-        if not any(category.title(withNamespace=False) in (
+        if not any(category.title(with_ns=False) in (
                 'Muži', 'Žijící lidé', 'Ženy') for category in categories):
             return text
 
@@ -889,7 +889,7 @@ class StyleFix(Fix): # todo: split and delete
         categories = textlib.getCategoryLinks(page.text, site=page.site)
         category_living = pywikibot.Category(page.site, 'Žijící lidé')
         if category_living in categories:
-            if any(cat.title(withNamespace=False).startswith('Úmrtí ')
+            if any(cat.title(with_ns=False).startswith('Úmrtí ')
                    for cat in categories):
                 categories.remove(category_living)
                 page.text = textlib.replaceCategoryLinks(
@@ -934,8 +934,7 @@ class TemplateFix(LazyFix):
                 do_replace = False
             if do_replace:
                 target = template.getRedirectTarget()
-                self.cache[template_name_norm] = target.title(
-                    withNamespace=False)
+                self.cache[template_name_norm] = target.title(with_ns=False)
             else:
                 self.cache[template_name_norm] = None
 

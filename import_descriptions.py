@@ -70,7 +70,7 @@ class BaseDescriptionBot(WikidataEntityBot):
 
     def get_summary(self, page, desc):
         return 'importing [%s] description "%s" from %s' % (
-            page.site.lang, desc, page.title(asLink=True, insite=self.repo))
+            page.site.lang, desc, page.title(as_link=True, insite=self.repo))
 
 
 class MissingDescriptionBot(BaseDescriptionBot):
@@ -102,6 +102,7 @@ class MissingDescriptionBot(BaseDescriptionBot):
         regex = self.get_regex_for_title(re.escape(title))
         for ref_page in PreloadingGenerator(
                 SearchPageGenerator(search_query, namespaces=[0])):
+            # todo: first polish text
             match = regex.search(ref_page.text)
             if not match:
                 continue

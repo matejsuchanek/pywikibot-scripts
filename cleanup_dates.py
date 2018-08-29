@@ -14,20 +14,23 @@ from .wikidata import WikidataEntityBot
 
 class DuplicateDatesBot(WikidataEntityBot):
 
-    props = ('P569', 'P570',)
+    props = ['P569', 'P570']
     use_from_page = False
 
-    def __init__(self, **kwargs):
+    def __init__(self, generator, **kwargs):
         super(DuplicateDatesBot, self).__init__(**kwargs)
         self.store = QueryStore()
+        self._generator = generator or self.custom_generator()
+
+    def custom_generator(self):
+        for prop in self.props:
+            query = self.store.build_query('duplicate_dates', prop=prop)
+            for item in WikidataSPARQLPageGenerator(query, site=self.repo):
+                yield item
 
     @property
     def generator(self):
-        for prop in self.props:
-            query = self.store.build_query('duplicate_dates', prop=prop)
-            for item in PreloadingEntityGenerator(
-                    WikidataSPARQLPageGenerator(query, site=self.repo)):
-                yield item
+        return PreloadingEntityGenerator(self._generator)
 
     @property
     def summary(self):
@@ -89,7 +92,12 @@ class DuplicateDatesBot(WikidataEntityBot):
 
 def main(*args):
     options = {}
-    for arg in pywikibot.handle_args(args):
+    local_args = pywikibot.handle_args(args)
+    site = pywikibot.Site()
+    genFactory = pagegenerators.GeneratorFactory(site=site)
+    for arg in local_args:
+        if genFactory.handleArg(arg):
+            continue
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':
@@ -97,8 +105,8 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    site = pywikibot.Site('wikidata', 'wikidata')
-    bot = DuplicateDatesBot(site=site, **options)
+    generator = genFactory.getCombinedGenerator()
+    bot = DuplicateDatesBot(generator=generator, site=site, **options)
     bot.run()
 
 

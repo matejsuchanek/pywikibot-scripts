@@ -47,7 +47,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
                 page.text, remove_disabled_parts=True, strip=True):
             # todo: l10n
             if template.lower() in ['commonscat', 'commons category']:
-                cat_name = page.title(withNamespace=False)
+                cat_name = page.title(with_ns=False)
                 if '1' in fielddict:
                     value = fielddict['1'].strip()
                     if value:

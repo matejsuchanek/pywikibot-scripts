@@ -74,7 +74,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                     page = page.toggleTalkPage()
                 if page.namespace() == self.repo.property_namespace:
                     yield pywikibot.PropertyPage(
-                        self.repo, page.title(withNamespace=False))
+                        self.repo, page.title(with_ns=False))
         else:
             # todo: preload
             for page in pagegenerators.AllpagesPageGenerator(
@@ -83,8 +83,8 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 if '/' in page.title():
                     continue
                 yield pywikibot.PropertyPage(
-                    self.repo, page.title(withNamespace=False))
-                if page.title(withNamespace=False) == self.getOption('end'):
+                    self.repo, page.title(with_ns=False))
+                if page.title(with_ns=False) == self.getOption('end'):
                     break
 
     @generator.setter
@@ -181,10 +181,10 @@ class MetadataHarvestingBot(WikidataEntityBot):
 
     def make_summary(self, prop, value):
         if isinstance(value, pywikibot.ItemPage):
-            value = value.title(insite=self.repo, asLink=True)
+            value = value.title(insite=self.repo, as_link=True)
         elif isinstance(value, pywikibot.FilePage):
             value = '[[%s|%s]]' % (value.title(insite=self.repo),
-                                   value.title(withNamespace=False))
+                                   value.title(with_ns=False))
         elif isinstance(value, pywikibot.PropertyPage):
             value = '[[%s|%s]]' % (value.title(), value.getID())
         rev_id = self.current_talk_page.latest_revision_id

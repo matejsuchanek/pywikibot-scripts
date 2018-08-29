@@ -6,26 +6,30 @@ from pywikibot import pagegenerators
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
 
+
 class ClaimsSplittingBot(WikidataEntityBot):
 
     start_prop = 'P580'
     end_prop = 'P582'
     use_from_page = False
 
-    def __init__(self, **kwargs):
+    def __init__(self, generator, **kwargs):
         self.availableOptions.update({
             'always': True,
             'limit': 500,
         })
         super(ClaimsSplittingBot, self).__init__(**kwargs)
         self.store = QueryStore()
+        self._generator = generator or self.custom_generator()
+
+    def custom_generator(self):
+        query = self.store.build_query(
+            'mixed_claims', limit=self.getOption('limit'))
+        return pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo)
 
     @property
     def generator(self):
-        query = self.store.build_query(
-            'mixed_claims', limit=self.getOption('limit'))
-        return pagegenerators.PreloadingEntityGenerator(
-            pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo))
+        return pagegenerators.PreloadingEntityGenerator(self._generator)
 
     def has_multiple(self, claim):
         return (len(claim.qualifiers.get(self.start_prop, [])) > 1
@@ -118,9 +122,15 @@ class ClaimsSplittingBot(WikidataEntityBot):
                 {'id': cl.toJSON()['id'], 'remove': ''} for cl in to_remove]}
             self.user_edit_entity(item, data, summary=self.summary)
 
+
 def main(*args):
     options = {}
-    for arg in pywikibot.handle_args(args):
+    local_args = pywikibot.handle_args(args)
+    site = pywikibot.Site()
+    genFactory = pagegenerators.GeneratorFactory(site=site)
+    for arg in local_args:
+        if genFactory.handleArg(arg):
+            continue
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':
@@ -128,9 +138,10 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    site = pywikibot.Site('wikidata', 'wikidata')
-    bot = ClaimsSplittingBot(site=site, **options)
+    generator = genFactory.getCombinedGenerator()
+    bot = ClaimsSplittingBot(generator=generator, site=site, **options)
     bot.run()
+
 
 if __name__ == '__main__':
     main()

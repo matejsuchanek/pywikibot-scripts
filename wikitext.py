@@ -11,6 +11,7 @@ from pywikibot.bot import SingleSiteBot, ExistingPageBot, NoRedirectPageBot
 
 from .custome_fixes import all_fixes
 
+
 class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
     '''
@@ -72,7 +73,7 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
     def userPut(self, page, oldtext, newtext, **kwargs):
         if oldtext.rstrip() == newtext.rstrip():
             pywikibot.output('No changes were needed on %s'
-                             % page.title(asLink=True))
+                             % page.title(as_link=True))
             return
 
         self.current_page = page
@@ -98,6 +99,7 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
                                              if not exc]
         page.save(*data, **kwargs)
 
+
 def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
@@ -115,6 +117,7 @@ def main(*args):
     generator = genFactory.getCombinedGenerator(preload=True)
     bot = WikitextFixingBot(generator=generator, **options)
     bot.run()
+
 
 if __name__ == "__main__":
     main()

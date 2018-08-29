@@ -77,7 +77,7 @@ class DuosManagingBot(WikidataEntityBot):
     }
     use_from_page = False
 
-    def __init__(self, **kwargs):
+    def __init__(self, generator, **kwargs):
         self.availableOptions.update({
             'always': True,
             'class': 'Q15618652',
@@ -86,6 +86,7 @@ class DuosManagingBot(WikidataEntityBot):
         super(DuosManagingBot, self).__init__(**kwargs)
         self.store = QueryStore()
         self.sparql = SparqlQuery(repo=self.repo)
+        self._generator = generator or self.custom_generator()
 
     def skip_page(self, item):
         if super(DuosManagingBot, self).skip_page(item):
@@ -98,12 +99,14 @@ class DuosManagingBot(WikidataEntityBot):
             return True
         return False
 
-    @property
-    def generator(self):
+    def custom_generator(self):
         kwargs = {'class': self.getOption('class')}
         query = self.store.build_query('duos', **kwargs)
-        return pagegenerators.PreloadingEntityGenerator(
-            pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo))
+        return pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo)
+
+    @property
+    def generator(self):
+        return pagegenerators.PreloadingEntityGenerator(self._generator)
 
     def get_relation(self, item):
         ask_pattern = 'ASK { wd:%s wdt:P31/wdt:P279* wd:%%s }' % item.id
@@ -186,7 +189,7 @@ class DuosManagingBot(WikidataEntityBot):
                 item, {'claims':[json]},
                 summary='moved [[Property:%s]] to %s' % (
                     claim.id, ' & '.join(map(methodcaller(
-                        'title', asLink=True, insite=self.repo), items))))
+                        'title', as_link=True, insite=self.repo), items))))
 
     def create_item(self, item, labels, relation, to_add):
         pywikibot.output('Creating item (relation "%s")...' % relation)
@@ -194,7 +197,7 @@ class DuosManagingBot(WikidataEntityBot):
         data = {'labels': labels}
         self.user_edit_entity(
             new_item, data, summary='based on data in %s' % item.title(
-                asLink=True, insite=self.repo), asynchronous=False)
+                as_link=True, insite=self.repo), asynchronous=False)
 
         claim = pywikibot.Claim(self.repo, 'P31')
         claim.setTarget(pywikibot.ItemPage(self.repo, 'Q5'))
@@ -215,13 +218,18 @@ class DuosManagingBot(WikidataEntityBot):
                 new_item, {'claims':[json]},
                 summary='moving [[Property:%s]] from %s' % (
                     temp_claim.id,
-                    item.title(asLink=True, insite=self.repo)))
+                    item.title(as_link=True, insite=self.repo)))
         return new_item
 
 
 def main(*args):
     options = {}
-    for arg in pywikibot.handle_args(args):
+    local_args = pywikibot.handle_args(args)
+    site = pywikibot.Site()
+    genFactory = pagegenerators.GeneratorFactory(site=site)
+    for arg in local_args:
+        if genFactory.handleArg(arg):
+            continue
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':
@@ -229,7 +237,8 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    bot = DuosManagingBot(**options)
+    generator = genFactory.getCombinedGenerator()
+    bot = DuosManagingBot(generator=generator, site=site, **options)
     bot.run()
 
 

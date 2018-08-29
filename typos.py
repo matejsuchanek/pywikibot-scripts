@@ -12,6 +12,7 @@ from pywikibot.bot import SkipPageError
 from .typoloader import TyposLoader
 from .wikitext import WikitextFixingBot
 
+
 class TypoBot(WikitextFixingBot):
 
     '''
@@ -95,7 +96,7 @@ class TypoBot(WikitextFixingBot):
             rule.longest = max(old_max, rule.longest)
 
     def save_false_positive(self, page):
-        link = page.title(asLink=True)
+        link = page.title(as_link=True)
         self.fp_page.text += '\n* %s' % link
         self.fp_page.save(summary=link, async=True)
         self.whitelist.append(page.title())
@@ -194,6 +195,7 @@ class TypoBot(WikitextFixingBot):
         if self.own_generator:
             pywikibot.output('\nCurrent offset: %s\n' % self.offset)
 
+
 def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
@@ -212,6 +214,7 @@ def main(*args):
     generator = genFactory.getCombinedGenerator(preload=True)
     bot = TypoBot(generator, **options)
     bot.run()
+
 
 if __name__ == '__main__':
     main()

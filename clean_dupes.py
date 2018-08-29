@@ -19,7 +19,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
     dupe_items = {'Q1263068', 'Q17362920', 'Q20511493', 'Q28065731'}
     use_from_page = False
 
-    def __init__(self, offset=0, **kwargs):
+    def __init__(self, generator, offset=0, **kwargs):
         self.availableOptions.update({
             'threads': 1,
         })
@@ -27,16 +27,20 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
         BaseRevertBot.__init__(self, self.site)
         self.offset = offset
         self.store = QueryStore()
+        self._generator = generator or self.custom_generator()
         self.save_lock = Lock()
         self.access_lock = Lock()
         self.site_locks = {}
 
     @property
     def generator(self):
+        return PreloadingEntityGenerator(self._generator)
+
+    def custom_generator(self):
         query = self.store.build_query(
             'dupes', dupe=' wd:'.join(self.dupe_items), offset=self.offset)
-        return PreloadingEntityGenerator(WikidataSPARQLPageGenerator(
-            query, site=self.repo, result_type=list))
+        return WikidataSPARQLPageGenerator(query, site=self.repo,
+                                           result_type=list))
 
     def setup(self):
         super(DupesMergingBot, self).setup()
@@ -186,9 +190,10 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
                 item, self._save_entity, Merger.clean_merge, item, target,
                 ignore_conflicts=['description']):
             pywikibot.output('Reverting changes...')
-            self.comment = 'Error occurred when attempting to merge with %s' % target.title(asLink=True)
+            # instantiate a new bot
+            self.comment = 'Error occurred when attempting to merge with %s' % target.title(as_link=True)
             self.revert({'title': item.title()})
-            self.comment = 'Error occurred when attempting to merge with %s' % item.title(asLink=True)
+            self.comment = 'Error occurred when attempting to merge with %s' % item.title(as_link=True)
             self.revert({'title': target.title()})
             return
 
@@ -219,7 +224,12 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
 
 def main(*args):
     options = {}
-    for arg in pywikibot.handle_args(args):
+    local_args = pywikibot.handle_args(args)
+    site = pywikibot.Site()
+    genFactory = pagegenerators.GeneratorFactory(site=site)
+    for arg in local_args:
+        if genFactory.handleArg(arg):
+            continue
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':
@@ -227,8 +237,8 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    site = pywikibot.Site('wikidata', 'wikidata')
-    bot = DupesMergingBot(site=site, **options)
+    generator = genFactory.getCombinedGenerator()
+    bot = DupesMergingBot(generator=generator, site=site, **options)
     bot.run()
 
 

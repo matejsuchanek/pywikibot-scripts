@@ -39,7 +39,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
 
     def skip_page(self):
         return super(DisambigsCheckingBot, self).skip_page(item) or (
-            item.title(asLink=True, insite=self.repo) in self.log_page.text or
+            item.title(as_link=True, insite=self.repo) in self.log_page.text or
             not self.is_disambig(item))
 
     def is_disambig(self, item):
@@ -79,7 +79,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
             page = pywikibot.Page(apisite, item.sitelinks[dbname])
             if not page.exists():
                 append_text += "\n** {} – {} – doesn't exist".format(
-                    dbname, page.title(asLink=True, insite=self.repo))
+                    dbname, page.title(as_link=True, insite=self.repo))
                 continue
             if page.isRedirectPage():
                 target = page.getRedirectTarget()
@@ -88,19 +88,19 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
                 except pywikibot.NoPage:
                     link = "''no item''"
                 else:
-                    link = target_item.title(asLink=True, insite=self.repo)
+                    link = target_item.title(as_link=True, insite=self.repo)
                 if not target.isDisambig():
                     link += ', not a disambiguation'
                 append_text += '\n** {} – {} – redirects to {} ({})'.format(
-                    dbname, page.title(asLink=True, insite=self.repo),
-                    target.title(asLink=True, insite=self.repo), link)
+                    dbname, page.title(as_link=True, insite=self.repo),
+                    target.title(as_link=True, insite=self.repo), link)
                 continue
             if not page.isDisambig():
                 append_text += '\n** {} – {} – not a disambiguation'.format(
-                    dbname, page.title(asLink=True, insite=self.repo))
+                    dbname, page.title(as_link=True, insite=self.repo))
 
         if append_text:
-            prep = '\n* %s' % item.title(asLink=True, insite=self.repo)
+            prep = '\n* %s' % item.title(as_link=True, insite=self.repo)
             if count > 0:
                 prep += ' (%i sitelink%s)' % (count, 's' if count > 1 else '')
             append_text = prep + append_text
