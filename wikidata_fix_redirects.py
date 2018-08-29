@@ -2,6 +2,7 @@
 import pywikibot
 
 from pywikibot.pagegenerators import (
+    GeneratorFactory,
     PreloadingEntityGenerator,
     WikidataSPARQLPageGenerator,
 )
@@ -17,22 +18,22 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
     summary = 'fixed redirect'
     use_from_page = False
 
-    def __init__(self, **kwargs):
+    def __init__(self, generator, **kwargs):
         self.availableOptions.update({
             'always': True,
             'days': 7,
         })
         super(WikidataRedirectsFixingBot, self).__init__(**kwargs)
         self.store = QueryStore()
-        self._generator = generator or self.custom_generator()
-
-    @property
-    def generator(self):
-        return PreloadingEntityGenerator(self._generator)
+        self.generator = generator or self.custom_generator()
+        self.summary = 'fixed redirect'
 
     def custom_generator(self):
         query = self.store.build_query('redirects', days=self.getOption('days'))
         return WikidataSPARQLPageGenerator(query, site=self.repo)
+
+    def skip_page(self, item):
+        return False
 
     def update_snak(self, snak, old):
         if snak.snaktype != 'value':
@@ -50,41 +51,37 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
         return False
 
     def treat_page_and_item(self, page, item):
-        gen = PreloadingEntityGenerator(
-            WikidataSPARQLPageGenerator(query, site=self.repo))
-        for redir in gen:
-            if not redir.isRedirectPage():
+        if not item.isRedirectPage():
+            return
+        target = item.getRedirectTarget()
+        pywikibot.output('%s --> %s' % (item, target))
+        backlinks = item.backlinks(
+            followRedirects=False, filterRedirects=False, namespaces=[0, 120])
+        for entity in PreloadingEntityGenerator(backlinks):
+            if entity == target:
                 continue
-            target = redir.getRedirectTarget()
-            pywikibot.output('%s --> %s' % (redir, target))
-            subgen = PreloadingEntityGenerator(
-                redir.backlinks(followRedirects=False, filterRedirects=False,
-                                namespaces=[0, 120]))
-            for entity in subgen:
-                if entity == target:
-                    continue
-                for claims in entity.claims.values():
-                    for claim in claims:
-                        if self.update_snak(claim, redir):
-                            claim.changeTarget(claim.target, summary=summary)
-                        for snaks in claim.qualifiers.values():
-                            for snak in snaks:
-                                if self.update_snak(snak, redir):
-                                    self.repo.editQualifier(
-                                        claim, snak, summary=summary)
-                        for source in claim.sources:
-                            snaks = list(chain.from_iterable(source.values()))
-                            for snak in snaks:
-                                if self.update_snak(snak, redir):
-                                    self.repo.editSource(
-                                        claim, snaks, summary=summary)
+            for claims in entity.claims.values():
+                for claim in claims:
+                    if self.update_snak(claim, item):
+                        claim.changeTarget(claim.target, summary=self.summary)
+                    for snaks in claim.qualifiers.values():
+                        for snak in snaks:
+                            if self.update_snak(snak, item):
+                                self.repo.editQualifier(
+                                    claim, snak, summary=self.summary)
+                    for source in claim.sources:
+                        snaks = list(chain.from_iterable(source.values()))
+                        for snak in snaks:
+                            if self.update_snak(snak, item):
+                                self.repo.editSource(
+                                    claim, snaks, summary=self.summary)
 
 
 def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
-    site = pywikibot.Site('wikidata', 'wikidata')
-    genFactory = pagegenerators.GeneratorFactory(site=site)
+    site = pywikibot.Site()
+    genFactory = GeneratorFactory(site=site)
     for arg in local_args:
         if genFactory.handleArg(arg):
             continue
