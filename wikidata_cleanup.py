@@ -21,6 +21,7 @@ class WikidataCleanupBot(WikidataEntityBot):
     def generator(self):
         return pagegenerators.PreloadingEntityGenerator(self._generator)
 
+    @property
     def summary(self):
         return {
             'add_missing_labels': 'add missing labels',

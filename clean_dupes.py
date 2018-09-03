@@ -3,7 +3,8 @@ import pywikibot
 
 from pywikibot.pagegenerators import (
     PreloadingEntityGenerator,
-    WikidataSPARQLPageGenerator)
+    WikidataSPARQLPageGenerator,
+)
 
 from queue import Queue
 from threading import Lock, Thread
@@ -11,10 +12,10 @@ from threading import Lock, Thread
 from .merger import Merger
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
-from scripts.revertbot import BaseRevertBot  # fixme: integrate to Merger
+from scripts.revertbot import BaseRevertBot
 
 
-class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
+class DupesMergingBot(WikidataEntityBot):
 
     dupe_items = {'Q1263068', 'Q17362920', 'Q20511493', 'Q28065731'}
     use_from_page = False
@@ -24,7 +25,6 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
             'threads': 1,
         })
         super(DupesMergingBot, self).__init__(**kwargs)
-        BaseRevertBot.__init__(self, self.site)
         self.offset = offset
         self.store = QueryStore()
         self._generator = generator or self.custom_generator()
@@ -40,7 +40,7 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
         query = self.store.build_query(
             'dupes', dupe=' wd:'.join(self.dupe_items), offset=self.offset)
         return WikidataSPARQLPageGenerator(query, site=self.repo,
-                                           result_type=list))
+                                           result_type=list)
 
     def setup(self):
         super(DupesMergingBot, self).setup()
@@ -190,11 +190,11 @@ class DupesMergingBot(WikidataEntityBot, BaseRevertBot):
                 item, self._save_entity, Merger.clean_merge, item, target,
                 ignore_conflicts=['description']):
             pywikibot.output('Reverting changes...')
-            # instantiate a new bot
-            self.comment = 'Error occurred when attempting to merge with %s' % target.title(as_link=True)
-            self.revert({'title': item.title()})
-            self.comment = 'Error occurred when attempting to merge with %s' % item.title(as_link=True)
-            self.revert({'title': target.title()})
+            bot = BaseRevertBot(self.site)  # todo: integrate to Merger
+            bot.comment = 'Error occurred when attempting to merge with %s' % target.title(as_link=True)
+            bot.revert({'title': item.title()})
+            bot.comment = 'Error occurred when attempting to merge with %s' % item.title(as_link=True)
+            bot.revert({'title': target.title()})
             return
 
         self.offset -= 1
