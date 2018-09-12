@@ -2,6 +2,7 @@
 import pywikibot
 
 from pywikibot.pagegenerators import (
+    GeneratorFactory,
     PreloadingEntityGenerator,
     WikidataSPARQLPageGenerator,
 )
@@ -226,7 +227,7 @@ def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
     site = pywikibot.Site()
-    genFactory = pagegenerators.GeneratorFactory(site=site)
+    genFactory = GeneratorFactory(site=site)
     for arg in local_args:
         if genFactory.handleArg(arg):
             continue

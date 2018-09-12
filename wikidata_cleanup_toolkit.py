@@ -63,7 +63,7 @@ class WikidataCleanupToolkit(object):
         ret = self.exec_fix('cleanup_labels', item, data['labels'],
                             set(data['labels'])) or ret
         ret = self.exec_fix('fix_HTML', terms, all_terms) or ret
-        ret = self.exec_fix('replace_invisible', terms, all_terms) or ret
+        #ret = self.exec_fix('replace_invisible', terms, all_terms) or ret
         ret = self.exec_fix('fix_quantities', item.claims,
                             data.setdefault('claims', [])) or ret
         return ret
@@ -76,7 +76,7 @@ class WikidataCleanupToolkit(object):
         ret = self.exec_fix('add_missing_labels', item, item.labels) or ret
         ret = self.exec_fix('cleanup_labels', item, item.labels) or ret
         ret = self.exec_fix('fix_HTML', terms, terms) or ret
-        ret = self.exec_fix('replace_invisible', terms, terms) or ret
+        #ret = self.exec_fix('replace_invisible', terms, terms) or ret
         ret = self.exec_fix('fix_quantities', item.claims, []) or ret  # dummy
         return ret
 
@@ -189,6 +189,8 @@ class WikidataCleanupToolkit(object):
             left, sep, right = label.rstrip(')').rpartition(' (')
             if not sep:
                 left, sep, right = label.partition(', ')
+                if right.isdigit():
+                    sep = False
             if sep and not (set(left) & set('(:)')):
                 if self.can_strip(right, description):
                     labels[lang] = left.strip()
