@@ -6,31 +6,59 @@ from pywikibot.tools import first_lower
 from pywikibot.tools.chars import invisible_regex
 
 
+class DataWrapper(dict):
+
+    def __init__(self, read, write):
+        self.read = read
+        self.write = write
+        read.update(write)
+        super(DataWrapper, self).__init__(read)
+
+    def __delitem__(self, key):
+        del self.read[key]
+        del self.write[key]
+        return super(DataWrapper, self).__delitem__(key)
+
+    def __getitem__(self, key):
+        return super(DataWrapper, self).__getitem__(key)
+
+    def __setitem__(self, key, value):
+        self.read[key] = value
+        self.write[key] = value
+        return super(DataWrapper, self).__setitem__(key, value)
+
+    def update(self, data):
+        self.read.update(data)
+        self.write.update(data)
+        return super(DataWrapper, self).update(data)
+
+
 class WikidataCleanupToolkit(object):
 
     lang_map = {
         'als': 'gsw',
-        'bat_smg': 'sgs',
-        'be_x_old': 'be-tarask',
+        'bat-smg': 'sgs',
+        'be-x-old': 'be-tarask',
         'bh': 'bho',
         'commons': None,
-        'fiu_vro': 'vro',
+        'fiu-vro': 'vro',
         'media': None,
         'meta': 'en',
         'no': 'nb',
-        'roa_rup': 'rup',
-        'simple': None,
+        'roa-rup': 'rup',
+        'simple': 'en',
         'species': 'en',
         'wikidata': None,
-        'zh_classical': 'lzh',
-        'zh_min_nan': 'nan',
-        'zh_yue': 'yue',
+        'zh-classical': 'lzh',
+        'zh-min-nan': 'nan',
+        'zh-yue': 'yue',
     }
 
     def __init__(self, fixes=[]):
         self.fixes = set(fixes)
 
     def cleanup(self, item, data=None):
+        # todo: unify
         if data is not None:
             return self.cleanup_data(item, data)
         else:
@@ -50,39 +78,35 @@ class WikidataCleanupToolkit(object):
 
     def cleanup_data(self, item, data):
         terms = {}
-        all_terms = self._get_terms(item)
         for key in ['labels', 'descriptions', 'aliases']:
-            data.setdefault(key, {})
-            terms[key] = data[key]
-            all_terms[key].update(data[key])
+            terms[key] = DataWrapper(
+                getattr(item, key), data.setdefault(key, {}))
         ret = False
         ret = self.exec_fix('fix_languages', terms) or ret
-        #ret = self.exec_fix('move_alias_to_label') or ret
-        ret = self.exec_fix('add_missing_labels', item, data['labels'],
-                            set(item.labels)) or ret
-        ret = self.exec_fix('cleanup_labels', item, data['labels'],
-                            set(data['labels'])) or ret
-        ret = self.exec_fix('fix_HTML', terms, all_terms) or ret
-        #ret = self.exec_fix('replace_invisible', terms, all_terms) or ret
-        ret = self.exec_fix('fix_quantities', item.claims,
-                            data.setdefault('claims', [])) or ret
+        #ret = self.exec_fix('deduplicate_aliases', terms) or ret
+        #ret = self.exec_fix('move_alias_to_label', terms) or ret
+        ret = self.exec_fix('add_missing_labels', item, terms['labels']) or ret
+        ret = self.exec_fix('cleanup_labels', terms) or ret
+        ret = self.exec_fix('fix_HTML', terms) or ret
+        #ret = self.exec_fix('replace_invisible', terms) or ret
+        ret = self.exec_fix(
+            'fix_quantities', item.claims, data.setdefault('claims', [])) or ret
         return ret
 
     def cleanup_entity(self, item):
         terms = self._get_terms(item)
         ret = False
         ret = self.exec_fix('fix_languages', terms) or ret
-        #ret = self.exec_fix('move_alias_to_label') or ret
-        ret = self.exec_fix('add_missing_labels', item, item.labels) or ret
-        ret = self.exec_fix('cleanup_labels', item, item.labels) or ret
-        ret = self.exec_fix('fix_HTML', terms, terms) or ret
-        #ret = self.exec_fix('replace_invisible', terms, terms) or ret
+        #ret = self.exec_fix('deduplicate_aliases', terms) or ret
+        #ret = self.exec_fix('move_alias_to_label', terms) or ret
+        ret = self.exec_fix('add_missing_labels', item, terms['labels']) or ret
+        ret = self.exec_fix('cleanup_labels', terms) or ret
+        ret = self.exec_fix('fix_HTML', terms) or ret
+        #ret = self.exec_fix('replace_invisible', terms) or ret
         ret = self.exec_fix('fix_quantities', item.claims, []) or ret  # dummy
         return ret
 
-    def move_alias_to_label(self, item, data):  # todo
-        if data is None:
-            return False  # fixme: T194512
+    def move_alias_to_label(self, terms):  # todo
         labels = {}
         aliases = {}
         keys = set(item.aliases.keys())
@@ -100,42 +124,51 @@ class WikidataCleanupToolkit(object):
             data.setdefault('aliases', {}).update(aliases)
         return bool(labels) and bool(aliases)
 
+    def deduplicate_aliases(self, data):  # todo
+        ret = False
+        for lang, aliases in data['aliases'].items():
+            already = set()
+            label = data['labels'].get(lang)
+            for alias in aliases[:]:
+                if alias == label or alias in already:
+                    aliases.remove(alias)
+                    ret = True
+                already.add(alias)
+        return ret
+
     @classmethod
     def normalize_lang(cls, lang):
-        lang = cls.lang_map.get(lang, lang)
-        if lang:
-            return lang.replace('_', '-')
-        else:
-            return None
+        lang = lang.replace('_', '-')
+        return cls.lang_map.get(lang, lang)
 
-    def fix_languages(self, terms):
+    def fix_languages(self, data):
         ret = False
         for lang, norm in self.lang_map.items():
-            label = terms['labels'].get(lang)
+            label = data['labels'].get(lang)
             if not label:
                 continue
-            if norm in terms['labels']:
-                terms['aliases'].setdefault(norm, []).append(label)
+            if norm in data['labels']:
+                data['aliases'].setdefault(norm, []).append(label)
             else:
-                terms['labels'][norm] = label
-            terms['labels'][lang] = ''
+                data['labels'][norm] = label
+            data['labels'][lang] = ''
             ret = True
         for lang, norm in self.lang_map.items():
-            description = terms['descriptions'].get(lang)
+            description = data['descriptions'].get(lang)
             if description:
-                if norm not in terms['descriptions']:
-                    terms['descriptions'][norm] = description
-                terms['descriptions'][lang] = ''
+                if norm not in data['descriptions']:
+                    data['descriptions'][norm] = description
+                data['descriptions'][lang] = ''
                 ret = True
 ##        for lang, norm in self.lang_map.items():  # fixme: T194512
-##            aliases = terms['aliases'].get(lang)
+##            aliases = data['aliases'].get(lang)
 ##            if aliases:
-##                terms['aliases'].setdefault(norm, []).extend(aliases)
+##                data['aliases'].setdefault(norm, []).extend(aliases)
 ##                ret = True
-        for lang, aliases in terms['aliases'].items():
+        for lang, aliases in data['aliases'].items():
             for alias in aliases:
-                if alias not in terms['aliases'].get(lang, []):
-                    terms['aliases'].setdefault(lang, []).append(alias)
+                if alias not in data['aliases'].get(lang, []):
+                    data['aliases'].setdefault(lang, []).append(alias)
         return ret
 
     def get_missing_labels(self, item, dont):
@@ -147,10 +180,6 @@ class WikidataCleanupToolkit(object):
             parts = dbname.partition('wik')
             lang = self.normalize_lang(parts[0])
             if lang and lang not in dont:
-                if lang in labels:
-                    labels.pop(lang)  # todo: better handling
-                    dont.add(lang)
-                    continue
                 if not has_colon:  # todo: refact. with get_labels_to_update
                     if title.endswith(')'):
                         left, sep, right = title.rpartition(' (')
@@ -162,11 +191,16 @@ class WikidataCleanupToolkit(object):
                         ('Abbaye ', 'Cathédrale ', 'Chapelle ', 'Cloître ',
                          'Couvent ', 'Monastère ', 'Église ')):
                     title = first_lower(title)
+                label = labels.get(lang)
+                if label and first_lower(label) != first_lower(title):
+                    labels.pop(lang)  # todo: better handling
+                    dont.add(lang)
+                    continue
                 labels[lang] = title
         return labels
 
-    def add_missing_labels(self, item, data, skip=set()):
-        labels = self.get_missing_labels(item, skip | set(data.keys()))
+    def add_missing_labels(self, item, data):
+        labels = self.get_missing_labels(item, set(data.keys()))
         data.update(labels)
         return bool(labels)
 
@@ -178,12 +212,10 @@ class WikidataCleanupToolkit(object):
                     return False
         return True
 
-    def get_labels_to_update(self, item, skip):
-        labels = {}
-        for lang, label in item.labels.items():
-            if lang in skip:
-                continue
-            description = item.descriptions.get(lang)
+    def cleanup_labels(self, terms):
+        ret = False
+        for lang, label in terms['labels'].items():
+            description = terms['descriptions'].get(lang)
             if not description:
                 continue
             left, sep, right = label.rstrip(')').rpartition(' (')
@@ -193,31 +225,27 @@ class WikidataCleanupToolkit(object):
                     sep = False
             if sep and not (set(left) & set('(:)')):
                 if self.can_strip(right, description):
-                    labels[lang] = left.strip()
-        return labels
+                    terms['labels'][lang] = left.strip()
+                    ret = True
+        return ret
 
-    def cleanup_labels(self, item, data, skip=set()):
-        labels = self.get_labels_to_update(item, skip)
-        data.update(labels)
-        return bool(labels)
-
-    def fix_HTML(self, data, terms):
+    def fix_HTML(self, terms):
         ret = False
         for key in ['labels', 'descriptions']:
             for lang, value in terms[key].items():
                 new = html2unicode(value)
                 if new != value:
-                    terms[key][lang] = data[key][lang] = new
+                    terms[key][lang] = new
                     ret = True
         return ret
 
-    def replace_invisible(self, data, terms):
+    def replace_invisible(self, terms):  # fixme: really all of them?
         ret = False
         for key in ['labels', 'descriptions']:
             for lang, value in terms[key].items():
                 new = invisible_regex.sub('', value)
                 if new != value:
-                    terms[key][lang] = data[key][lang] = new
+                    terms[key][lang] = new
                     ret = True
         return ret
 

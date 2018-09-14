@@ -58,15 +58,12 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    generator = page_with_property_generator('displaytitle', site=site)
-    second_generator = genFactory.getCombinedGenerator()
-    if second_generator:
-        genFactory.gens = [second_generator]
-        genFactory.intersect = True
-        generator = genFactory.getCombinedGenerator(generator)
-    elif genFactory.namespaces:
-        generator = NamespaceFilterPageGenerator(
-            generator, genFactory.namespaces, site=site)
+    generator = genFactory.getCombinedGenerator()
+    if not generator:
+        generator = page_with_property_generator('displaytitle', site=site)
+        if genFactory.namespaces:
+            generator = NamespaceFilterPageGenerator(
+                generator, genFactory.namespaces, site=site)
 
     bot = LabelSettingBot(generator=generator, site=site, **options)
     bot.run()
