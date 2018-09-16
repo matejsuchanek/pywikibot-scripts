@@ -28,7 +28,7 @@ class WikidataCleanupBot(WikidataEntityBot):
             'cleanup_labels': 'strip labels',
             'deduplicate_aliases': 'remove duplicate aliases',
             'fix_HTML': 'fix HTML',
-            'fix_languages': 'fix languages',
+            'fix_languages': 'fix invalid languages',
             'replace_invisible': 'replace invisible characters',
             'fix_quantities': 'remove explicit bounds',
         }[self.fix]

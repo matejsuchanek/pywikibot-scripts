@@ -9,28 +9,25 @@ from pywikibot.tools.chars import invisible_regex
 class DataWrapper(dict):
 
     def __init__(self, read, write):
-        self.read = read
         self.write = write
         read.update(write)
         super(DataWrapper, self).__init__(read)
 
     def __delitem__(self, key):
-        del self.read[key]
         del self.write[key]
-        return super(DataWrapper, self).__delitem__(key)
-
-    def __getitem__(self, key):
-        return super(DataWrapper, self).__getitem__(key)
+        super(DataWrapper, self).__delitem__(key)
 
     def __setitem__(self, key, value):
-        self.read[key] = value
         self.write[key] = value
-        return super(DataWrapper, self).__setitem__(key, value)
+        super(DataWrapper, self).__setitem__(key, value)
 
-    def update(self, data):
-        self.read.update(data)
-        self.write.update(data)
-        return super(DataWrapper, self).update(data)
+    def update(self, *args, **kwargs):
+        self.write.update(*args, **kwargs)
+        return super(DataWrapper, self).update(*args, **kwargs)
+
+    def setdefault(self, *args):
+        self.write.setdefault(*args, **kwargs)
+        return super(DataWrapper, self).setdefault(*args)
 
 
 class WikidataCleanupToolkit(object):
@@ -41,13 +38,18 @@ class WikidataCleanupToolkit(object):
         'be-x-old': 'be-tarask',
         'bh': 'bho',
         'commons': None,
+        'de-formal': 'de',
+        'es-formal': 'es',
         'fiu-vro': 'vro',
+        'hu-formal': 'hu',
         'media': None,
         'meta': 'en',
+        'nl-informal': 'nl',
         'no': 'nb',
         'roa-rup': 'rup',
         'simple': 'en',
         'species': 'en',
+        'tokipona': None,
         'wikidata': None,
         'zh-classical': 'lzh',
         'zh-min-nan': 'nan',
@@ -74,18 +76,20 @@ class WikidataCleanupToolkit(object):
     def _get_terms(self, item):
         return {'labels': item.labels,
                 'descriptions': item.descriptions,
-                'aliases': item.aliases}
+                'aliases': item.aliases,
+                'sitelinks': item.sitelinks}
 
     def cleanup_data(self, item, data):
         terms = {}
-        for key in ['labels', 'descriptions', 'aliases']:
+        for key in ['labels', 'descriptions', 'aliases', 'sitelinks']:
             terms[key] = DataWrapper(
                 getattr(item, key), data.setdefault(key, {}))
         ret = False
         ret = self.exec_fix('fix_languages', terms) or ret
-        #ret = self.exec_fix('deduplicate_aliases', terms) or ret
+        ret = self.exec_fix('deduplicate_aliases', terms) or ret
         #ret = self.exec_fix('move_alias_to_label', terms) or ret
-        ret = self.exec_fix('add_missing_labels', item, terms['labels']) or ret
+        ret = self.exec_fix('add_missing_labels',
+                            terms['sitelinks'], terms['labels']) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
         ret = self.exec_fix('fix_HTML', terms) or ret
         #ret = self.exec_fix('replace_invisible', terms) or ret
@@ -97,43 +101,39 @@ class WikidataCleanupToolkit(object):
         terms = self._get_terms(item)
         ret = False
         ret = self.exec_fix('fix_languages', terms) or ret
-        #ret = self.exec_fix('deduplicate_aliases', terms) or ret
+        ret = self.exec_fix('deduplicate_aliases', terms) or ret
         #ret = self.exec_fix('move_alias_to_label', terms) or ret
-        ret = self.exec_fix('add_missing_labels', item, terms['labels']) or ret
+        ret = self.exec_fix('add_missing_labels',
+                            terms['sitelinks'], terms['labels']) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
         ret = self.exec_fix('fix_HTML', terms) or ret
         #ret = self.exec_fix('replace_invisible', terms) or ret
         ret = self.exec_fix('fix_quantities', item.claims, []) or ret  # dummy
         return ret
 
-    def move_alias_to_label(self, terms):  # todo
-        labels = {}
-        aliases = {}
-        keys = set(item.aliases.keys())
-        keys -= set(item.labels.keys())
-        keys -= set(item.descriptions.keys())
-        keys -= set(data.get('labels', {}).keys())
-        for lang in keys:
-            if len(item.aliases[lang]) == 1:
-                labels[lang] = item.aliases[lang][0]
-                aliases[lang] = {
-                    'language': lang, 'value': item.aliases[lang][0],
-                    'remove': ''}  # fixme: T194512
-        if labels and aliases:
-            data.setdefault('labels', {}).update(labels)
-            data.setdefault('aliases', {}).update(aliases)
-        return bool(labels) and bool(aliases)
+    def move_alias_to_label(self, terms):  # todo: not always desired
+        ret = False
+        for lang, aliases in terms['aliases'].items():
+            if len(aliases) == 1:
+                terms['aliases'][lang] = []
+                terms['labels'][lang] = aliases.pop()
+                ret = True
+        return ret
 
-    def deduplicate_aliases(self, data):  # todo
+    def deduplicate_aliases(self, data):
         ret = False
         for lang, aliases in data['aliases'].items():
             already = set()
             label = data['labels'].get(lang)
+            if label:
+                already.add(label)
             for alias in aliases[:]:
-                if alias == label or alias in already:
+                if alias in already:
                     aliases.remove(alias)
                     ret = True
-                already.add(alias)
+                else:
+                    already.add(alias)
+            data['aliases'][lang] = aliases
         return ret
 
     @classmethod
@@ -147,33 +147,41 @@ class WikidataCleanupToolkit(object):
             label = data['labels'].get(lang)
             if not label:
                 continue
-            if norm in data['labels']:
-                data['aliases'].setdefault(norm, []).append(label)
-            else:
-                data['labels'][norm] = label
+            if norm:
+                if norm in data['labels']:
+                    aliases = data['aliases'].get(norm, [])
+                    if label not in aliases:
+                        aliases.append(label)
+                        data['aliases'][norm] = aliases
+                else:
+                    data['labels'][norm] = label
             data['labels'][lang] = ''
             ret = True
         for lang, norm in self.lang_map.items():
             description = data['descriptions'].get(lang)
             if description:
-                if norm not in data['descriptions']:
+                if norm and norm not in data['descriptions']:
                     data['descriptions'][norm] = description
                 data['descriptions'][lang] = ''
                 ret = True
-##        for lang, norm in self.lang_map.items():  # fixme: T194512
-##            aliases = data['aliases'].get(lang)
-##            if aliases:
-##                data['aliases'].setdefault(norm, []).extend(aliases)
-##                ret = True
-        for lang, aliases in data['aliases'].items():
-            for alias in aliases:
-                if alias not in data['aliases'].get(lang, []):
-                    data['aliases'].setdefault(lang, []).append(alias)
+        for lang, norm in self.lang_map.items():
+            old_aliases = data['aliases'].get(lang)
+            if old_aliases:
+                if norm:
+                    new_aliases = data['aliases'].get(norm, [])
+                    already = set(new_aliases)
+                    for alias in old_aliases:
+                        if alias not in already:
+                            new_aliases.append(alias)
+                            already.add(alias)
+                    data['aliases'][norm] = new_aliases
+                data['aliases'][lang] = []
+                ret = True
         return ret
 
-    def get_missing_labels(self, item, dont):
+    def get_missing_labels(self, sitelinks, dont):
         labels = {}
-        for dbname, title in item.sitelinks.items():  # todo: impr. dependency
+        for dbname, title in sitelinks.items():
             has_colon = ':' in title
             if not has_colon and '/' in title:
                 continue
@@ -199,8 +207,8 @@ class WikidataCleanupToolkit(object):
                 labels[lang] = title
         return labels
 
-    def add_missing_labels(self, item, data):
-        labels = self.get_missing_labels(item, set(data.keys()))
+    def add_missing_labels(self, sitelinks, data):
+        labels = self.get_missing_labels(sitelinks, set(data.keys()))
         data.update(labels)
         return bool(labels)
 
