@@ -16,6 +16,7 @@ from .wikitext import WikitextFixingBot
 class CheckWikiSettings(object):
 
     prio_map = {
+        '0': '',
         '1': 'high',
         '2': 'medium',
         '3': 'low'
@@ -28,7 +29,7 @@ class CheckWikiSettings(object):
         return self.data[error]['priority']
 
     def get_errors_by_priority(self, priority):
-        for error, data in self.data.values():
+        for error, data in self.data.items():
             if data['priority'] == priority:
                 yield error
 
@@ -70,9 +71,10 @@ class CheckWikiSettings(object):
             num = int(split[1])
             if num > 500:
                 continue
-            data[num] = {}
+            data.setdefault(num, {})
             if split[2] == 'prio':
-                if text in cls.prio_map:
+                text = text.strip()
+                if text in cls.prio_map.keys():
                     data[num]['priority'] = cls.prio_map[text]
             elif split[2] == 'whitelistpage':
                 data[num].setdefault('whitelists', []).append(text)
@@ -265,17 +267,15 @@ class CheckWiki(object):
             if part.isdigit():
                 ids.append(int(part))
             elif part in CheckWikiSettings.prio_map.values():
-                priotities.append(part)
+                priorities.append(part)
         return ids, priorities
 
 
 class CheckWikiBot(WikitextFixingBot):
 
-    def __init__(self, checkwiki, numbers, generator, **kwargs):
+    def __init__(self, checkwiki, numbers, **kwargs):
         kwargs['checkwiki'] = False
-        if not generator:
-            generator = CheckWikiErrorGenerator(checkwiki, ids=numbers)
-        super(CheckWikiBot, self).__init__(generator=generator, **kwargs)
+        super(CheckWikiBot, self).__init__(**kwargs)
         self.checkwiki = checkwiki
         self.numbers = numbers
 
@@ -309,7 +309,8 @@ def main(*args):
             continue
         if arg.startswith('-checkwiki:'):
             ids, priorities = checkwiki.parse_option(arg.partition(':')[2])
-            gen = CheckWikiErrorGenerator(checkwiki, ids, priorities)
+            gen = CheckWikiErrorGenerator(
+                checkwiki, ids=ids, priorities=priorities)
             gens.append(gen)
             continue
         if arg.startswith('-'):
@@ -321,9 +322,15 @@ def main(*args):
         else:
             numbers.extend(checkwiki.parse_option(arg)[0])
 
+    if gens:
+        genFactory.gens.extend(gens)
     generator = genFactory.getCombinedGenerator(preload=True)
+    if not generator:
+        genFactory.gens.append(CheckWikiErrorGenerator(checkwiki, ids=numbers))
+        generator = genFactory.getCombinedGenerator(preload=True)
 
-    bot = CheckWikiBot(checkwiki, numbers, generator, site=site, **options)
+    bot = CheckWikiBot(checkwiki, numbers, generator=generator,
+                       site=site, **options)
     bot.run()
 
 
