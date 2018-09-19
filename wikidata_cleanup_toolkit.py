@@ -26,7 +26,7 @@ class DataWrapper(dict):
         return super(DataWrapper, self).update(*args, **kwargs)
 
     def setdefault(self, *args):
-        self.write.setdefault(*args, **kwargs)
+        self.write.setdefault(*args)
         return super(DataWrapper, self).setdefault(*args)
 
 
