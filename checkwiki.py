@@ -7,12 +7,109 @@ import re
 from pywikibot import pagegenerators
 from pywikibot.exceptions import UnknownExtension
 
+from operator import attrgetter
+
 from .checkwiki_errors import *
 from .wikitext import WikitextFixingBot
 
+
+class CheckWikiSettings(object):
+
+    prio_map = {
+        '1': 'high',
+        '2': 'medium',
+        '3': 'low'
+    }
+
+    def __init__(self, data):
+        self.data = data
+
+    def get_priority(self, error):
+        return self.data[error]['priority']
+
+    def get_errors_by_priority(self, priority):
+        for error, data in self.data.values():
+            if data['priority'] == priority:
+                yield error
+
+    @classmethod
+    def new_from_text(cls, text, dbName):
+        data = {}
+        inside_setting = False
+        setting = None
+        setting_text = ''
+        parsed_settings = {}
+        for line in text.splitlines():
+            if inside_setting is False:
+                match = re.match(' *([a-z0-9_]+) *=', line)
+                if match is not None:
+                    setting = match.group(1)
+                    setting_text = ''
+                    inside_setting = True
+                    line = line[match.end():]
+
+            if inside_setting is True:
+                if 'END' in line:
+                    setting_text += line[:line.index('END')].strip()
+                    inside_setting = False
+                    parsed_settings[setting] = setting_text
+                else:
+                    setting_text += line.strip() + '\n'
+
+        project = parsed_settings.pop('project', dbName)
+        for setting, text in parsed_settings.items():
+            split = setting.split('_')
+            if len(split) != 4:
+                continue
+            if split[0] != 'error':
+                continue
+            if split[-1] != project:
+                continue
+            if not split[1].isdigit():
+                continue
+            num = int(split[1])
+            if num > 500:
+                continue
+            data[num] = {}
+            if split[2] == 'prio':
+                if text in cls.prio_map:
+                    data[num]['priority'] = cls.prio_map[text]
+            elif split[2] == 'whitelistpage':
+                data[num].setdefault('whitelists', []).append(text)
+        return cls(data)
+
+    @classmethod
+    def new_from_site(cls, site):
+        try:
+            page = site.page_from_repository('Q10784379')
+        except (NotImplementedError, UnknownExtension) as e:
+            pywikibot.error(e)
+            return None
+        return cls.new_from_text(page.text, site.dbName())
+
+
+class CheckWikiErrorGenerator(object):
+
+    def __init__(self, checkwiki, priorities=None, ids=None):
+        self.checkwiki = checkwiki
+        self.priorities = priorities or []
+        self.ids = ids or []
+
+    def __iter__(self):
+        for error in self.ids:
+            for page in self.checkwiki.iter_pages(error):
+                yield page
+        already = set(self.ids)
+        for prio in self.priorities:
+            for error in self.checkwiki.settings.get_errors_by_priority(prio):
+                if error not in already:
+                    for page in self.checkwiki.iter_pages(error):
+                        yield page
+
+
 class CheckWiki(object):
 
-    '''Singleton class representing the Check Wikipedia project'''
+    url = 'https://tools.wmflabs.org/checkwiki/cgi-bin/checkwiki_bots.cgi'
 
     errorMap = {
         1: PrefixedTemplate,
@@ -62,15 +159,8 @@ class CheckWiki(object):
         104: ReferenceQuotes,
     }
 
-    prio_map = {
-        '1': 'high',
-        '2': 'medium',
-        '3': 'low'
-    }
-
-    def __init__(self, site, **kwargs):
+    def __init__(self, site):
         self.site = site
-        self.auto = kwargs.pop('auto', True) # todo: user_interactor
 
     def purge(self):
         self.__cache = {}
@@ -83,105 +173,42 @@ class CheckWiki(object):
     def site(self, value):
         self._site = value
         self.purge()
-        self.loadSettings()
+        self.load_settings()
+
+    def load_settings(self):
+        pywikibot.output('Loading CheckWiki settings...')
+        self._settings = CheckWikiSettings.new_from_site(self.site)
 
     @property
     def settings(self):
+        if not hasattr(self, '_settings'):
+            self.load_settings()
         return self._settings
 
-    def loadSettings(self):
-        pywikibot.output('Loading CheckWiki settings')
-        self._settings = {
-            'priority': {
-                'high': [],
-                'medium': [],
-                'low': []
-            },
-            'whitelists': {},
-            #'special': {}
-        }
-        try:
-            set_page = self.site.page_from_repository('Q10784379')
-        except (NotImplementedError, UnknownExtension) as e:
-            pywikibot.error(e)
-            return
-        text = set_page.text
-        inside_setting = False
-        setting = None
-        setting_text = ''
-        parsed_settings = {}
-        for line in text.splitlines():
-            if inside_setting is False:
-                match = re.match(' *([a-z0-9_]+) *=', line)
-                if match is not None:
-                    setting = match.group(1)
-                    setting_text = ''
-                    inside_setting = True
-                    line = line[match.end():]
-
-            if inside_setting is True:
-                if 'END' in line:
-                    setting_text += line[:line.index('END')].strip()
-                    inside_setting = False
-                    parsed_settings[setting] = setting_text
-                else:
-                    setting_text += line.strip() + '\n'
-
-        i = 0
-        project = parsed_settings.pop('project', self.site.dbName())
-        for setting, text in parsed_settings.items():
-            split = setting.split('_')
-            if len(split) != 4:
-                continue
-            if split[0] != 'error':
-                continue
-            if split[-1] != project:
-                continue
-            if not split[1].isdigit():
-                continue
-            num = int(split[1])
-            if num > 500:
-                continue
-            if split[2] == 'prio':
-                if text in self.prio_map:
-                    self._settings['priority'][self.prio_map[text]].append(num)
-                    i += 1
-            elif split[2] == 'whitelistpage':
-                self._settings['whitelists'][num] = text
-
-        self._settings['project'] = project
-        pywikibot.output('%s CheckWiki errors recognized' % i)
-
-    def getError(self, number):
+    def get_error(self, number):
         return self.__cache.setdefault(number, self.errorMap[number](self))
 
-    def iter_errors(self, numbers=[], forFixes=False, instances=[],
-                    priorities=['*'], **kwargs): # todo: own generator
-        for num in self.errorMap.keys():
+    def iter_errors(self, numbers=None, only_for_fixes=False, priorities=None):
+        for num in self.errorMap:
             if numbers and num not in numbers:
                 continue
-
-            #if instances and not ...:
-            error = self.getError(num)
-            if forFixes and not error.isForFixes():
+            if priorities and self.settings.get_priority(num) not in priorities:
                 continue
 
-            #if priorities and not ...:
+            error = self.get_error(num)
+            if only_for_fixes and not error.isForFixes():
+                continue
+
             yield error
 
-    def loadErrors(self, limit=0, **kwargs):
-        for error in self.iter_errors(**kwargs):
-            for page in error.loadError(limit):
-                yield page
-
-    def applyErrors(self, text, page, replaced=[], fixed=[], **kwargs):
-        errors = list(self.iter_errors(**kwargs))
+    def apply(self, text, page, replaced=[], fixed=[], errors=[], **kwargs):
+        errors = list(self.iter_errors(set(errors)))
         while len(errors) > 0:
             error = errors.pop(0)
             if error.needsDecision() or error.handledByCC(): # todo
                 continue
 
-            numbers = list(map(lambda e: e.number, errors))
+            numbers = list(map(attrgetter('number'), errors))
             i = max([numbers.index(num) for num in error.needsFirst
                      if num in numbers] + [0])
             if i > 0:
@@ -198,56 +225,107 @@ class CheckWiki(object):
 
         return text
 
-    def markFixed(self, numbers, page):
-        for error in self.iter_errors(numbers=numbers):
-            error.markFixed(page)
+    def iter_titles(self, num, **kwargs):
+        data = {
+            'action': 'list',
+            'id': num,
+            'project': self.site.dbName(),
+        }
+        for line in self.get(data, **kwargs).iter_lines():
+            yield line.decode().replace('title=', '')  # fixme: b/c
+
+    def iter_pages(self, num, **kwargs):
+        for title in self.iter_titles(num, **kwargs):
+            yield pywikibot.Page(self.site, title)
+
+    def get(self, data, **kwargs):
+        return requests.get(self.url, data, **kwargs)
+
+    def post(self, data, **kwargs):
+        return requests.post(self.url, data, **kwargs)
+
+    def mark_as_fixed(self, page, error):
+        data = {
+            'action': 'mark',
+            'id': error,
+            'project': page.site.dbName(),
+            'title': page.title(),
+        }
+        return self.post(data)
+
+    def mark_as_fixed_multiple(self, page, errors):
+        for error in errors:
+            self.mark_as_fixed(page, error)
+
+    @staticmethod
+    def parse_option(option):
+        ids = []
+        priorities = []
+        for part in option.split(','):
+            if part.isdigit():
+                ids.append(int(part))
+            elif part in CheckWikiSettings.prio_map.values():
+                priotities.append(part)
+        return ids, priorities
+
 
 class CheckWikiBot(WikitextFixingBot):
 
-    def __init__(self, numbers, generator, **kwargs):
+    def __init__(self, checkwiki, numbers, generator, **kwargs):
         kwargs['checkwiki'] = False
-        limit = kwargs.pop('limit', 100) # fixme: options
-        super(CheckWikiBot, self).__init__(**kwargs)
-        self.checkwiki = CheckWiki(self.site, **kwargs)
-        if generator: # fixme!
-            self.generator = self.checkwiki.loadErrors(limit, numbers=numbers)
+        if not generator:
+            generator = CheckWikiErrorGenerator(checkwiki, ids=numbers)
+        super(CheckWikiBot, self).__init__(generator=generator, **kwargs)
+        self.checkwiki = checkwiki
+        self.numbers = numbers
 
     def treat_page(self):
         page = self.current_page
         replaced = []
         fixed = []
-        text = self.checkwiki.applyErrors(page.text, page, replaced, fixed)
+        text = self.checkwiki.apply(
+            page.text, page, replaced, fixed, self.numbers)
         summary = 'opravy dle [[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced)
         self.put_current(
             text, summary=summary,
-            callback=lambda *args: self.markAsFixedOnSuccess(fixed, *args))
+            callback=lambda *args: self.mark_as_fixed_on_success(fixed, *args))
 
-    def markAsFixedOnSuccess(self, numbers, page, exc=None):
-        if exc is None:
-            self.checkwiki.markFixed(numbers, page)
+    def mark_as_fixed_on_success(self, numbers, page, exc=None):
+        if exc is not None:
+            return
+        self.checkwiki.mark_as_fixed_multiple(page, numbers)
+
 
 def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
-    genFactory = pagegenerators.GeneratorFactory()
+    site = pywikibot.Site()
+    checkwiki = CheckWiki(site)
+    genFactory = pagegenerators.GeneratorFactory(site=site)
     numbers = []
+    gens = []
     for arg in local_args:
         if genFactory.handleArg(arg):
             continue
-
+        if arg.startswith('-checkwiki:'):
+            ids, priorities = checkwiki.parse_option(arg.partition(':')[2])
+            gen = CheckWikiErrorGenerator(checkwiki, ids, priorities)
+            gens.append(gen)
+            continue
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':
-                options[arg[1:]] = value if not value.isdigit() else int(value)
+                options[arg[1:]] = int(value) if value.isdigit() else value
             else:
                 options[arg[1:]] = True
-        elif arg.isdigit():
-            numbers.append(int(arg))
+        else:
+            numbers.extend(checkwiki.parse_option(arg)[0])
 
     generator = genFactory.getCombinedGenerator(preload=True)
 
-    bot = CheckWikiBot(numbers, generator, **options)
+    bot = CheckWikiBot(checkwiki, numbers, generator, site=site, **options)
     bot.run()
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     main()

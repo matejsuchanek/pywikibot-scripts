@@ -41,6 +41,7 @@ class FixGenerator(object):
     def __nonzero__(self):
         return True
 
+
 class BaseFix(object):
 
     '''Abstract class representing a wikitext fix'''
@@ -75,6 +76,7 @@ class BaseFix(object):
     def generator(self):
         return (x for x in []) # empty
 
+
 class Fix(BaseFix):
 
     '''A wikitext fix that needs access to the page'''
@@ -87,6 +89,7 @@ class Fix(BaseFix):
     @property
     def exceptions(self):
         return self.exceptions
+
 
 class LazyFix(BaseFix):
 
@@ -139,6 +142,7 @@ class LazyFix(BaseFix):
     @property
     def summary(self):
         return self.message
+
 
 class AdataFix(Fix):
 
@@ -211,6 +215,7 @@ class AdataFix(Fix):
             page.text = new_text
         else:
             pywikibot.output('Failed to add authority control')
+
 
 class CategoriesFix(LazyFix):
 
@@ -352,6 +357,7 @@ class CategoriesFix(LazyFix):
                                                      self.site)
         return result
 
+
 class FilesFix(LazyFix):
 
     key = 'files'
@@ -438,6 +444,7 @@ class FilesFix(LazyFix):
 
         return '[[%s]]' % '|'.join(split)
 
+
 class CheckWikiFix(LazyFix): # todo: make abstract and split
 
     '''
@@ -458,22 +465,24 @@ class CheckWikiFix(LazyFix): # todo: make abstract and split
 
     def load(self):
         from .checkwiki import CheckWiki # fixme
-        self.checkwiki = CheckWiki(self.site) # fixme: **kwargs
+        self.checkwiki = CheckWiki(self.site)
 
     #def generator(self): todo
 
     def replacements(self):
-        for error in self.checkwiki.iter_errors([], forFixes=True):
+        for error in self.checkwiki.iter_errors(only_for_fixes=True):
             pair = error.toTuple()
             yield pair
 
     def apply(self, page, summaries=[], callbacks=[]):
         replaced = []
         fixed = []
-        page.text = self.checkwiki.applyErrors(page.text, page, replaced, fixed)
+        page.text = self.checkwiki.apply(page.text, page, replaced, fixed)
         if len(replaced) > 0: # todo: maxsummarycw
             summaries.append('[[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced))
-            callbacks.append(lambda: self.checkwiki.markFixed(fixed, page))
+            callbacks.append(
+                lambda: self.checkwiki.mark_as_fixed_multiple(page, fixed))
+
 
 class InterwikiFix(Fix):
 
@@ -501,6 +510,7 @@ class InterwikiFix(Fix):
 
         page.text = textlib.replaceLanguageLinks(page.text, new_links, page.site)
         summaries.append('odstranění interwiki')
+
 
 class RedirectFix(LazyFix):
 
@@ -631,6 +641,7 @@ class RedirectFix(LazyFix):
 
         return options_list[int(choice)-1]
 
+
 class RedirectsFromFileFix(RedirectFix):
 
     key = 'redirects-file'
@@ -701,6 +712,7 @@ class RefSortFix(LazyFix):
             text = self.regex_adjacent.sub(callback, text)
 
         return text
+
 
 class SectionsFix(LazyFix):
 
@@ -876,6 +888,7 @@ class SectionsFix(LazyFix):
                                               for node in sect['nodes']]
         return str(code)
 
+
 class StyleFix(Fix): # todo: split and delete
 
     key = 'mos'
@@ -900,6 +913,7 @@ class StyleFix(Fix): # todo: split and delete
                 '|'.join(map(re.escape, self.site.getmagicwords('defaultsort'))),
                 '|'.join(self.site.namespaces[14])),
             r'\1\2', page.text)
+
 
 class TemplateFix(LazyFix):
 
@@ -948,6 +962,7 @@ class TemplateFix(LazyFix):
                 target = first_lower(target)
 
         return match.group('before') + target + match.group('after')
+
 
 class TypoFix(LazyFix):
 

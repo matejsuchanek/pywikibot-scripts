@@ -16,7 +16,6 @@ class CheckWikiError(object):
     exceptions = ['ce', 'comment', 'graph', 'hiero', 'math', 'nowiki',
                   'pre', 'score', 'source', 'startspace']
     needsFirst = []
-    url = 'https://tools.wmflabs.org/checkwiki/cgi-bin/checkwiki_bots.cgi'
 
     def __init__(self, checkwiki):
         self.checkwiki = checkwiki
@@ -29,27 +28,6 @@ class CheckWikiError(object):
     def settings(self):
         return self.checkwiki.settings
 
-    def loadError(self, limit=100):
-        pywikibot.output('Loading pages with error #%s' % self.number)
-        url = '%s?action=list&project=%s&id=%s&limit=%s' % (
-            self.url, self.settings['project'], self.number, limit)
-        for line in requests.get(url).iter_lines():
-            page = pywikibot.Page(self.site, line.decode().replace('title=', '')) # fixme: b/c
-            if not page.exists():
-                self.markFixed(page)
-                continue
-
-            yield page
-
-    def markFixed(self, page):
-        data = {
-            'action': 'mark',
-            'id': self.number,
-            'project': self.settings['project'],
-            'title': page.title()
-        }
-        requests.post(self.url, data)
-
     def apply(self, text, page):
         return textlib.replaceExcept(text, self.pattern(), self.replacement,
                                      self.exceptions, site=page.site)
@@ -61,26 +39,18 @@ class CheckWikiError(object):
         assert self.isForFixes()
         return (self.pattern().pattern, self.replacement)
 
-    @property
-    def priority(self):
-        if not hasattr(self, '_priority'):
-            for prio, errors in self.settings['priority'].items():
-                if self.number in errors:
-                    self._priority = prio # number?
-                    break
-
-        return self._priority
-
     def needsDecision(self): # todo: per subclass, user_interactor
         return False
 
     def handledByCC(self):
         return False
 
+
 class CCHandledError(CheckWikiError):
 
     def handledByCC(self):
         return True
+
 
 class HeaderError(CheckWikiError):
 
@@ -89,13 +59,15 @@ class HeaderError(CheckWikiError):
     def pattern(self):
         return re.compile('(?m)^(?P<start>==+)(?P<content>((?!==|= *$).)+?)(?P<end>==+) *$')
 
+
 class TagReplacement(CheckWikiError):
 
     summary = 'odstranění zb. HTML tagu'
-    tag = None # extend
+    tag = None  # extend
 
     def pattern(self):
         return re.compile(r'(?s)<(?P<tag>%s)>(?P<content>.*?)</(?P=tag)>')
+
 
 class EntityReplacement(CheckWikiError):
 
@@ -110,6 +82,7 @@ class EntityReplacement(CheckWikiError):
         entity = match.group('entity')
         return self.entities_map[entity]
 
+
 class DefaultsortError(CheckWikiError):
 
     summary = 'oprava DEFAULTSORTu'
@@ -117,6 +90,7 @@ class DefaultsortError(CheckWikiError):
     def pattern(self):
         magic = self.site.getmagicwords('defaultsort')
         return re.compile(r'\{\{ *(?P<magic>%s)(?P<key>[^}]+)\}\}' % '|'.join(magic))
+
 
 class PrefixedTemplate(CheckWikiError):
 
@@ -131,6 +105,7 @@ class PrefixedTemplate(CheckWikiError):
 
     def replacement(self, match):
         return '{{'
+
 
 class BrokenHTMLTag(CheckWikiError):
 
@@ -191,6 +166,7 @@ class BrokenHTMLTag(CheckWikiError):
 
         return super(BrokenHTMLTag, self).apply(text, page)
 
+
 class LowHeadersLevel(HeaderError):
 
     number = 7
@@ -216,6 +192,7 @@ class LowHeadersLevel(HeaderError):
 
         return text
 
+
 class MissingEquation(CheckWikiError):
 
     number = 8
@@ -237,9 +214,11 @@ class MissingEquation(CheckWikiError):
 
         return match.group()
 
+
 class SingleLineCategories(CCHandledError):
 
     number = 9
+
 
 class NoEndSquareBrackets(CheckWikiError): # fixme
 
@@ -305,6 +284,7 @@ class NoEndSquareBrackets(CheckWikiError): # fixme
             #return match.group()[2:]
 
         return match.group()
+
 
 class HTMLEntity(EntityReplacement):
 
@@ -372,9 +352,11 @@ class HTMLEntity(EntityReplacement):
 
         return match.group()
 
+
 class InvisibleChars(CCHandledError):
 
     number = 16
+
 
 class DuplicateCategory(CheckWikiError):
 
@@ -389,9 +371,11 @@ class DuplicateCategory(CheckWikiError):
             text = textlib.replaceCategoryLinks(text, categories, page.site)
         return text
 
+
 class LowerCaseCategory(CCHandledError):
 
     number = 18
+
 
 class SingleEquationHeader(HeaderError):
 
@@ -405,6 +389,7 @@ class SingleEquationHeader(HeaderError):
     def replacement(self, match):
         return '== %s ==' % match.group(1).strip()
 
+
 class Dagger(EntityReplacement):
 
     entity_map = {
@@ -412,6 +397,7 @@ class Dagger(EntityReplacement):
         'Dagger': '‡',
     }
     number = 20
+
 
 class EnglishCategory(CCHandledError):
 
@@ -425,6 +411,7 @@ class EnglishCategory(CCHandledError):
         ns = list(self.site.namespaces[14])
         ns.remove('Category')
         return '[[%s:' % ns[0]
+
 
 class CategoryWithSpace(CheckWikiError):
 
@@ -456,6 +443,7 @@ class CategoryWithSpace(CheckWikiError):
                 return '[[%s:%s]]' % (new_prefix, new_content)
 
         return match.group()
+
 
 class HeaderHierarchy(HeaderError):
 
@@ -503,6 +491,7 @@ class HeaderHierarchy(HeaderError):
 
         return text
 
+
 class Bold(CCHandledError, TagReplacement):
 
     needsFirst = [2]
@@ -512,9 +501,11 @@ class Bold(CCHandledError, TagReplacement):
     def replacement(self, match):
         return match.expand("'''\g<content>'''")
 
+
 class Unicode(CheckWikiError): # todo
 
     number = 27
+
 
 class MultiplePipes(CheckWikiError):
 
@@ -541,6 +532,7 @@ class MultiplePipes(CheckWikiError):
 
         return match.group()
 
+
 class MagicWords(CheckWikiError):
 
     exceptions = CheckWikiError.exceptions[:] + ['gallery', 'ref'] # todo: etc.
@@ -563,6 +555,7 @@ class MagicWords(CheckWikiError):
 
         return match.group()
 
+
 class Italics(CCHandledError, TagReplacement):
 
     needsFirst = [2]
@@ -572,6 +565,7 @@ class Italics(CCHandledError, TagReplacement):
     def replacement(self, match):
         return match.expand("''\g<content>''")
 
+
 class StrikedText(TagReplacement):
 
     needsFirst = [2]
@@ -580,6 +574,7 @@ class StrikedText(TagReplacement):
 
     def replacement(self, match):
         return match.expand('<s>\g<content></s>')
+
 
 class BoldHeader(HeaderError):
 
@@ -591,9 +586,11 @@ class BoldHeader(HeaderError):
         content = match.group('content')
         if "'''" in content:
             content = content.replace("'''", '')
-            return ' '.join([match.group('start'), content.strip(), match.group('end')])
+            return ' '.join([
+                match.group('start'), content.strip(), match.group('end')])
         else:
             return match.group()
+
 
 class SelfLink(CheckWikiError):
 
@@ -629,9 +626,11 @@ class SelfLink(CheckWikiError):
             text, r"(?P<before>''')?\[\[(?P<inside>[^]]+)\]\](?P<after>''')?",
             lambda m: self.replacement(m, title), exceptions, site=page.site)
 
+
 class HTMLHeader(CCHandledError):
 
     number = 49
+
 
 class EntitesAsDashes(EntityReplacement):
 
@@ -641,17 +640,21 @@ class EntitesAsDashes(EntityReplacement):
     }
     number = 50
 
+
 class InterwikiBeforeHeader(CCHandledError):
 
     number = 51
+
 
 class CategoriesBeforeHeader(CCHandledError):
 
     number = 52
 
+
 class InterwikiBeforeCategory(CCHandledError):
 
     number = 53
+
 
 class ListWithBreak(CheckWikiError):
 
@@ -669,6 +672,7 @@ class ListWithBreak(CheckWikiError):
         else:
             return line
 
+
 class HeaderWithColon(HeaderError):
 
     number = 57
@@ -677,9 +681,14 @@ class HeaderWithColon(HeaderError):
     def replacement(self, match):
         content = match.group('content').strip()
         if content.endswith(':'):
-            return ' '.join([match.group('start'), content[:-1].strip(), match.group('end')])
+            return ' '.join([
+                match.group('start'),
+                content[:-1].strip(),
+                match.group('end'),
+            ])
         else:
             return match.group()
+
 
 class ParameterWithBreak(CheckWikiError):
 
@@ -692,7 +701,7 @@ class ParameterWithBreak(CheckWikiError):
             return match.group()
 
         for template, fielddict in textlib.extract_templates_and_params(
-            match.group(), remove_disabled_parts=False, strip=False):
+                match.group(), remove_disabled_parts=False, strip=False):
             if template.strip() == match.group('name'):
                 changed = False
                 name_part = match.group().split('|', 1)[0]
@@ -715,6 +724,7 @@ class ParameterWithBreak(CheckWikiError):
 
     def apply(self, text, page):
         return textlib.NESTED_TEMPLATE_REGEX.sub(self.replacement, text)
+
 
 class RefBeforePunctuation(CheckWikiError):
 
@@ -781,6 +791,7 @@ class RefBeforePunctuation(CheckWikiError):
         return init + ''.join(match.group()[start:end] for start, end in zip(
             positions[::2], positions[1::2])) + space_after
 
+
 class SmallInsideTags(CheckWikiError):
 
     number = 63
@@ -801,6 +812,7 @@ class SmallInsideTags(CheckWikiError):
         return '<{tag}{params}>{content}</{tag}>'.format(
             tag=match.group('tag'), content=content,
             params=match.group('params') or '')
+
 
 class BadListStructure(CheckWikiError): # todo
 
@@ -855,9 +867,11 @@ class BadListStructure(CheckWikiError): # todo
             text, regex, lambda match: self.replace(match, levels),
             self.exceptions[:], site=self.site)
 
+
 class NoSpace(CheckWikiError): # todo
 
     number = 76
+
 
 class BrokenExternalLink(CheckWikiError): # todo
 
@@ -880,6 +894,7 @@ class BrokenExternalLink(CheckWikiError): # todo
             return match.expand(r'[\g<link>]\g<stop>')
 
         return match.group()
+
 
 class DuplicateReferences(CheckWikiError):
 
@@ -1040,6 +1055,7 @@ class DuplicateReferences(CheckWikiError):
             text = ref_regex.sub(repairNamesAndTidy, new_text)
         return text
 
+
 class EmptyTag(CheckWikiError):
 
     number = 85
@@ -1054,10 +1070,12 @@ class EmptyTag(CheckWikiError):
     def replacement(self, match):
         return match.expand(r'\2')
 
+
 class ExternalLinkLikeInternal(CCHandledError):
 
     number = 86
     summary = 'oprava syntaxe odkazu'
+
 
 class DefaultsortSpace(DefaultsortError):
 
@@ -1069,6 +1087,7 @@ class DefaultsortSpace(DefaultsortError):
             return '{{%s%s}}' % (magic, key.strip())
 
         return match.group()
+
 
 class DefaultsortComma(DefaultsortError):
 
@@ -1082,11 +1101,13 @@ class DefaultsortComma(DefaultsortError):
 
         return match.group()
 
+
 class InternalLink(CCHandledError):
 
     number = 90
     summary = 'oprava odkazu'
     # todo: inside files
+
 
 class DoubleHttp(CheckWikiError):
 
@@ -1100,6 +1121,7 @@ class DoubleHttp(CheckWikiError):
     def replacement(self, match):
         return match.group()[match.group().rfind('http'):]
 
+
 class Ordinals(CheckWikiError):
 
     needsFirst = [81]
@@ -1112,6 +1134,7 @@ class Ordinals(CheckWikiError):
     def replacement(self, match):
         return match.expand(r'\1\2')
 
+
 class SuperfluousPipe(CheckWikiError):
 
     number = 103
@@ -1122,6 +1145,7 @@ class SuperfluousPipe(CheckWikiError):
 
     def replacement(self, match):
         return match.expand(r'[[\1|\2]]')
+
 
 class ReferenceQuotes(CheckWikiError):
 
@@ -1136,7 +1160,7 @@ class ReferenceQuotes(CheckWikiError):
             starts = p.group('starts') or ''
             ends = p.group('ends') or ''
             if starts == ends and len(starts) < 2 and len(ends) < 2:
-                return p.group() # could tidy but not our business now
+                return p.group()  # could tidy but not our business now
 
             if len(starts) > 1:
                 starts = '"' if '"' in starts else "'"
