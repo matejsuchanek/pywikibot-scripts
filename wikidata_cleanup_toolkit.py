@@ -81,7 +81,8 @@ class WikidataCleanupToolkit(object):
 
     def cleanup_data(self, item, data):
         terms = {}
-        for key in ['labels', 'descriptions', 'aliases', 'sitelinks']:
+        keys = ('labels', 'descriptions', 'aliases', 'sitelinks')
+        for key in keys:
             terms[key] = DataWrapper(
                 getattr(item, key), data.setdefault(key, {}))
         ret = False
@@ -95,6 +96,9 @@ class WikidataCleanupToolkit(object):
         #ret = self.exec_fix('replace_invisible', terms) or ret
         ret = self.exec_fix(
             'fix_quantities', item.claims, data.setdefault('claims', [])) or ret
+        for key in keys:
+            if not data[key]:
+                data.pop(key)
         return ret
 
     def cleanup_entity(self, item):
@@ -150,7 +154,7 @@ class WikidataCleanupToolkit(object):
             if norm:
                 if norm in data['labels']:
                     aliases = data['aliases'].get(norm, [])
-                    if label not in aliases:
+                    if label not in map(first_lower, aliases):
                         aliases.append(label)
                         data['aliases'][norm] = aliases
                 else:
@@ -169,7 +173,9 @@ class WikidataCleanupToolkit(object):
             if old_aliases:
                 if norm:
                     new_aliases = data['aliases'].get(norm, [])
-                    already = set(new_aliases)
+                    already = set(map(first_lower, new_aliases))
+                    if norm in data['labels']:
+                        already.add(first_lower(data['labels'][norm]))
                     for alias in old_aliases:
                         if alias not in already:
                             new_aliases.append(alias)

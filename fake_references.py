@@ -141,7 +141,8 @@ class FakeReferencesBot(WikidataEntityBot):
                 #continue?
                 return ret
 
-            url = next(iter(source[prop])).getTarget()
+            snak = next(iter(source[prop]))
+            url = snak.getTarget()
             if not url:
                 continue
             target = None
@@ -157,10 +158,13 @@ class FakeReferencesBot(WikidataEntityBot):
             except ValueError:
                 pass
             if target:
-                snak = pywikibot.Claim(
-                    self.repo, self.inferred_from, isReference=True)
-                snak.setTarget(target)
-                source.setdefault(self.inferred_from, []).append(snak)
+                if target.isRedirectPage():
+                    target = target.getRedirectTarget()
+                if target != snak.on_item:
+                    snak = pywikibot.Claim(
+                        self.repo, self.inferred_from, isReference=True)
+                    snak.setTarget(target)
+                    source.setdefault(self.inferred_from, []).append(snak)
                 source.pop(prop)
                 ret = True
         return ret
