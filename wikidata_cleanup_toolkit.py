@@ -220,6 +220,13 @@ class WikidataCleanupToolkit(object):
 
     @staticmethod
     def can_strip(part, description):
+        words = {  # [[d:Topic:Uljziilm6l85hsp3]]
+            'vrouwen', 'mannen', 'jongens', 'meisjes', 'enkel', 'dubbel',
+            'mannenenkel', 'vrouwenenkel', 'jongensenkel', 'meisjesenkel',
+            'mannendubbel', 'vrouwendubbel', 'jongensdubbel', 'meisjesdubbel',
+        }
+        if part.isdigit() or part in words:
+            return False
         if part not in description:  # todo: word to word, not just substring
             for sub in part.split(', '):
                 if sub not in description:
@@ -235,8 +242,6 @@ class WikidataCleanupToolkit(object):
             left, sep, right = label.rstrip(')').rpartition(' (')
             if not sep:
                 left, sep, right = label.partition(', ')
-                if right.isdigit():
-                    sep = False
             if sep and not (set(left) & set('(:)')):
                 if self.can_strip(right, description):
                     terms['labels'][lang] = left.strip()
@@ -272,16 +277,16 @@ class WikidataCleanupToolkit(object):
         return False
 
     def iter_fixed_quantities(self, all_claims):
-        for prop, claims in all_claims.items():
+        for claims in all_claims.values():
             for claim in claims:
-                if self.fix_quantity(claim):
-                    yield claim
-                for qprop, snaks in claim.qualifiers.items():
+                ret = self.fix_quantity(claim)
+                for snaks in claim.qualifiers.values():
                     for snak in snaks:
-                        if self.fix_quantity(snak):
-                            yield claim
+                        ret = self.fix_quantity(snak) or ret
+                if ret:
+                    yield claim
 
     def fix_quantities(self, claims, data):
-        fixed = set(self.iter_fixed_quantities(claims))
-        data.extend(claim.toJSON() for claim in fixed)
+        data.extend(
+            claim.toJSON() for claim in self.iter_fixed_quantities(claims))
         return bool(fixed)
