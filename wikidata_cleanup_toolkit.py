@@ -287,6 +287,8 @@ class WikidataCleanupToolkit(object):
                     yield claim
 
     def fix_quantities(self, claims, data):
-        data.extend(
-            claim.toJSON() for claim in self.iter_fixed_quantities(claims))
-        return bool(fixed)
+        ret = False
+        for claim in self.iter_fixed_quantities(claims):
+            data.append(claim.toJSON())
+            ret = True
+        return ret
