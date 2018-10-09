@@ -188,17 +188,10 @@ class WikidataCleanupToolkit(object):
     def get_missing_labels(self, sitelinks, dont):
         labels = {}
         for dbname, title in sitelinks.items():
-            has_colon = ':' in title
-            if not has_colon and '/' in title:
+            if ':' not in title and '/' in title:
                 continue
-            parts = dbname.partition('wik')
-            lang = self.normalize_lang(parts[0])
+            lang = self.normalize_lang(dbname.partition('wik')[0])
             if lang and lang not in dont:
-                if not has_colon:  # todo: refact. with get_labels_to_update
-                    if title.endswith(')'):
-                        left, sep, right = title.rpartition(' (')
-                        if left and not (set(left) & set('(:)')):
-                            title = left
                 # [[d:Topic:Uhdjlv9aae6iijuc]]
                 # todo: create a lib for this
                 if lang == 'fr' and title.startswith(
@@ -225,7 +218,7 @@ class WikidataCleanupToolkit(object):
             'mannenenkel', 'vrouwenenkel', 'jongensenkel', 'meisjesenkel',
             'mannendubbel', 'vrouwendubbel', 'jongensdubbel', 'meisjesdubbel',
         }
-        if part.isdigit() or part in words:
+        if part[-1].isdigit() or part in words:
             return False
         if part not in description:  # todo: word to word, not just substring
             for sub in part.split(', '):
