@@ -56,7 +56,6 @@ class QuickStatementsBot(WikidataEntityBot):
                 snak.setTarget(monotext)
                 return True
         elif snak.type == 'globe-coordinate':
-            # fixme: crashes
             match = re.fullmatch(r'@(\d+(?:\.\d+)?)/(\d+(?:\.\d+)?)', value)
             if match:
                 coord = Coordinate(*map(float, match.groups()), site=self.repo)
