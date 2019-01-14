@@ -10,12 +10,21 @@ from .wikidata import WikidataEntityBot
 
 class QuickStatementsBot(WikidataEntityBot):
 
+    decimal_pattern = r'[+-]?\d+(?:\.\d+)?'
+
     def __init__(self, file, **kwargs):
         self.availableOptions({
             'always': True,
         })
         super(QuickStatementsBot, self).__init__(**kwargs)
         self.file = file
+        self.globeR = re.compile(r'@({0})/({0})'.format(self.decimal_pattern))
+        self.quantityR = re.compile(
+            r'({0})(?:~({0}))?(?:U(\d+))?'
+            .format(self.decimal_pattern))
+        self.quantity_oldR = re.compile(
+            r'({0})(?:\[({0}),({0})\])(?:U(\d+))?'
+            .format(self.decimal_pattern))
 
     def teardown(self):
         self.file.close()
@@ -28,11 +37,19 @@ class QuickStatementsBot(WikidataEntityBot):
         if snak.type == 'wikibase-item':
             snak.setTarget(pywikibot.ItemPage(self.repo, value))
             return True
+        elif snak.type == 'wikibase-property':
+            snak.setTarget(pywikibot.PropertyPage(self.repo, value))
+            return True
         elif snak.type == 'quantity':
-            match = re.fullmatch(
-                r'(\d+(?:\.\d+)?)(?:~(\d+(?:\.\d+)?))?(?:U(\d+))?', value)
+            match = self.quantityR(value)
             if match:
                 amount, error, unit = match.groups()
+            else:
+                match = self.quantity_oldR(value)
+                if match:
+                    amount, lower, upper, unit = match.groups()
+                    error = upper, lower  # it *is* the other way around
+            if match:
                 if unit:
                     unit = pywikibot.ItemPage(self.repo, 'Q' + unit)
                 quantity = WbQuantity(amount, unit, error, site=self.repo)
@@ -45,10 +62,16 @@ class QuickStatementsBot(WikidataEntityBot):
                     iso, precision=int(prec), site=self.repo)
                 snak.setTarget(time)
                 return True
-        elif snak.type in ('string', 'external-id', 'url'):
+        elif snak.type in ('string', 'external-id', 'url', 'math'):
             if value.startswith('"') and value.endswith('"'):
                 snak.setTarget(value[1:-1])
                 return True
+        elif snak.type == 'commonsMedia':
+            if value.startswith('"') and value.endswith('"'):
+                repo = self.repo.image_repository()
+                snak.setTarget(pywikibot.FilePage(repo, value[1:-1]))
+                return True
+        #elif snak.type in ('geo-shape', 'tabular-data'):
         elif snak.type == 'monolingualtext':
             lang, _, text = value.partition(':')
             if text and text.startswith('"') and text.endswith('"'):
@@ -56,7 +79,7 @@ class QuickStatementsBot(WikidataEntityBot):
                 snak.setTarget(monotext)
                 return True
         elif snak.type == 'globe-coordinate':
-            match = re.fullmatch(r'@(\d+(?:\.\d+)?)/(\d+(?:\.\d+)?)', value)
+            match = self.globeR(value)
             if match:
                 coord = Coordinate(*map(float, match.groups()), site=self.repo)
                 snak.setTarget(coord)
@@ -67,6 +90,7 @@ class QuickStatementsBot(WikidataEntityBot):
         for line in self.file.readlines():
             split = line.split('\t')
             if len(split) < 3 or len(split) % 2 == 0:
+                pywikibot.warning('Invalid line: {}'.format(line))
                 continue
 
             try:
@@ -77,7 +101,7 @@ class QuickStatementsBot(WikidataEntityBot):
 
             try:
                 claim = pywikibot.Claim(self.repo, split[1])
-            except Exception:
+            except Exception as e:
                 pywikibot.error(e)
                 continue
 
