@@ -41,11 +41,11 @@ class QuickStatementsBot(WikidataEntityBot):
             snak.setTarget(pywikibot.PropertyPage(self.repo, value))
             return True
         elif snak.type == 'quantity':
-            match = self.quantityR(value)
+            match = self.quantityR.fullmatch(value)
             if match:
                 amount, error, unit = match.groups()
             else:
-                match = self.quantity_oldR(value)
+                match = self.quantity_oldR.fullmatch(value)
                 if match:
                     amount, lower, upper, unit = match.groups()
                     error = upper, lower  # it *is* the other way around
@@ -79,7 +79,7 @@ class QuickStatementsBot(WikidataEntityBot):
                 snak.setTarget(monotext)
                 return True
         elif snak.type == 'globe-coordinate':
-            match = self.globeR(value)
+            match = self.globeR.fullmatch(value)
             if match:
                 coord = Coordinate(*map(float, match.groups()), site=self.repo)
                 snak.setTarget(coord)
@@ -121,11 +121,11 @@ class QuickStatementsBot(WikidataEntityBot):
                 snak = pywikibot.Claim(self.repo, prop, **{key: True})
                 if self.set_target(snak, value.strip()):
                     data.append(snak)
-            item.addClaim(claim)
             for q in qualifiers:
                 claim.addQualifier(q)
             if references:
                 claim.addSources(references)
+            self.user_add_claim(item, claim)
 
 
 def main(*args):
