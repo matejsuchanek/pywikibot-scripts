@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 import pywikibot
 
 from pywikibot import pagegenerators
@@ -15,7 +17,6 @@ class ClaimsSplittingBot(WikidataEntityBot):
 
     def __init__(self, generator, **kwargs):
         self.availableOptions.update({
-            'always': True,
             'limit': 500,
         })
         super(ClaimsSplittingBot, self).__init__(**kwargs)
@@ -91,10 +92,10 @@ class ClaimsSplittingBot(WikidataEntityBot):
 
     def treat_page_and_item(self, page, item):
         to_remove = []
-        for prop, claims in item.claims.items():
+        for claims in item.claims.values():
             for claim in claims:
                 if self.has_multiple(claim) and self.can_divide(claim):
-                    assert not claim.sources
+                    assert not claim.sources  # todo
                     to_remove.append(claim)
                     pairs = self.get_qualifier_pairs(claim)
                     for start, end in pairs:
@@ -103,9 +104,7 @@ class ClaimsSplittingBot(WikidataEntityBot):
                             new_claim.setTarget(claim.target)
                         else:
                             new_claim.setSnakType(claim.snaktype)
-                        item.addClaim(new_claim)
-                        if new_claim.rank != claim.rank:
-                            new_claim.changeRank(claim.rank)
+                        new_claim.setRank(claim.rank)
                         if start:
                             start.hash = None
                             new_claim.addQualifier(start)
@@ -114,9 +113,10 @@ class ClaimsSplittingBot(WikidataEntityBot):
                             new_claim.addQualifier(end)
                         for ref in claim.sources:
                             sources = []
-                            for prop, snaks in ref.items():
+                            for snaks in ref.values():
                                 sources.extend(snaks)
                             new_claim.addSources(sources)
+                        self.user_add_claim(item, new_claim)
         if to_remove:
             data = {'claims': [
                 {'id': cl.toJSON()['id'], 'remove': ''} for cl in to_remove]}
