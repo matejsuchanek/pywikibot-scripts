@@ -44,6 +44,12 @@ class CaptionToImageBot(WikidataEntityBot):
         return super(CaptionToImageBot, self).skip_page(item) or (
             self.caption_property not in item.claims)
 
+    def _save_entity(self, func, *args, **kwargs):
+        # fixme upstream
+        if 'asynchronous' in kwargs:
+            kwargs.pop('asynchronous')
+        return func(*args, **kwargs)
+
     def treat_page_and_item(self, page, item):
         our_prop = self.image_property
         if our_prop not in item.claims:
