@@ -139,7 +139,7 @@ class DuosManagingBot(WikidataEntityBot):
                             split[0] += ' %s' % split1[-1]
                             split0.append(split1[-1])
                 if len(split0) > 1 or len(split1) == 1:
-                    for i in range(2):
+                    for i in [0, 1]:
                         labels[i][lang] = split[i]
                     break
 
@@ -159,8 +159,8 @@ class DuosManagingBot(WikidataEntityBot):
 
         to_add = []
         to_remove = []
-        for prop in set(self.distribute_properties) & set(item.claims.keys()):
-            for claim in item.claims[prop]:
+        for prop in self.distribute_properties:
+            for claim in item.claims.get(prop, []):
                 if claim.getTarget():
                     to_remove.append(claim)
                     json = claim.toJSON()
@@ -170,10 +170,10 @@ class DuosManagingBot(WikidataEntityBot):
         items = [self.create_item(item, data, relation, to_add)
                  for data in labels]
         if self.relation_map.get(relation):
-            for i in [1, 0]:
+            for it, target in zip(items, reversed(items)):
                 claim = pywikibot.Claim(self.repo, self.relation_map[relation])
-                claim.setTarget(items[1-i])
-                self.user_add_claim(items[i], claim)
+                claim.setTarget(target)
+                self.user_add_claim(it, claim)
 
         for it in items:
             claim = pywikibot.Claim(self.repo, 'P527')
@@ -202,10 +202,10 @@ class DuosManagingBot(WikidataEntityBot):
         claim = pywikibot.Claim(self.repo, 'P31')
         claim.setTarget(pywikibot.ItemPage(self.repo, 'Q5'))
         self.user_add_claim(new_item, claim)
-        if relation == 'twin':
-            claim = pywikibot.Claim(self.repo, 'P31')
-            claim.setTarget(pywikibot.ItemPage(self.repo, 'Q159979'))
-            self.user_add_claim(new_item, claim)
+##        if relation == 'twin':
+##            claim = pywikibot.Claim(self.repo, 'P31')
+##            claim.setTarget(pywikibot.ItemPage(self.repo, 'Q159979'))
+##            self.user_add_claim(new_item, claim)
 
         claim = pywikibot.Claim(self.repo, 'P361')
         claim.setTarget(item)
