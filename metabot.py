@@ -15,6 +15,23 @@ from .tools import get_best_statements
 from .wikidata import WikidataEntityBot
 
 
+def parse_float(value):  # todo: move to tools
+    if ',' in value:
+        if '.' in value:
+            try:
+                value = float(value.replace(',', ''))
+            except ValueError:
+                value = float(value.replace('.', '').replace(',', '.'))
+        else:
+            value = float(value.replace(',', '.'))
+    else:
+        try:
+            value = float(value)
+        except ValueError:
+            value = float(value.replace('.', ''))
+    return value
+
+
 class MetadataHarvestingBot(WikidataEntityBot):
 
     obsolete_params = ('datatype', 'planned use', 'status', 'suggested values',
@@ -25,12 +42,13 @@ class MetadataHarvestingBot(WikidataEntityBot):
             r'\b(?:[Ff]il|[Ii]mag)e:(?P<value>[^]|[{}]*\.\w{3,})\b'),
         #'coordinates': r'',
         #'monolingualtext': r'',
-        'quantity': re.compile(r'(?P<value>-?\b\d([\d.,]*\d)?\b'
-                               r'(\s*(?:±|[+-])\s*\d([\d.,]*\d)?\b)?'
-                               r'(\s+[Qq]\W*[1-9]\d*\b)?)'),
+        'quantity': re.compile(
+            r'(?P<value>(?P<amount>-?\b\d(?:[\d.,]*\d)?)\b'
+            r'(\s*(?:±|[+-])\s*(?P<error>\d(?:[\d.,]*\d)?)\b)?'
+            r'(?P<unit>\W+[Qq]\W*[1-9]\d*\b)?)'),
         'split-break': re.compile(r'\s*(?:<[^>\w]*br\b[^>]*> *|'
                                   '(?:^|\n+)[:;*#]+){1,2}'),
-        'split-comma': re.compile(r'\s*(?:;\s+|,\s*)'),
+        'split-comma': re.compile(r'\s*[:,]\s+'),
         #'time': r'',
         'url': textlib.compileLinkR(),
         'wikibase-item': re.compile(r'\b[Qq]\W*(?P<value>[1-9]\d*)\b'),
@@ -102,6 +120,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
 
     def treat_property_and_talk(self, prop, page):
         self.current_talk_page = page
+        # todo: skip sandbox properties
         # todo: removeDisabledParts now?
         code = mwparserfromhell.parse(page.text, skip_style_tags=True)
         for template in code.ifilter_templates():
@@ -164,6 +183,11 @@ class MetadataHarvestingBot(WikidataEntityBot):
             self.regexes['formatter'] = re.compile(
                 self.get_regex_from_prop(prop))
         return self.regexes['formatter']
+
+    def get_source(self):
+        source = pywikibot.Claim(self.repo, 'P4656', is_reference=True)
+        source.setTarget('https:' + self.current_talk_page.permalink())
+        return source
 
     def make_summary(self):
         rev_id = self.current_talk_page.latest_revision_id
@@ -311,32 +335,38 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 while qual_target.isRedirectPage():
                     qual_target = pywikibot.FilePage(qual_target.getRedirectTarget())
             elif prop.type == 'quantity':
-                value, _, right = qual_target.rpartition(' ')
-                error = unit = None
-                if right:
+                try:
+                    amount = parse_float(qual_match.group('amount'))
+                except ValueError:
+                    pywikibot.output('Couldn\'t parse "{}"'
+                                     ''.format(qual_target))
+                    continue
+                error = qual_match.group('error')
+                unit = qual_match.group('unit')
+                if error:
+                    try:
+                        error = parse_float(error)
+                    except ValueError:
+                        pywikibot.output('Couldn\'t parse "{}"'
+                                         ''.format(qual_target))
+                        continue
+                if unit:
                     search = self.regexes['wikibase-item'].search(unit)
-                    if search:
-                        unit = pywikibot.ItemPage(
-                            self.repo, 'Q' + search.group('value'))
-                        if unit.isRedirectPage():
-                            unit = unit.getRedirectTarget()
-                        value, _, error = value.partition(' ')
-                    else:
-                        error = right
-                    if error:
-                        error = error.lstrip().lstrip('±+-').lstrip()
-                        error = float(error.replace(',', ''))
-                    else:
-                        error = None
-                num = float(value.replace(',', ''))
+                    unit = pywikibot.ItemPage(
+                        self.repo, 'Q' + search.group('value'))
+                    if unit.isRedirectPage():
+                        unit = unit.getRedirectTarget()
+                else:
+                    unit = None
                 qual_target = pywikibot.WbQuantity(
-                    num, unit, error, site=self.repo)
+                    amount, unit, error, site=self.repo)
 
             claim = pywikibot.Claim(self.repo, 'P1855')
             claim.setTarget(target)
-            qualifier = prop.newClaim(isQualifier=True)
+            qualifier = prop.newClaim(is_qualifier=True)
             qualifier.setTarget(qual_target)
             claim.addQualifier(qualifier)
+            claim.addSource(self.get_source())
             ok = self.user_add_claim(prop, claim, summary=self.make_summary())
             remove = ok and remove
         return remove
@@ -359,6 +389,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 continue  # ???
             claim = pywikibot.Claim(self.repo, 'P1630')
             claim.setTarget(match)
+            claim.addSource(self.get_source())
             ok = self.user_add_claim(prop, claim, summary=self.make_summary())
             remove = ok and remove
         return remove
@@ -380,6 +411,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 if target.isRedirectPage():
                     target = target.getRedirectTarget()
                 claim.setTarget(target)
+                claim.addSource(self.get_source())
                 ok = self.user_add_claim(
                     prop, claim, summary=self.make_summary(),
                     asynchronous=not inverse)
@@ -409,6 +441,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                           'Wikidata:Property_proposal/Archive/{}#{}'
                           ).format(textvalue, prop.id)
                 claim.setTarget(target)
+                claim.addSource(self.get_source())
                 return self.user_add_claim(
                     prop, claim, summary=self.make_summary())
         return False
@@ -422,6 +455,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 claim = pywikibot.Claim(self.repo, 'P3254')
                 target = 'https://www.wikidata.org/wiki/' + title
                 claim.setTarget(target)
+                claim.addSource(self.get_source())
                 return self.user_add_claim(prop, claim, self.make_summary())
         return False
 
@@ -451,6 +485,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 claim = pywikibot.Claim(self.repo, 'P1896')
                 claim.setTarget(target)
                 # todo: qualifier 'title', language "und"
+                claim.addSource(self.get_source())
                 ok = self.user_add_claim(
                     prop, claim, summary=self.make_summary())
                 remove = ok and remove
@@ -473,6 +508,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                     target = pywikibot.WbQuantity(num, site=self.repo)
                     claim = pywikibot.Claim(self.repo, 'P4876')
                     claim.setTarget(target)
+                    claim.addSource(self.get_source())
                     remove = self.user_add_claim(
                         prop, claim, summary=self.make_summary())
         else:
