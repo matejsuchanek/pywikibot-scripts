@@ -202,7 +202,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 if prop.type == 'external-id':
                     pywikibot.output('Info: No formatter found for "{}"'
                                      ''.format(prop.title()))
-                regex = re.compile('^(?P<value>{})$'.format(regex)
+                regex = re.compile('^(?P<value>{})$'.format(regex))
             else:
                 split = formatter.split('$1')
                 full_regex = ''
