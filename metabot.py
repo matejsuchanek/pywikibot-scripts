@@ -23,7 +23,10 @@ def parse_float(value):  # todo: move to tools
             except ValueError:
                 value = float(value.replace('.', '').replace(',', '.'))
         else:
-            value = float(value.replace(',', '.'))
+            try:
+                value = float(value.replace(',', '.'))
+            except ValueError:
+                value = float(value.replace(',', ''))
     else:
         try:
             value = float(value)
@@ -48,7 +51,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
             r'(?P<unit>\W+[Qq]\W*[1-9]\d*\b)?)'),
         'split-break': re.compile(r'\s*(?:<[^>\w]*br\b[^>]*> *|'
                                   '(?:^|\n+)[:;*#]+){1,2}'),
-        'split-comma': re.compile(r'\s*[:,]\s+'),
+        'split-comma': re.compile(r'\s*[:;,]\s+'),
         #'time': r'',
         'url': textlib.compileLinkR(),
         'wikibase-item': re.compile(r'\b[Qq]\W*(?P<value>[1-9]\d*)\b'),
@@ -226,7 +229,12 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 if prop.type == 'external-id':
                     pywikibot.output('Info: No formatter found for "{}"'
                                      ''.format(prop.title()))
-                regex = re.compile('^(?P<value>{})$'.format(regex))
+                try:
+                    regex = re.compile('^(?P<value>{})$'.format(regex))
+                except re.error as e:
+                    pywikibot.output("Couldn't create a regex")
+                    pywikibot.exception(e)
+                    return False
             else:
                 split = formatter.split('$1')
                 full_regex = ''
@@ -244,6 +252,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                     regex = re.compile(full_regex)
                 except re.error:
                     pywikibot.output("Couldn't create a regex")
+                    pywikibot.exception(e)
                     return False
 
         elif prop.type == 'commonsMedia':
@@ -340,6 +349,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 except ValueError:
                     pywikibot.output('Couldn\'t parse "{}"'
                                      ''.format(qual_target))
+                    remove = False
                     continue
                 error = qual_match.group('error')
                 unit = qual_match.group('unit')
@@ -349,6 +359,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                     except ValueError:
                         pywikibot.output('Couldn\'t parse "{}"'
                                          ''.format(qual_target))
+                        remove = False
                         continue
                 if unit:
                     search = self.regexes['wikibase-item'].search(unit)

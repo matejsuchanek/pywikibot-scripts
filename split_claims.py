@@ -86,10 +86,6 @@ class ClaimsSplittingBot(WikidataEntityBot):
             i += 1
         return pairs
 
-    @property
-    def summary(self):
-        return 'removing splitted claim(s)'
-
     def treat_page_and_item(self, page, item):
         to_remove = []
         for claims in item.claims.values():
@@ -116,11 +112,14 @@ class ClaimsSplittingBot(WikidataEntityBot):
                             for snaks in ref.values():
                                 sources.extend(snaks)
                             new_claim.addSources(sources)
-                        self.user_add_claim(item, new_claim)
+                        if not self.user_add_claim(
+                                item, new_claim, summary='split claim'):
+                            break
         if to_remove:
             data = {'claims': [
                 {'id': cl.toJSON()['id'], 'remove': ''} for cl in to_remove]}
-            self.user_edit_entity(item, data, summary=self.summary)
+            self.user_edit_entity(
+                item, data, summary='remove splitted claim(s)')
 
 
 def main(*args):

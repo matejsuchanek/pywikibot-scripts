@@ -1,4 +1,4 @@
 SELECT DISTINCT ?item {
   ?statement wikibase:rank wikibase:DeprecatedRank; pq:%(prop)s [] .
-  ?item ?p ?statement .
+  ?item ?p ?statement; wikibase:sitelinks [] .
 } LIMIT %(limit)i
