@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import pywikibot
 
-from pywikibot import html2unicode
+from pywikibot import Claim, html2unicode
 from pywikibot.tools import first_lower
 from pywikibot.tools.chars import invisible_regex
 
@@ -89,13 +89,29 @@ class WikidataCleanupToolkit(object):
         ret = self.exec_fix('fix_languages', terms) or ret
         ret = self.exec_fix('deduplicate_aliases', terms) or ret
         #ret = self.exec_fix('move_alias_to_label', terms) or ret
-        ret = self.exec_fix('add_missing_labels',
-                            terms['sitelinks'], terms['labels']) or ret
+        ret = self.exec_fix(
+            'add_missing_labels',
+            terms['sitelinks'],
+            terms['labels']
+        ) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
-        ret = self.exec_fix('fix_HTML', terms) or ret
+        ret = self.exec_fix(
+            'fix_HTML',
+            terms,
+            item.claims,
+            data.setdefault('claims', [])
+        ) or ret
         #ret = self.exec_fix('replace_invisible', terms) or ret
         ret = self.exec_fix(
-            'fix_quantities', item.claims, data.setdefault('claims', [])) or ret
+            'fix_quantities',
+            item.claims,
+            data.setdefault('claims', [])
+        ) or ret
+        ret = self.exec_fix(
+            'deduplicate_claims',
+            item.claims,
+            data.setdefault('claims', [])
+        ) or ret
         for key in keys:
             if not data[key]:
                 data.pop(key)
@@ -105,14 +121,21 @@ class WikidataCleanupToolkit(object):
         terms = self._get_terms(item)
         ret = False
         ret = self.exec_fix('fix_languages', terms) or ret
+        ret = self.exec_fix('fix_HTML', terms, item.claims, []) or ret
+        #ret = self.exec_fix('replace_invisible', terms) or ret
         ret = self.exec_fix('deduplicate_aliases', terms) or ret
         #ret = self.exec_fix('move_alias_to_label', terms) or ret
-        ret = self.exec_fix('add_missing_labels',
-                            terms['sitelinks'], terms['labels']) or ret
+        ret = self.exec_fix(
+            'add_missing_labels',
+            terms['sitelinks'],
+            terms['labels']
+        ) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
-        ret = self.exec_fix('fix_HTML', terms) or ret
-        #ret = self.exec_fix('replace_invisible', terms) or ret
         ret = self.exec_fix('fix_quantities', item.claims, []) or ret  # dummy
+        ret = self.exec_fix(
+            'deduplicate_claims',
+            item.claims, []
+        ) or ret
         return ret
 
     def move_alias_to_label(self, terms):  # todo: not always desired
@@ -241,13 +264,38 @@ class WikidataCleanupToolkit(object):
                     ret = True
         return ret
 
-    def fix_HTML(self, terms):
+    def fix_HTML(self, terms, claims, data):
         ret = False
         for key in ['labels', 'descriptions']:
             for lang, value in terms[key].items():
-                new = html2unicode(value)
-                if new != value:
-                    terms[key][lang] = new
+                while True:
+                    new = html2unicode(value.replace('^|^', '&'))
+                    if new == value:
+                        break
+                    terms[key][lang] = value = new
+                    ret = True
+        for lang, aliases in terms['aliases'].items():
+            for i, value in enumerate(aliases):
+                while True:
+                    new = html2unicode(value.replace('^|^', '&'))
+                    if new == value:
+                        break
+                    aliases[i] = value = new
+                    ret = True
+        for values in claims.values():
+            for claim in values:
+                if claim.type != 'monolingualtext':
+                    continue
+                value = claim.target.text if claim.target else None
+                changed = False
+                while value:
+                    new = html2unicode(value.replace('^|^', '&'))
+                    if value == new:
+                        break
+                    claim.target.text = value = new
+                    changed = True
+                if changed:
+                    data.append(claim.toJSON())
                     ret = True
         return ret
 
@@ -258,6 +306,12 @@ class WikidataCleanupToolkit(object):
                 new = invisible_regex.sub('', value)
                 if new != value:
                     terms[key][lang] = new
+                    ret = True
+        for lang, aliases in terms['aliases'].items():
+            for i, value in enumerate(aliases):
+                new = invisible_regex.sub('', value)
+                if new != value:
+                    aliases[i] = new
                     ret = True
         return ret
 
@@ -285,3 +339,46 @@ class WikidataCleanupToolkit(object):
             data.append(claim.toJSON())
             ret = True
         return ret
+
+    def deduplicate_claims(self, claims, data):
+        ret = False
+        for claims_list in claims.values():
+            ret = self.deduplicate_claims_list(claims_list, data) or ret
+        return ret
+
+    def deduplicate_claims_list(self, claims, data):
+        stack = []
+        changed = []
+        removed = []
+        for claim in claims:
+            remove = False
+            for c in stack:
+                if self.merge_claims(c, claim):
+                    remove = True
+                    if c not in changed:
+                        changed.append(c)
+                    break
+            if remove:
+                removed.append(claim)
+            else:
+                stack.append(claim)
+        for claim in changed:
+            data.append(claim.toJSON())
+        for claim in removed:
+            json = claim.toJSON()
+            json['remove'] = ''
+            data.append(json)
+            claims.remove(claim)
+        return bool(changed)
+
+    def merge_claims(self, claim1, claim2):
+        if claim1 == claim2:
+            hashes = set(
+                s['hash'] for s in claim1.toJSON().get('references', []))
+            for source in claim2.toJSON().get('references', []):
+                if source['hash'] not in hashes:
+                    source_copy = Claim.referenceFromJSON(claim2.repo, source)
+                    claim1.sources.append(source_copy)
+            return True
+        else:
+            return False

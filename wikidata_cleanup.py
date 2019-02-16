@@ -31,10 +31,11 @@ class WikidataCleanupBot(WikidataEntityBot):
             'fix_languages': 'fix invalid languages',
             'replace_invisible': 'replace invisible characters',
             'fix_quantities': 'remove explicit bounds',
+            'deduplicate_claims': 'merge duplicate claims',
         }[self.fix]
 
     def treat_page_and_item(self, page, item):
-        data = {}
+        data = None  # seems to work more reliably than empty dict
         if self.my_kit.cleanup(item, data):
             self.user_edit_entity(item, data, summary=self.summary)
 
