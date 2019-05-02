@@ -39,26 +39,31 @@ class TypoBot(WikitextFixingBot):
         kwargs['typos'] = False
         self.own_generator = not bool(generator)
         if self.own_generator:
-            self.generator = self.makeGenerator
+            self.generator = self.make_generator()
         else:
             self.generator = generator
 
         super(TypoBot, self).__init__(**kwargs)
-        loader = TyposLoader(self.site, **kwargs) # fixme: too many args
+        self.offset = offset
+
+    def setup(self):
+        loader = TyposLoader(
+            self.site, allrules=self.getOption('allrules'),
+            typospage=self.getOption('typospage'),
+            whitelistpage=self.getOption('whitelistpage'))
+        loader = TyposLoader(self.site, **kwargs)  # fixme: too many args
         self.typoRules = loader.loadTypos()
         self.fp_page = loader.getWhitelistPage()
         self.whitelist = loader.loadWhitelist()
-        self.offset = offset
 
     @property
-    def isRuleAccurate(self):
+    def is_rule_accurate(self):
         threshold = float(self.getOption('threshold'))
         result = (self.processed < threshold or
                   self.processed / threshold < self.replaced)
         return result
 
-    @property
-    def makeGenerator(self):
+    def make_generator(self):
         for i, rule in enumerate(self.typoRules[:]):
             if self.offset > i:
                 continue
@@ -70,7 +75,7 @@ class TypoBot(WikitextFixingBot):
             pywikibot.output('\nQuery: "%s"' % rule.query)
             old_max = rule.longest
             rule.longest = 0.0
-            self.currentrule = rule
+            self.current_rule = rule
             self.skip_rule = False
             self.processed = 0.0
             self.replaced = 0.0
@@ -78,9 +83,9 @@ class TypoBot(WikitextFixingBot):
                 if self.skip_rule:
                     break
                 yield page
-                if not self.isRuleAccurate:
+                if not self.is_rule_accurate:
                     pywikibot.output(
-                        'Skipped inefficient query "%s" (%s/%s)' % (
+                        'Skipped inefficient query "%s" (%d/%d)' % (
                             rule.query,
                             int(self.replaced), int(self.processed)))
                     break
@@ -88,25 +93,26 @@ class TypoBot(WikitextFixingBot):
                 if self.processed < 1:
                     pywikibot.output('No results from query %s' % rule.query)
                 else:
-                    pywikibot.output('{}% accuracy of query {}'.format(
-                        int((self.replaced / self.processed) * 100), rule.query))
+                    pywikibot.output('%.f accuracy of query %s' % (
+                        (self.replaced / self.processed) * 100, rule.query))
 
             if self.processed > 0:
-                pywikibot.output('Longest match: %ss' % rule.longest)
+                pywikibot.output('Longest match: %fs' % rule.longest)
             rule.longest = max(old_max, rule.longest)
 
     def save_false_positive(self, page):
         link = page.title(as_link=True)
         self.fp_page.text += '\n* %s' % link
-        self.fp_page.save(summary=link, async=True)
+        self.fp_page.save(summary=link, asynchronous=True)
         self.whitelist.append(page.title())
 
     def init_page(self, page):
+        # fixme: this is deprecated
         if page.title() in self.whitelist:
             raise SkipPageError(page, 'Page is whitelisted')
 
         if self.own_generator:
-            if self.currentrule.matches(page.title()):
+            if self.current_rule.find.search(page.title()):
                 raise SkipPageError(page, 'Rule matches title')
 
         super(TypoBot, self).init_page(page)
@@ -120,21 +126,21 @@ class TypoBot(WikitextFixingBot):
         quickly = self.getOption('quick') is True
         start = time.clock()
         if self.own_generator:
-            text = self.currentrule.apply(page.text, done_replacements)
+            text = self.current_rule.apply(page.text, done_replacements)
             if page.text == text:
                 if quickly:
-                    pywikibot.output('Typo not found, not fixing another typos '
-                                     'in quick mode')
+                    pywikibot.output('Typo not found, not fixing another '
+                                     'typos in quick mode')
                     return
             else:
                 self.replaced += 1
 
         for rule in self.typoRules:
-            if self.own_generator and rule == self.currentrule: # __eq__
+            if self.own_generator and rule == self.current_rule:  # __eq__
                 continue
-            if rule.matches(page.title()):
+            if rule.find.search(page.title()):
                 continue
-            if quickly and rule.needsDecision():
+            if quickly and rule.needs_decision():
                 continue
 
             text = rule.apply(text, done_replacements)
@@ -185,15 +191,16 @@ class TypoBot(WikitextFixingBot):
 
     def exit(self):
         super(TypoBot, self).exit()
-        rules = sorted(filter(lambda rule: not rule.needsDecision(),
+        # todo: defer to tear down
+        rules = sorted(filter(lambda rule: not rule.needs_decision(),
                               self.typoRules),
                        key=attrgetter('longest'), reverse=True)[:3]
         pywikibot.output('\nSlowest autonomous rules:')
         for i, rule in enumerate(rules, start=1):
             pywikibot.output(
-                '%s. "%s" - %s' % (i, rule.find.pattern, rule.longest))
+                '%d. "%s" - %f' % (i, rule.find.pattern, rule.longest))
         if self.own_generator:
-            pywikibot.output('\nCurrent offset: %s\n' % self.offset)
+            pywikibot.output('\nCurrent offset: %d\n' % self.offset)
 
 
 def main(*args):

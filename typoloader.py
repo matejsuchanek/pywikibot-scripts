@@ -11,16 +11,23 @@ from pywikibot import pagegenerators, textlib
 
 from pywikibot.tools.formatter import color_format
 
+
 class IncompleteTypoRuleException(Exception):
+
     '''Exception raised when constructing a typo rule from incomplete data'''
+
     def __init__(self, message):
         self.message = message
 
+
 class InvalidExpressionException(Exception):
+
     '''Exception raised when an expression has invalid syntax'''
+
     def __init__(self, error, aspect='regular expression'):
         self.message = error.msg
         self.aspect = aspect
+
 
 class TypoRule(object):
 
@@ -42,6 +49,8 @@ class TypoRule(object):
                               re.M | re.U),
                    re.compile(r'\b[A-Za-z]+\.[a-z]{2}')] # url fragment
 
+    nowikiR = re.compile('</?nowiki>')
+
     def __init__(self, find, replacements, site, auto=False, query=None):
         self.find = find
         self.replacements = replacements
@@ -53,7 +62,8 @@ class TypoRule(object):
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.id == other.id
-        raise NotImplemented
+        else:
+            return False
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -62,13 +72,14 @@ class TypoRule(object):
 ##    def __repr__(self):
 ##        pass
 
-    def needsDecision(self):
+    def needs_decision(self):
         return not self.auto or len(self.replacements) > 1
 
     def canSearch(self):
         return self.query is not None
 
     def querySearch(self):
+        # todo: remove
         return pagegenerators.SearchPageGenerator(
             self.query, namespaces=[0], site=self.site)
 
@@ -77,7 +88,7 @@ class TypoRule(object):
         if '1' not in parameters:
             raise IncompleteTypoRuleException('Missing find expression')
 
-        find = re.sub('</?nowiki>', '', parameters['1'])
+        find = cls.nowikiR.sub('', parameters['1'])
         try:
             find = re.compile(find, re.U | re.M)
         except re.error as exc:
@@ -86,37 +97,28 @@ class TypoRule(object):
         replacements = []
         for key in '23456':
             if key in parameters:
-                replacement = re.sub(r'\$([1-9])',
-                                     r'\\\1',
-                                     re.sub('</?nowiki>',
-                                            '',
-                                            parameters[key]
-                                            )
-                                     )
+                replacement = re.sub(r'\$([1-9])', r'\\\1', cls.nowikiR.sub(
+                    '', parameters[key]))
                 replacements.append(replacement)
 
         if len(replacements) == 0:
             raise IncompleteTypoRuleException('No replacements found')
 
         query = None
-        if 'hledat' in parameters:
-            if parameters['hledat'] != '':
-                part = parameters['hledat'].replace('{{!}}', '|')
-                if 'insource' in parameters and parameters['insource'] == 'ne':
-                    query = part
-                else:
-                    try:
-                        re.compile(part)
-                        query = 'insource:/%s/' % part
-                    except re.error as exc:
-                        raise InvalidExpressionException(exc, 'query')
+        if parameters.get('hledat'):
+            part = parameters['hledat'].replace('{{!}}', '|')
+            if parameters.get('insource') == 'ne':
+                query = part
+            else:
+                try:
+                    re.compile(part)
+                    query = 'insource:/%s/' % part
+                except re.error as exc:
+                    raise InvalidExpressionException(exc, 'query')
 
-        auto = parameters.get('auto', 'ne') == 'ano'
+        auto = parameters.get('auto') == 'ano'
 
         return cls(find, replacements, site, auto, query)
-
-    def matches(self, text):
-        return self.find.search(text) is not None
 
     def summary_hook(self, match, replaced):
         def underscores(string):
@@ -127,7 +129,7 @@ class TypoRule(object):
             return string
 
         new = old = match.group()
-        if self.needsDecision():
+        if self.needs_decision():
             options = [('keep', 'k')]
             replacements = []
             for i, repl in enumerate(self.replacements, start=1):
@@ -167,9 +169,10 @@ class TypoRule(object):
         delta = finish - start
         self.longest = max(delta, self.longest)
         if delta > 5:
-            pywikibot.warning('Slow typo rule "%s" (%s)' % (
+            pywikibot.warning('Slow typo rule "%s" (%f)' % (
                 self.find.pattern, delta))
         return text
+
 
 class TyposLoader(object):
 
@@ -177,11 +180,11 @@ class TyposLoader(object):
 
     '''Class loading and holding typo rules'''
 
-    def __init__(self, site, allrules=False, **kwargs):
+    def __init__(self, site, allrules=False, typospage=None, whitelistpage=None):
         self.site = site
-        self.typos_page_name = kwargs.pop('typospage', None)
-        self.whitelist_page_name = kwargs.pop('whitelistpage', None)
         self.load_all = allrules
+        self.typos_page_name = typospage
+        self.whitelist_page_name = whitelistpage
 
     def getWhitelistPage(self):
         if self.whitelist_page_name is None:
@@ -203,12 +206,12 @@ class TyposLoader(object):
         content = typos_page.get()
         load_all = self.load_all is True
         for template, fielddict in textlib.extract_templates_and_params(
-            content, remove_disabled_parts=False, strip=False):
+                content, remove_disabled_parts=False, strip=False):
             if template.lower() == 'typo':
                 try:
                     rule = TypoRule.newFromParameters(fielddict, self.site)
                 except IncompleteTypoRuleException as exc:
-                    pywikibot.warning(exc.message) # pwb.exception?
+                    pywikibot.warning(exc.message)  # pwb.exception?
                 except InvalidExpressionException as exc:
                     if 'fixed-width' not in exc.message:
                         pywikibot.warning('Invalid %s %s: %s' % (
@@ -216,10 +219,10 @@ class TyposLoader(object):
                 else:
                     rule.id = self.top_id
                     self.top_id += 1
-                    if load_all or not rule.needsDecision():
+                    if load_all or not rule.needs_decision():
                         self.typoRules.append(rule)
 
-        pywikibot.output('%s typo rules loaded' % len(self.typoRules))
+        pywikibot.output('%d typo rules loaded' % len(self.typoRules))
         return self.typoRules
 
     def loadWhitelist(self):
