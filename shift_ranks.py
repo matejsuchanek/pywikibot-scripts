@@ -41,7 +41,7 @@ class RanksShiftingBot(WikidataEntityBot):
                 '[[Special:MyLanguage/Help:Ranking|Help:Ranking]]')
 
     def treat_page_and_item(self, page, item):
-        changed = []
+        changed = False
         for claims in item.claims.values():
             by_rank = {
                 'preferred': [],
@@ -66,15 +66,14 @@ class RanksShiftingBot(WikidataEntityBot):
             for claim in by_rank['deprecated']:
                 if claim.qualifiers.get(self.end_prop):
                     claim.setRank('normal')
-                    changed.append(claim)
+                    changed = True
             if not by_rank['preferred']:
                 for claim in by_rank['normal']:
                     if not claim.qualifiers.get(self.end_prop):
                         claim.setRank('preferred')
-                        changed.append(claim)
+                        changed = True
         if changed:
-            data = {'claims': [cl.toJSON() for cl in changed]}
-            self.user_edit_entity(item, data, summary=self.summary)
+            self.user_edit_entity(item, summary=self.summary)
 
 
 def main(*args):

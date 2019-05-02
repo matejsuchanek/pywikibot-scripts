@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import pywikibot
 import re
 
+from datetime import datetime
 from itertools import chain
 
 from pywikibot import i18n, textlib
@@ -32,7 +33,7 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
-            'year': 2018,  # todo: the current one
+            'year': datetime.today().year,
         })
         super(DeathDateUpdatingBot, self).__init__(**kwargs)
         self.categoryR = re.compile(i18n.translate(self.site, birth))
@@ -43,7 +44,7 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         while True:
             category = pywikibot.Category(
                 self.site, i18n.translate(self.site, death) % self.year)
-            for page in category.articles(content=True):
+            for page in category.articles(content=True, namespaces=[0]):
                 yield page
             self.year -= 1
 
@@ -56,11 +57,11 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
             categories)
         matches = list(filter(bool, map(self.categoryR.fullmatch, titles)))
         if not matches:
-            # todo: output
+            pywikibot.output('No birthdate category found')
             return
         fullmatch = matches.pop()
         if matches:
-            # todo: output
+            pywikibot.output('Multiple birthdate categories found')
             return
         birth_date = fullmatch.group(1)
         search_query = 'linksto:"%s"' % page.title()
@@ -73,11 +74,12 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
                     followRedirects=False, filterRedirects=True,
                     namespaces=[0]))))
         pattern += r' +\(\* *(\[\[)?(%s)(\]\])?\)' % birth_date
-        regex = re.compile(pattern, re.M)
+        regex = re.compile(pattern)
         for ref_page in PreloadingGenerator(
                 SearchPageGenerator(
                     search_query, namespaces=[0], site=self.site)):
             text = ref_page.text
+            # todo: multiple matches
             match = regex.search(text)
             if not match:
                 continue
