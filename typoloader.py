@@ -203,10 +203,11 @@ class TyposLoader(object):
             # todo: feedback
             return
 
-        content = typos_page.get()
+        text = textlib.removeDisabledParts(
+            typos_page.text, include=['nowiki'], site=self.site)
         load_all = self.load_all is True
         for template, fielddict in textlib.extract_templates_and_params(
-                content, remove_disabled_parts=False, strip=False):
+                text, remove_disabled_parts=False, strip=False):
             if template.lower() == 'typo':
                 try:
                     rule = TypoRule.newFromParameters(fielddict, self.site)
