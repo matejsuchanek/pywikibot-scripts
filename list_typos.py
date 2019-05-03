@@ -32,16 +32,13 @@ class TypoReportBot(SingleSiteBot):
 
     @property
     def generator(self):
-        return pagegenerators.PreloadingGenerator(self._generator())
-
-    def _generator(self):
         for rule in self.typoRules:
             if not rule.canSearch():
                 continue
 
             pywikibot.output('Query: "%s"' % rule.query)
             self.current_rule = rule
-            for page in rule.querySearch():
+            for page in pagegenerators.PreloadingGenerator(rule.querySearch()):
                 yield page
 
     def init_page(self, page):
@@ -55,6 +52,9 @@ class TypoReportBot(SingleSiteBot):
         super(TypoReportBot, self).init_page(page)
 
     def treat(self, page):
+        match = self.current_rule.find.search(page.text)
+        if not match:
+            return
         text = textlib.removeDisabledParts(
             page.text, TypoRule.exceptions, site=self.site)
         match = self.current_rule.find.search(text)
