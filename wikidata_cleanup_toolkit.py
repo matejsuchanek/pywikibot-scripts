@@ -49,7 +49,6 @@ class WikidataCleanupToolkit(object):
         'roa-rup': 'rup',
         'simple': 'en',
         'species': 'en',
-        'tokipona': None,
         'wikidata': None,
         'zh-classical': 'lzh',
         'zh-min-nan': 'nan',
@@ -76,12 +75,19 @@ class WikidataCleanupToolkit(object):
     def _get_terms(self, item):
         return {'labels': item.labels,
                 'descriptions': item.descriptions,
-                'aliases': item.aliases,
-                'sitelinks': item.sitelinks}
+                'aliases': item.aliases}
+
+    def get_sitelinks(self, collection, data=dict()):
+        sitelinks = {}
+        for key in collection:
+            sitelinks[key] = collection[key].title
+        for key in data:
+            sitelinks[key] = data[key]['title']
+        return sitelinks
 
     def cleanup_data(self, item, data):
         terms = {}
-        keys = ('labels', 'descriptions', 'aliases', 'sitelinks')
+        keys = ('labels', 'descriptions', 'aliases')
         for key in keys:
             terms[key] = DataWrapper(
                 getattr(item, key), data.setdefault(key, {}))
@@ -91,7 +97,7 @@ class WikidataCleanupToolkit(object):
         #ret = self.exec_fix('move_alias_to_label', terms) or ret
         ret = self.exec_fix(
             'add_missing_labels',
-            terms['sitelinks'],
+            self.get_sitelinks(item.sitelinks, data.get('sitelinks')),
             terms['labels']
         ) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
@@ -127,7 +133,7 @@ class WikidataCleanupToolkit(object):
         #ret = self.exec_fix('move_alias_to_label', terms) or ret
         ret = self.exec_fix(
             'add_missing_labels',
-            terms['sitelinks'],
+            self.get_sitelinks(item.sitelinks),
             terms['labels']
         ) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
@@ -379,6 +385,7 @@ class WikidataCleanupToolkit(object):
                 if source['hash'] not in hashes:
                     source_copy = Claim.referenceFromJSON(claim2.repo, source)
                     claim1.sources.append(source_copy)
+            # todo: ranks
             return True
         else:
             return False

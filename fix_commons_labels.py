@@ -33,7 +33,7 @@ class LabelsFixingBot(WikidataEntityBot):
     def treat_page_and_item(self, page, item):
         if any(cl.target_equals('Q4167836') for cl in item.claims.get('P31', [])):
             return
-        if item.sitelinks['commonswiki'].startswith('Category:'):
+        if item.getSitelink('commonswiki').startswith('Category:'):
             if item.labels['en'].startswith('Category:'):
                 data = {'en': item.labels['en'][len('Category:'):]}
                 self.user_edit_entity(item, {'labels': data},

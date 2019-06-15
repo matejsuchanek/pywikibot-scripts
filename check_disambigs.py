@@ -75,8 +75,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
         for dbname in item.sitelinks:
             if dbname in self.skip:
                 continue
-            apisite = pywikibot.site.APISite.fromDBName(dbname)
-            page = pywikibot.Page(apisite, item.sitelinks[dbname])
+            page = pywikibot.Page(item.sitelinks[dbname])
             if not page.exists():
                 append_text += "\n** {} – {} – doesn't exist".format(
                     dbname, page.title(as_link=True, insite=self.repo))
