@@ -106,15 +106,20 @@ class TypoBot(WikitextFixingBot):
         self.fp_page.save(summary=link, asynchronous=True)
         self.whitelist.append(page.title())
 
-    def init_page(self, page):
-        # fixme: this is deprecated
+    def skip_page(self, page):
         if page.title() in self.whitelist:
-            raise SkipPageError(page, 'Page is whitelisted')
+            pywikibot.warning('Skipped {page} because it is whitelisted'
+                              .format(page=page))
+            return True
 
-        if self.own_generator:
-            if self.current_rule.find.search(page.title()):
-                raise SkipPageError(page, 'Rule matches title')
+        if self.current_rule.find.search(page.title()):
+            pywikibot.warning('Skipped {page} because the rule matches '
+                              'its title'.format(page=page))
+            return True
 
+        return super(TypoBot, self).skip_page(page)
+
+    def init_page(self, page):
         super(TypoBot, self).init_page(page)
         if self.own_generator:
             self.processed += 1

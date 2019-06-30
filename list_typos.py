@@ -41,15 +41,17 @@ class TypoReportBot(SingleSiteBot):
             for page in pagegenerators.PreloadingGenerator(rule.querySearch()):
                 yield page
 
-    def init_page(self, page):
-        # fixme: this is deprecated
+    def skip_page(self, page):
         if page.title() in self.whitelist:
-            raise SkipPageError(page, 'Page is whitelisted')
+            pywikibot.warning('Skipped {page} because it is whitelisted'
+                              .format(page=page))
+            return True
 
         if self.current_rule.find.search(page.title()):
-            raise SkipPageError(page, 'Rule matches title')
+                              'its title'.format(page=page))
+            return True
 
-        super(TypoReportBot, self).init_page(page)
+        return super(TypoReportBot, self).skip_page(page)
 
     def treat(self, page):
         match = self.current_rule.find.search(page.text)

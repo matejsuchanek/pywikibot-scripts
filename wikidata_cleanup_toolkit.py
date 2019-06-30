@@ -77,12 +77,12 @@ class WikidataCleanupToolkit(object):
                 'descriptions': item.descriptions,
                 'aliases': item.aliases}
 
-    def get_sitelinks(self, collection, data=dict()):
+    def get_sitelinks(self, item, data=dict()):
         sitelinks = {}
-        for key in collection:
-            sitelinks[key] = collection[key].title
-        for key in data:
-            sitelinks[key] = data[key]['title']
+        for key, value in item._content['sitelinks'].items():
+            sitelinks[key] = value['title']
+        for key, value in data.items():
+            sitelinks[key] = value['title']
         return sitelinks
 
     def cleanup_data(self, item, data):
@@ -97,7 +97,7 @@ class WikidataCleanupToolkit(object):
         #ret = self.exec_fix('move_alias_to_label', terms) or ret
         ret = self.exec_fix(
             'add_missing_labels',
-            self.get_sitelinks(item.sitelinks, data.get('sitelinks')),
+            self.get_sitelinks(item, data.get('sitelinks')),
             terms['labels']
         ) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
@@ -133,7 +133,7 @@ class WikidataCleanupToolkit(object):
         #ret = self.exec_fix('move_alias_to_label', terms) or ret
         ret = self.exec_fix(
             'add_missing_labels',
-            self.get_sitelinks(item.sitelinks),
+            self.get_sitelinks(item),
             terms['labels']
         ) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
@@ -265,7 +265,7 @@ class WikidataCleanupToolkit(object):
             if not sep:
                 left, sep, right = label.partition(', ')
             if sep and not (set(left) & set('(:)')):
-                if self.can_strip(right, description):
+                if right and self.can_strip(right, description):
                     terms['labels'][lang] = left.strip()
                     ret = True
         return ret

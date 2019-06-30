@@ -21,8 +21,6 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
         'igwiki',
         'mkwiki',
         'mznwiki',
-        'simplewikibooks',  # T180404
-        'simplewikiquote',  # T180404
         'specieswiki',
         'towiki',
     }

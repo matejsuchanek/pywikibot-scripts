@@ -92,9 +92,10 @@ class CaptionToImageBot(WikidataEntityBot):
                         remove_claims.append(caption)
                     continue
 
-            caption.isQualifier = True
+            qualifier = caption.copy()
+            qualifier.isQualifier = True
             if self._save_page(item, self._save_entity, media_claim.addQualifier,
-                               caption):
+                               qualifier):
                 remove_claims.append(caption)
 
         if len(remove_claims) > 0:
