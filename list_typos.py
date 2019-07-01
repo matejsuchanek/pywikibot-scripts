@@ -48,6 +48,7 @@ class TypoReportBot(SingleSiteBot):
             return True
 
         if self.current_rule.find.search(page.title()):
+            pywikibot.warning('Skipped {page} because the rule matches '
                               'its title'.format(page=page))
             return True
 
