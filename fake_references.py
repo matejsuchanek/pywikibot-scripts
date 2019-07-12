@@ -81,14 +81,13 @@ class FakeReferencesBot(WikidataEntityBot):
                 'Bot/MatSuBot 8|RfPB]]')
 
     def treat_page_and_item(self, page, item):
-        all_claims = set()
+        changed = False
         for prop, claims in item.claims.items():
             for claim in claims:
                 if self.handle_claim(claim):
-                    all_claims.add(claim)
-        if all_claims:
-            data = {'claims': [cl.toJSON() for cl in all_claims]}
-            self.user_edit_entity(item, data, summary=self.summary)
+                    changed = True
+        if changed:
+            self.user_edit_entity(item, summary=self.summary)
 
     def handle_claim(self, claim):
         ret = False
