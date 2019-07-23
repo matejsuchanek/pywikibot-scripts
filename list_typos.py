@@ -11,11 +11,13 @@ from .typoloader import TypoRule, TyposLoader
 
 class TypoReportBot(SingleSiteBot):
 
+    pattern = '# {} – {}'
+
     def __init__(self, **kwargs):
         self.availableOptions.update({
             'always': True,
             'anything': False,
-            'outputpage': None,  # todo: mandatory
+            'outputpage': None,
             'typospage': None,
             'whitelistpage': None,
         })
@@ -62,15 +64,17 @@ class TypoReportBot(SingleSiteBot):
             page.text, TypoRule.exceptions, site=self.site)
         match = self.current_rule.find.search(text)
         if match:
-            text = '# {} - {}'.format(page.title(as_link=True), match.group(0))
+            text = self.pattern.format(page.title(as_link=True), match.group(0))
             pywikibot.stdout(text)
             self.data.append(text)
 
     def teardown(self):
-        if self._generator_completed or self.getOption('anything'):
-            page = pywikibot.Page(self.site, self.getOption('outputpage'))
-            page.put('\n'.join(self.data), minor=False, cc=False,
-                     summary='aktualizace seznamu překlepů')
+        outputpage = self.getOption('outputpage')
+        if (self._generator_completed or self.getOption('anything')
+                ) and outputpage:
+            page = pywikibot.Page(self.site, outputpage)
+            page.put('\n'.join(self.data), summary='aktualizace seznamu překlepů',
+                     apply_cosmetic_changes=False, bot=False, minor=False)
         super(TypoReportBot, self).teardown()
 
 

@@ -44,7 +44,7 @@ class TypoRule(object):
     # todo: linktrail?
     exceptions += [re.compile(r'\[\[[^][|]+[]|]'), # 'target-part' of a wikilink
                    re.compile('<[a-z]+ [^>]+>'), # HTML tag
-                   re.compile('„[^“]+“'), # quotation marks
+                   re.compile('„[^"“]+["“]'), # quotation marks
                    re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1).)+\1", # italics
                               re.M | re.U),
                    re.compile(r'\b[A-Za-z]+\.[a-z]{2}')] # url fragment
@@ -112,7 +112,7 @@ class TypoRule(object):
             else:
                 try:
                     re.compile(part)
-                    query = 'insource:/%s/' % part
+                    query = 'insource:/%s/i' % part
                 except re.error as exc:
                     raise InvalidExpressionException(exc, 'query')
 

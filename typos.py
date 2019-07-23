@@ -51,7 +51,6 @@ class TypoBot(WikitextFixingBot):
             self.site, allrules=self.getOption('allrules'),
             typospage=self.getOption('typospage'),
             whitelistpage=self.getOption('whitelistpage'))
-        loader = TyposLoader(self.site, **kwargs)  # fixme: too many args
         self.typoRules = loader.loadTypos()
         self.fp_page = loader.getWhitelistPage()
         self.whitelist = loader.loadWhitelist()
@@ -112,7 +111,7 @@ class TypoBot(WikitextFixingBot):
                               .format(page=page))
             return True
 
-        if self.current_rule.find.search(page.title()):
+        if self.own_generator and self.current_rule.find.search(page.title()):
             pywikibot.warning('Skipped {page} because the rule matches '
                               'its title'.format(page=page))
             return True
@@ -194,9 +193,7 @@ class TypoBot(WikitextFixingBot):
 
         return True
 
-    def exit(self):
-        super(TypoBot, self).exit()
-        # todo: defer to tear down
+    def teardown(self):
         rules = sorted(filter(lambda rule: not rule.needs_decision(),
                               self.typoRules),
                        key=attrgetter('longest'), reverse=True)[:3]
@@ -206,6 +203,7 @@ class TypoBot(WikitextFixingBot):
                 '%d. "%s" - %f' % (i, rule.find.pattern, rule.longest))
         if self.own_generator:
             pywikibot.output('\nCurrent offset: %d\n' % self.offset)
+        super(TypoBot, self).teardown()
 
 
 def main(*args):
