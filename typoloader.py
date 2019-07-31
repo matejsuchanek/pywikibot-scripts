@@ -42,12 +42,13 @@ class TypoRule(object):
                    'timeline']
 
     # todo: linktrail?
-    exceptions += [re.compile(r'\[\[[^][|]+[]|]'), # 'target-part' of a wikilink
-                   re.compile('<[a-z]+ [^>]+>'), # HTML tag
-                   re.compile('„[^"“]+["“]'), # quotation marks
-                   re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1).)+\1", # italics
-                              re.M | re.U),
-                   re.compile(r'\b[A-Za-z]+\.[a-z]{2}')] # url fragment
+    exceptions += [
+        re.compile(r'\[\[([^][|]+)(\]\]|([^][|]+\|)+)'), # 'target-part' of a wikilink
+        re.compile('<[a-z]+ [^>]+>'), # HTML tag
+        re.compile('„[^"“]+["“]'), # quotation marks
+        re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1)[^\n])+\1", re.U), # italics
+        re.compile(r'\b[A-Za-z]+\.[a-z]{2}'), # url fragment
+    ]
 
     nowikiR = re.compile('</?nowiki>')
 
