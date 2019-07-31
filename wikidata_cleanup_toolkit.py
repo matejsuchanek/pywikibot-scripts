@@ -42,6 +42,7 @@ class WikidataCleanupToolkit(object):
         'es-formal': 'es',
         'fiu-vro': 'vro',
         'hu-formal': 'hu',
+        'incubator': None,
         'media': None,
         'meta': 'en',
         'nl-informal': 'nl',
@@ -49,7 +50,9 @@ class WikidataCleanupToolkit(object):
         'roa-rup': 'rup',
         'simple': 'en',
         'species': 'en',
-        'wikidata': None,
+        'sources': None,
+        'wikidata': 'en',
+        'wikimania': 'en',
         'zh-classical': 'lzh',
         'zh-min-nan': 'nan',
         'zh-yue': 'yue',
@@ -219,6 +222,8 @@ class WikidataCleanupToolkit(object):
         for dbname, title in sitelinks.items():
             if ':' not in title and '/' in title:
                 continue
+            # fixme: 'wikidata' -> ('', 'wiki', 'data')
+            # fixme: 'mediawikiwiki' -> ('media', 'wiki', 'wiki')
             lang = self.normalize_lang(dbname.partition('wik')[0])
             if lang and lang not in dont:
                 # [[d:Topic:Uhdjlv9aae6iijuc]]
@@ -379,13 +384,17 @@ class WikidataCleanupToolkit(object):
 
     def merge_claims(self, claim1, claim2):
         if claim1 == claim2:
+            if claim1.rank != claim2.rank:
+                if claim1.rank != 'normal':
+                    if claim2.rank != 'normal':
+                        return False
+                    claim1.rank = claim2.rank
             hashes = set(
                 s['hash'] for s in claim1.toJSON().get('references', []))
             for source in claim2.toJSON().get('references', []):
                 if source['hash'] not in hashes:
                     source_copy = Claim.referenceFromJSON(claim2.repo, source)
                     claim1.sources.append(source_copy)
-            # todo: ranks
             return True
         else:
             return False
