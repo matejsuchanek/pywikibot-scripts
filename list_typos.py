@@ -74,7 +74,7 @@ class TypoReportBot(SingleSiteBot):
                 ) and outputpage:
             page = pywikibot.Page(self.site, outputpage)
             page.put('\n'.join(self.data), summary='aktualizace seznamu překlepů',
-                     apply_cosmetic_changes=False, bot=False, minor=False)
+                     apply_cosmetic_changes=False, botflag=False, minor=False)
         super(TypoReportBot, self).teardown()
 
 

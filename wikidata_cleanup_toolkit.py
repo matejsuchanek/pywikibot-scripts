@@ -82,7 +82,7 @@ class WikidataCleanupToolkit(object):
 
     def get_sitelinks(self, item, data=dict()):
         sitelinks = {}
-        for key, value in item._content['sitelinks'].items():
+        for key, value in item._content.get('sitelinks', {}).items():
             sitelinks[key] = value['title']
         for key, value in data.items():
             sitelinks[key] = value['title']
@@ -100,7 +100,7 @@ class WikidataCleanupToolkit(object):
         #ret = self.exec_fix('move_alias_to_label', terms) or ret
         ret = self.exec_fix(
             'add_missing_labels',
-            self.get_sitelinks(item, data.get('sitelinks')),
+            self.get_sitelinks(item, data.get('sitelinks', {})),
             terms['labels']
         ) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
