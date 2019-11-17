@@ -5,7 +5,8 @@ import re
 
 import pywikibot
 
-FULL_ARTICLE_REGEX = '(?s)^.*$'
+FULL_ARTICLE_REGEX = '\A[\s\S]*\Z'
+
 
 class FileRegexHolder(object):
 
@@ -43,7 +44,8 @@ def deduplicate(arg):
 def parse_image(text, site):
     # TODO: merge with .migrate_infobox.InfoboxMigratingBot.handle_image
     image, caption = None, None
-    imgR = re.compile(r'\[\[\s*(?:%s) *:' % '|'.join(site.namespaces[6]))
+    imgR = re.compile(r'\[\[\s*(?:%s) *:' % '|'.join(site.namespaces[6]),
+                      flags=re.I)
     if imgR.match(text):
         split = text.rstrip()[:-2].split('|')
         matchR = FileRegexHolder.get_regex(site)

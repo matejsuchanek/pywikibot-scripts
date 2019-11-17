@@ -33,21 +33,21 @@ class TypoRule(object):
 
     '''Class representing one typo rule'''
 
-    exceptions = ['category', 'comment', 'gallery', 'header', 'hyperlink',
-                  'interwiki', 'invoke', 'pre', 'property', 'source',
-                  'startspace', 'template'] # todo: remove 'template' or 'startspace'
-    # tags
-    exceptions += ['ce', 'chem', 'code', 'graph', 'imagemap', 'mapframe',
-                   'maplink', 'math', 'nowiki', 'poem', 'score', 'section',
-                   'timeline']
+    # todo: remove 'template' or 'startspace'
+    exceptions = [
+        'category', 'comment', 'header', 'hyperlink', 'interwiki', 'invoke',
+        'property', 'startspace', 'template',
 
-    # todo: linktrail?
-    exceptions += [
-        re.compile(r'\[\[([^][|]+)(\]\]|([^][|]+\|)+)'), # 'target-part' of a wikilink
+        # tags
+        'ce', 'chem', 'code', 'gallery', 'graph', 'imagemap', 'kbd',
+        'mapframe', 'maplink', 'math', 'nowiki', 'poem', 'pre', 'score',
+        'section', 'source', 'timeline', 'tt', 'var',
+
+        re.compile(r'\[\[([^][|]+)(\]\]\w*|([^][|]+\|)+)', re.U), # 'target-part' of a wikilink
         re.compile('<[a-z]+ [^>]+>'), # HTML tag
-        re.compile('„[^"“]+["“]'), # quotation marks
+        re.compile('„[^\n"“]+["“]'), # quotation marks
         re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1)[^\n])+\1", re.U), # italics
-        re.compile(r'\b[A-Za-z]+\.[a-z]{2}'), # url fragment
+        re.compile(r'\b([A-Za-z]+\.)+[a-z]{2,}'), # url fragment
     ]
 
     nowikiR = re.compile('</?nowiki>')
@@ -69,9 +69,9 @@ class TypoRule(object):
     def __ne__(self, other):
         return not self.__eq__(other)
 
-## TODO
-##    def __repr__(self):
-##        pass
+    def __repr__(self):
+        return '{0!r}({1!r}, {2!r}, {3!r}, {4!r}, {5!r})'.format(
+            self.__class__.name, find, replacements, site, auto, query)
 
     def needs_decision(self):
         return not self.auto or len(self.replacements) > 1
@@ -161,7 +161,7 @@ class TypoRule(object):
                 replaced.append(fragment)
         return new
 
-    def apply(self, text, replaced=[]):
+    def apply(self, text, replaced=list()):
         hook = lambda match: self.summary_hook(match, replaced)
         start = time.clock()
         text = textlib.replaceExcept(
@@ -220,6 +220,7 @@ class TyposLoader(object):
                             exc.aspect, fielddict['1'], exc.message))
                 else:
                     rule.id = self.top_id
+                    # fixme: cvar or ivar?
                     self.top_id += 1
                     if load_all or not rule.needs_decision():
                         self.typoRules.append(rule)

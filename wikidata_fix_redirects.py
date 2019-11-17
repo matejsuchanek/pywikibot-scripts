@@ -35,18 +35,19 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
     def skip_page(self, item):
         return False
 
-    def update_snak(self, snak, old):
+    def update_snak(self, snak, old, target):
         if snak.snaktype != 'value':
             return False
         if snak.type == 'wikibase-item':
             eq = snak.target_equals(old)
             if eq:
-                snak.setTarget(old.getRedirectTarget())
+                snak.setTarget(target)
             return eq
+        #elif snak.type == 'wikibase-lexeme':
         elif snak.type == 'quantity':
-            eq = snak.target.unit == old.concept_uri()
+            eq = snak.target.unit == target.concept_uri()
             if eq:
-                snak.target._unit = old.getRedirectTarget()
+                snak.target._unit = target
             return eq
         return False
 
@@ -54,27 +55,45 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
         if not item.isRedirectPage():
             return
         target = item.getRedirectTarget()
+        while target.isRedirectPage():
+            target = target.getRedirectTarget()
         pywikibot.output('%s --> %s' % (item, target))
         backlinks = item.backlinks(
-            followRedirects=False, filterRedirects=False, namespaces=[0, 120])
+            follow_redirects=False,
+            filter_redirects=False,
+            namespaces=[0, 120])
         for entity in PreloadingEntityGenerator(backlinks):
             if entity == target:
                 continue
-            for claims in entity.claims.values():
-                for claim in claims:
-                    if self.update_snak(claim, item):
-                        claim.changeTarget(claim.target, summary=self.summary)
-                    for snaks in claim.qualifiers.values():
-                        for snak in snaks:
-                            if self.update_snak(snak, item):
-                                self.repo.editQualifier(
-                                    claim, snak, summary=self.summary)
-                    for source in claim.sources:
-                        snaks = list(chain.from_iterable(source.values()))
-                        for snak in snaks:
-                            if self.update_snak(snak, item):
-                                self.repo.editSource(
-                                    claim, snaks, summary=self.summary)
+            callbacks = []
+            update = []
+            for claim in chain.from_iterable(entity.claims.values()):
+                changed = False
+                if self.update_snak(claim, item, target):
+                    changed = True
+                    callbacks.append(lambda: claim.changeTarget(
+                        target, summary=self.summary))
+                for snak in chain.from_iterable(claim.qualifiers.values()):
+                    if self.update_snak(snak, item, target):
+                        changed = True
+                        callbacks.append(lambda: claim.repo.editQualifier(
+                            claim, snak, summary=self.summary))
+                for source in claim.sources:
+                    snaks = list(chain.from_iterable(source.values()))
+                    for snak in snaks:
+                        if self.update_snak(snak, item, target):
+                            changed = True
+                            callbacks.append(lambda: claim.repo.editSource(
+                                claim, snaks, summary=self.summary))
+                if changed:
+                    update.append(claim)
+            # fixme: if len(callbacks) > 1:
+            if update:
+                data = {'claims': [c.toJSON() for c in update]}
+                entity.editEntity(data, summary=self.summary)
+                #self.user_edit_entity(entity, data, summary=self.summary)
+            elif len(callbacks) == 1:
+                callbacks[0]()
 
 
 def main(*args):

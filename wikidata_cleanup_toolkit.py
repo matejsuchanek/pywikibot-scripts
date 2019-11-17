@@ -267,8 +267,8 @@ class WikidataCleanupToolkit(object):
             if not description:
                 continue
             left, sep, right = label.rstrip(')').rpartition(' (')
-            if not sep:
-                left, sep, right = label.partition(', ')
+            #if not sep:
+            #    left, sep, right = label.partition(', ')
             if sep and not (set(left) & set('(:)')):
                 if right and self.can_strip(right, description):
                     terms['labels'][lang] = left.strip()

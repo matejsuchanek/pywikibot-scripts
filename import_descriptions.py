@@ -28,9 +28,9 @@ class BaseDescriptionBot(WikidataEntityBot):
             'min_words': 2,
         })
         super(BaseDescriptionBot, self).__init__(**kwargs)
-        self.COMMENT_REGEX = re.compile('<!--.*?-->') # todo: from textlib
+        self.COMMENT_REGEX = re.compile('<!--.*?-->')
         self.FILE_LINK_REGEX = re.compile(
-            frpattern % '|'.join(self.site.namespaces[6]))
+            frpattern % '|'.join(self.site.namespaces[6]), flags=re.I)
         self.FORMATTING_REGEX = re.compile("('{5}|'{2,3})")
         self.REF_REGEX = re.compile(r'<ref.*?(>.*?</ref|/)>')
 
