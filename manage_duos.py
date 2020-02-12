@@ -80,7 +80,7 @@ class DuosManagingBot(WikidataEntityBot):
     def __init__(self, generator, **kwargs):
         self.availableOptions.update({
             'always': True,
-            'class': 'Q15618652',
+            'class': 'Q10648343',
             'min_labels': 1,
         })
         super(DuosManagingBot, self).__init__(**kwargs)
@@ -202,11 +202,6 @@ class DuosManagingBot(WikidataEntityBot):
         claim = pywikibot.Claim(self.repo, 'P31')
         claim.setTarget(pywikibot.ItemPage(self.repo, 'Q5'))
         self.user_add_claim(new_item, claim)
-##        if relation == 'twin':
-##            claim = pywikibot.Claim(self.repo, 'P31')
-##            claim.setTarget(pywikibot.ItemPage(self.repo, 'Q159979'))
-##            self.user_add_claim(new_item, claim)
-
         claim = pywikibot.Claim(self.repo, 'P361')
         claim.setTarget(item)
         self.user_add_claim(new_item, claim)

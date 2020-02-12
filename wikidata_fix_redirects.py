@@ -90,7 +90,9 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
             # fixme: if len(callbacks) > 1:
             if update:
                 data = {'claims': [c.toJSON() for c in update]}
-                entity.editEntity(data, summary=self.summary)
+                entity.editEntity(
+                    data, summary='fix redirect [[%s]] &rarr; [[%s]]' % (
+                        item.id, target.id))
                 #self.user_edit_entity(entity, data, summary=self.summary)
             elif len(callbacks) == 1:
                 callbacks[0]()

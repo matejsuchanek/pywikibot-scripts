@@ -220,6 +220,9 @@ class WikidataCleanupToolkit(object):
     def get_missing_labels(self, sitelinks, dont):
         labels = {}
         for dbname, title in sitelinks.items():
+            if dbname.startswith('alswiki'):
+                # [[d:Topic:]]
+                continue
             if ':' not in title and '/' in title:
                 continue
             # fixme: 'wikidata' -> ('', 'wiki', 'data')

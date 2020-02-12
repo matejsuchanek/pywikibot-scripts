@@ -559,10 +559,10 @@ class RedirectFix(LazyFix):
     def load(self):
         self.cache = {}
         self.redirects = self.get_redirects()
-        pywikibot.output('%s redirects loaded' % len(self.redirects))
+        pywikibot.output('%d redirects loaded' % len(self.redirects))
 
     def from_cache(self, link):
-        link = link.replace('_', ' ').strip() # todo
+        link = link.replace('_', ' ').strip()  # todo: normalize completely
         if link not in self.redirects:
             return False
 
@@ -570,11 +570,11 @@ class RedirectFix(LazyFix):
             page = pywikibot.Page(self.site, link)
             if not page.exists():
                 pywikibot.warning('%s does not exist' % page.title())
-                self.redirects.remove(link) # fixme: both cases
+                self.redirects.remove(link)  # fixme: both cases
                 return False
             if not page.isRedirectPage():
                 pywikibot.warning('%s is not a redirect' % page.title())
-                self.redirects.remove(link) # fixme: both cases
+                self.redirects.remove(link)  # fixme: both cases
                 return False
 
             target = page.getRedirectTarget()
@@ -588,9 +588,8 @@ class RedirectFix(LazyFix):
 
     def replacements(self):
         yield (r'\[\[([^]|[<>]+)\|', self.replace1)
-        if self.onlypiped is False:
-            yield (r'\[\[([^]|[<>]+)\]\](%s)?' % self.site.linktrail(),
-                   self.replace2)
+        yield (r'\[\[([^]|[<>]+)\]\](%s)?' % self.site.linktrail(),
+               self.replace2)
 
     def replace1(self, match):
         link = match.group(1)
@@ -603,19 +602,23 @@ class RedirectFix(LazyFix):
         return '[[%s%s%s|' % (left_spaces * ' ', target, right_spaces * ' ')
 
     def replace2(self, match):
-        if self.onlypiped is True: # todo: user_interactor
-            return match.group()
-
         link = match.group(1)
         trail = match.group(2) or ''
         target = self.from_cache(link)
         if not target:
             return match.group()
 
+        left_spaces = len(link) - len(link.lstrip())
+        right_spaces = len(link) - len(link.rstrip())
+        if (link.lstrip() + trail).startswith(target):
+            rest = (link.lstrip() + trail)[len(target):]
+            return '[[%s%s]]%s' % (' ' * left_spaces, target, rest)
+
+        if self.onlypiped is True:  # todo: user_interactor
+            return match.group()
+
         options_list = [match.group()]
         if not trail:
-            left_spaces = len(link) - len(link.lstrip())
-            right_spaces = len(link) - len(link.rstrip())
             options_list.append(
                 '[[%s%s%s]]' % (left_spaces * ' ', target, right_spaces * ' ')
             )

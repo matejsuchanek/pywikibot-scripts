@@ -85,7 +85,7 @@ class DupesMergingBot(WikidataEntityBot):
             if claim.target.id not in self.dupe_items:
                 continue
             claims.append(claim)
-            for prop in ['P460', 'P642']:
+            for prop in ('P460', 'P642'):
                 for snak in claim.qualifiers.get(prop, []):
                     if snak.snaktype == 'value':
                         targets.add(snak.getTarget())
@@ -166,7 +166,7 @@ class DupesMergingBot(WikidataEntityBot):
                 continue
             if claim.target.id not in self.dupe_items:
                 continue
-            for prop in ['P460', 'P642']:
+            for prop in ('P460', 'P642'):
                 for snak in claim.qualifiers.get(prop, []):
                     if snak.snaktype != 'value':
                         continue
@@ -186,6 +186,9 @@ class DupesMergingBot(WikidataEntityBot):
         if len(target_claims) > 0:
             self._save_page(
                 target, self._save_entity, target.removeClaims, target_claims)
+
+        item, target = Merge.sort_for_merge(
+            [item, target], key=['sitelinks', 'id'])
 
         if not self._save_page(
                 item, self._save_entity, Merger.clean_merge, item, target,
