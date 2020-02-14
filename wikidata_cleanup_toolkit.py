@@ -141,10 +141,11 @@ class WikidataCleanupToolkit(object):
         ) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
         ret = self.exec_fix('fix_quantities', item.claims, []) or ret  # dummy
-        ret = self.exec_fix(
-            'deduplicate_claims',
-            item.claims, []
-        ) or ret
+        # fixme (upstream)
+##        ret = self.exec_fix(
+##            'deduplicate_claims',
+##            item.claims, []
+##        ) or ret
         return ret
 
     def move_alias_to_label(self, terms):  # todo: not always desired
@@ -220,8 +221,10 @@ class WikidataCleanupToolkit(object):
     def get_missing_labels(self, sitelinks, dont):
         labels = {}
         for dbname, title in sitelinks.items():
+            if 'wikinews' in dbname:
+                continue
             if dbname.startswith('alswiki'):
-                # [[d:Topic:]]
+                # [[d:Topic:Vedxkcb8ek6ss1pc]]
                 continue
             if ':' not in title and '/' in title:
                 continue
