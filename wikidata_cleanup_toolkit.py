@@ -391,16 +391,17 @@ class WikidataCleanupToolkit(object):
     def merge_claims(self, claim1, claim2):
         if claim1 == claim2:
             if claim1.rank != claim2.rank:
-                if claim1.rank != 'normal':
-                    if claim2.rank != 'normal':
-                        return False
+                if claim1.rank == 'normal':
                     claim1.rank = claim2.rank
-            hashes = set(
-                s['hash'] for s in claim1.toJSON().get('references', []))
-            for source in claim2.toJSON().get('references', []):
-                if source['hash'] not in hashes:
-                    source_copy = Claim.referenceFromJSON(claim2.repo, source)
-                    claim1.sources.append(source_copy)
+                elif claim2.rank != 'normal':
+                    return False
+            hashes = {ref['hash'] for ref in claim1.toJSON().get(
+                'references', [])}
+            for ref in claim2.toJSON().get('references', []):
+                if ref['hash'] not in hashes:
+                    ref_copy = Claim.referenceFromJSON(claim2.repo, ref)
+                    claim1.sources.append(ref_copy)
+                    hashes.add(ref['hash'])
             return True
         else:
             return False
