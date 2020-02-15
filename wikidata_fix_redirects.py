@@ -15,7 +15,6 @@ from .wikidata import WikidataEntityBot
 
 class WikidataRedirectsFixingBot(WikidataEntityBot):
 
-    summary = 'fixed redirect'
     use_from_page = False
 
     def __init__(self, generator, **kwargs):
@@ -26,7 +25,7 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
         super(WikidataRedirectsFixingBot, self).__init__(**kwargs)
         self.store = QueryStore()
         self.generator = generator or self.custom_generator()
-        self.summary = 'fixed redirect'
+        self.summary = 'fix redirect [[%s]] → [[%s]]'
 
     def custom_generator(self):
         query = self.store.build_query('redirects', days=self.getOption('days'))
@@ -34,6 +33,9 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
 
     def skip_page(self, item):
         return False
+
+    def _make_callback(self, callback, *args, **kwargs):
+        return lambda: callback(*args, **kwargs)
 
     def update_snak(self, snak, old, target):
         if snak.snaktype != 'value':
@@ -52,8 +54,6 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
         return False
 
     def treat_page_and_item(self, page, item):
-        if not item.isRedirectPage():
-            return
         target = item.getRedirectTarget()
         while target.isRedirectPage():
             target = target.getRedirectTarget()
@@ -62,6 +62,9 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
             follow_redirects=False,
             filter_redirects=False,
             namespaces=[0, 120])
+        summary = self.summary % (item.id, target.id)
+        if target != item.getRedirectTarget():
+            item.set_redirect_target(target, summary=summary)
         for entity in PreloadingEntityGenerator(backlinks):
             if entity == target:
                 continue
@@ -71,29 +74,28 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
                 changed = False
                 if self.update_snak(claim, item, target):
                     changed = True
-                    callbacks.append(lambda: claim.changeTarget(
-                        target, summary=self.summary))
+                    callbacks.append(self._make_callback(
+                        claim.changeTarget, target, summary=summary))
                 for snak in chain.from_iterable(claim.qualifiers.values()):
                     if self.update_snak(snak, item, target):
                         changed = True
-                        callbacks.append(lambda: claim.repo.editQualifier(
-                            claim, snak, summary=self.summary))
+                        callbacks.append(self._make_callback(
+                            claim.repo.editQualifier, claim, snak,
+                            summary=summary))
                 for source in claim.sources:
                     snaks = list(chain.from_iterable(source.values()))
                     for snak in snaks:
                         if self.update_snak(snak, item, target):
                             changed = True
-                            callbacks.append(lambda: claim.repo.editSource(
-                                claim, snaks, summary=self.summary))
+                            callbacks.append(self._make_callback(
+                                claim.repo.editSource, claim, snaks,
+                                summary=summary))
                 if changed:
                     update.append(claim)
-            # fixme: if len(callbacks) > 1:
-            if update:
+            if len(callbacks) > 1:
                 data = {'claims': [c.toJSON() for c in update]}
-                entity.editEntity(
-                    data, summary='fix redirect [[%s]] &rarr; [[%s]]' % (
-                        item.id, target.id))
-                #self.user_edit_entity(entity, data, summary=self.summary)
+                self.user_edit_entity(
+                    entity, data, cleanup=False, summary=summary)
             elif len(callbacks) == 1:
                 callbacks[0]()
 
