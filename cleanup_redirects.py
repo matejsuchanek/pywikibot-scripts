@@ -12,6 +12,7 @@ from pywikibot.bot import RedirectPageBot, WikidataBot
 
 from .merger import Merger
 
+
 class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
 
     labs_url = 'https://tools.wmflabs.org'
@@ -93,9 +94,10 @@ class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
         target = page.getRedirectTarget()
         try:
             items.append(target.data_item())
+            target.get()
         except pywikibot.NoPage:
             self._save_page(items[0], items[0].setSitelink, target,
-                            **self.ignore) # todo: summary
+                            **self.ignore)  # todo: summary
             return
 
         Merger.sort_for_merge(items, key=['sitelinks', 'id'])

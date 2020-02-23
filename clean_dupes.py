@@ -18,12 +18,12 @@ from scripts.revertbot import BaseRevertBot
 
 class DupesMergingBot(WikidataEntityBot):
 
-    dupe_items = {'Q1263068', 'Q17362920', 'Q20511493', 'Q28065731'}
+    dupe_items = {'Q1263068', 'Q17362920', 'Q21528878'}
     use_from_page = False
 
     def __init__(self, generator, offset=0, **kwargs):
         self.availableOptions.update({
-            'threads': 1,
+            'threads': 1,  # unstable
         })
         super(DupesMergingBot, self).__init__(**kwargs)
         self.offset = offset
@@ -46,12 +46,13 @@ class DupesMergingBot(WikidataEntityBot):
     def setup(self):
         super(DupesMergingBot, self).setup()
         count = self.getOption('threads')
-        self.queue = Queue(count)
         self.workers = []
-        for i in range(count):
-            thread = Thread(target=self.work)
-            thread.start()
-            self.workers.append(thread)
+        if count > 1:
+            self.queue = Queue(count)
+            for i in range(count):
+                thread = Thread(target=self.work)
+                thread.start()
+                self.workers.append(thread)
 
     def get_lock_for(self, site):
         with self.access_lock:
@@ -74,7 +75,10 @@ class DupesMergingBot(WikidataEntityBot):
             super(DupesMergingBot, self).skip_page(item))
 
     def treat_page_and_item(self, page, item):
-        self.queue.put(item)
+        if self.getOption('threads') > 1:
+            self.queue.put(item)
+        else:
+            self.process_item(item)
 
     def process_item(self, item):
         claims = []
@@ -187,17 +191,18 @@ class DupesMergingBot(WikidataEntityBot):
             self._save_page(
                 target, self._save_entity, target.removeClaims, target_claims)
 
-        item, target = Merge.sort_for_merge(
-            [item, target], key=['sitelinks', 'id'])
+        target, item = Merger.sort_for_merge(
+            [item, target], key=['sitelinks', 'claims', 'id'])
 
         if not self._save_page(
                 item, self._save_entity, Merger.clean_merge, item, target,
                 ignore_conflicts=['description']):
             pywikibot.output('Reverting changes...')
             bot = BaseRevertBot(self.site)  # todo: integrate to Merger
-            bot.comment = 'Error occurred when attempting to merge with %s' % target.title(as_link=True)
+            comment = 'Error occurred when attempting to merge with %s'
+            bot.comment = comment % target.title(as_link=True)
             bot.revert({'title': item.title()})
-            bot.comment = 'Error occurred when attempting to merge with %s' % item.title(as_link=True)
+            bot.comment = comment % item.title(as_link=True)
             bot.revert({'title': target.title()})
             return
 

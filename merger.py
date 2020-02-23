@@ -8,15 +8,17 @@ from operator import attrgetter, methodcaller
 
 from pywikibot.data.sparql import SparqlQuery
 
+
 class Merger(object):
 
     strategies = {
         'id': '_sort_by_id',
+        'claims': '_sort_by_claims',
         'revisions': '_sort_by_revisions',
         'sitelinks': '_sort_by_sitelinks',
     }
-    no_conflict_props = ['P17', 'P21', 'P105', 'P170', 'P171', 'P225', 'P271',
-                         'P296', 'P495', 'P569', 'P570', 'P734', 'P856']
+    no_conflict_props = {'P17', 'P21', 'P105', 'P170', 'P171', 'P225', 'P271',
+                         'P296', 'P495', 'P569', 'P570', 'P734', 'P856'}
     no_conflict_trees = {
         'P19': 'P131',
         'P31': 'P279',
@@ -34,7 +36,7 @@ class Merger(object):
 
     @classmethod
     def clean_merge(cls, item_from, item_to, safe=False, quick=True, **kwargs):
-        kwargs.pop('asynchronous', None) # fixme
+        kwargs.pop('asynchronous', None)  # fixme
         if safe and not cls.can_merge(item_from, item_to, quick=quick):
             raise pywikibot.OtherPageSaveError(
                 item_from, 'Cannot merge %s with %s' % (item_from, item_to))
@@ -62,7 +64,7 @@ class Merger(object):
 
     @classmethod
     def _conflicts(cls, data1, data2):
-        set1 = set(map(repr, map(attrgetter('target'), data1))) # hack
+        set1 = set(map(repr, map(attrgetter('target'), data1)))  # hack
         set2 = set(map(repr, map(attrgetter('target'), data2)))
         return not bool(set1 & set2)
 
@@ -75,7 +77,7 @@ class Merger(object):
 
     @classmethod
     def _same_tree(cls, prop, data1, data2):
-        sparql = SparqlQuery() # fixme: dependencies
+        sparql = SparqlQuery()  # fixme: dependencies
         pattern = ('ASK { VALUES ?x1 { wd:%s } . VALUES ?x2 { wd:%s } . '
                    '?x1 wdt:%s* ?x2 }')
         item1 = ' wd:'.join(map(attrgetter('target.id'), data1))
@@ -150,35 +152,37 @@ class Merger(object):
 
     @classmethod
     def _sort_by_id(cls, item1, item2):
-        id1, id2 = tuple(map(methodcaller('getID', numeric=True),
-                             [item1, item2]))
-        return 1 if id1 < id2 else -1
+        id1, id2 = map(methodcaller('getID', numeric=True), [item1, item2])
+        return (id1 < id2) - (id1 > id2)
 
     @classmethod
     def _sort_by_revisions(cls, item1, item2):
-        len1, len2 = tuple(map(lambda item: len(list(item.revisions())),
-                               [item1, item2]))
-        if len1 == len2:
-            return 0
-        return 1 if len1 > len2 else -1
+        len1, len2 = map(
+            lambda item: len(list(item.revisions())), [item1, item2])
+        return (len1 > len2) - (len1 < len2)
+
+    @classmethod
+    def _sort_by_claims(cls, item1, item2):
+        callback = lambda item: sum(map(len, item.claims.values()))
+        count1, count2 = map(callback, [item1, item2])
+        return (count1 > count2) - (count1 < count2)
 
     @classmethod
     def _sort_by_sitelinks(cls, item1, item2):
-        len1, len2 = tuple(map(lambda item: len(item.get().get('sitelinks')),
-                               [item1, item2]))
-        if len1 == len2:
-            return 0
-        return 1 if len1 > len2 else -1
+        len1, len2 = map(lambda item: len(item.sitelinks), [item1, item2])
+        return (len1 > len2) - (len1 < len2)
 
     @classmethod
     def sort_for_merge(cls, items, key=['id']):
         for strategy in key:
             if strategy not in cls.strategies:
                 continue
-            call = getattr(cls, cls.strategies[strategy])
-            res = call(*items)
+            callback = getattr(cls, cls.strategies[strategy])
+            res = callback(*items)
             if res == 0:
                 continue
             if res == -1:
-                items.append(items.pop(0))
+                items[:] = items[::-1]
             break
+        target_item, from_item = items
+        return target_item, from_item
