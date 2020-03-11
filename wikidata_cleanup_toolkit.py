@@ -89,6 +89,7 @@ class WikidataCleanupToolkit(object):
         return sitelinks
 
     def cleanup_data(self, item, data):
+        # fixme: entity type
         terms = {}
         keys = ('labels', 'descriptions', 'aliases')
         for key in keys:
@@ -110,7 +111,6 @@ class WikidataCleanupToolkit(object):
             item.claims,
             data.setdefault('claims', [])
         ) or ret
-        #ret = self.exec_fix('replace_invisible', terms) or ret
         ret = self.exec_fix(
             'fix_quantities',
             item.claims,
@@ -121,17 +121,19 @@ class WikidataCleanupToolkit(object):
             item.claims,
             data.setdefault('claims', [])
         ) or ret
-        for key in keys:
+        ret = self.exec_fix('replace_invisible', terms) or ret
+        for key in keys + ('claims',):
             if not data[key]:
                 data.pop(key)
         return ret
 
     def cleanup_entity(self, item):
+        # fixme: entity type
         terms = self._get_terms(item)
         ret = False
         ret = self.exec_fix('fix_languages', terms) or ret
         ret = self.exec_fix('fix_HTML', terms, item.claims, []) or ret
-        #ret = self.exec_fix('replace_invisible', terms) or ret
+        ret = self.exec_fix('replace_invisible', terms) or ret
         ret = self.exec_fix('deduplicate_aliases', terms) or ret
         #ret = self.exec_fix('move_alias_to_label', terms) or ret
         ret = self.exec_fix(
@@ -140,12 +142,8 @@ class WikidataCleanupToolkit(object):
             terms['labels']
         ) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
-        ret = self.exec_fix('fix_quantities', item.claims, []) or ret  # dummy
-        # fixme (upstream)
-##        ret = self.exec_fix(
-##            'deduplicate_claims',
-##            item.claims, []
-##        ) or ret
+        ret = self.exec_fix('fix_quantities', item.claims, []) or ret
+        ret = self.exec_fix('deduplicate_claims', item.claims, []) or ret
         return ret
 
     def move_alias_to_label(self, terms):  # todo: not always desired
@@ -316,17 +314,26 @@ class WikidataCleanupToolkit(object):
                     ret = True
         return ret
 
-    def replace_invisible(self, terms):  # fixme: really all of them?
+    def replace_invisible(self, terms):
         ret = False
-        for key in ['labels', 'descriptions']:
+        double = ' ' * 2
+        for key in ('labels', 'descriptions'):
             for lang, value in terms[key].items():
-                new = invisible_regex.sub('', value)
+                new = value
+                # fixme: really all of them?
+                #new = invisible_regex.sub('', new)
+                while double in new:
+                    new = new.replace(double, ' ')
                 if new != value:
                     terms[key][lang] = new
                     ret = True
         for lang, aliases in terms['aliases'].items():
             for i, value in enumerate(aliases):
-                new = invisible_regex.sub('', value)
+                new = value
+                # fixme: really all of them?
+                #new = invisible_regex.sub('', new)
+                while double in new:
+                    new = new.replace(double, ' ')
                 if new != value:
                     aliases[i] = new
                     ret = True
