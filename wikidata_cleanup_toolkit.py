@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+try:
+    from collections.abc import MutableMapping
+except ImportError:
+    from collections import MutableMapping
+
 import pywikibot
 
 from pywikibot import Claim, html2unicode
@@ -6,28 +11,32 @@ from pywikibot.tools import first_lower
 from pywikibot.tools.chars import invisible_regex
 
 
-class DataWrapper(dict):
+class DataWrapper(MutableMapping):
 
     def __init__(self, read, write):
+        self.read = read
         self.write = write
-        read.update(write)
-        super(DataWrapper, self).__init__(read)
+        self.update(write)
+
+    def __getitem__(self, key):
+        return self.read[key]
 
     def __delitem__(self, key):
+        del self.read[key]
         del self.write[key]
-        super(DataWrapper, self).__delitem__(key)
 
     def __setitem__(self, key, value):
+        self.read[key] = value
         self.write[key] = value
-        super(DataWrapper, self).__setitem__(key, value)
 
-    def update(self, *args, **kwargs):
-        self.write.update(*args, **kwargs)
-        return super(DataWrapper, self).update(*args, **kwargs)
+    def __iter__(self):
+        return iter(self.read)
 
-    def setdefault(self, *args):
-        self.write.setdefault(*args)
-        return super(DataWrapper, self).setdefault(*args)
+    def __len__(self):
+        return len(self.read)
+
+    def __contains__(self, key):
+        return key in self.read
 
 
 class WikidataCleanupToolkit(object):
@@ -109,19 +118,20 @@ class WikidataCleanupToolkit(object):
             'fix_HTML',
             terms,
             item.claims,
-            data.setdefault('claims', [])
-        ) or ret
-        ret = self.exec_fix(
-            'fix_quantities',
-            item.claims,
-            data.setdefault('claims', [])
-        ) or ret
-        ret = self.exec_fix(
-            'deduplicate_claims',
-            item.claims,
-            data.setdefault('claims', [])
+            [], #data.setdefault('claims', [])
         ) or ret
         ret = self.exec_fix('replace_invisible', terms) or ret
+        # fixme: buggy
+##        ret = self.exec_fix(
+##            'fix_quantities',
+##            item.claims,
+##            data.setdefault('claims', [])
+##        ) or ret
+##        ret = self.exec_fix(
+##            'deduplicate_claims',
+##            item.claims,
+##            data.setdefault('claims', [])
+##        ) or ret
         for key in keys + ('claims',):
             if not data[key]:
                 data.pop(key)
@@ -129,6 +139,7 @@ class WikidataCleanupToolkit(object):
 
     def cleanup_entity(self, item):
         # fixme: entity type
+        # fixme: sync order with cleanup_data
         terms = self._get_terms(item)
         ret = False
         ret = self.exec_fix('fix_languages', terms) or ret
@@ -211,6 +222,7 @@ class WikidataCleanupToolkit(object):
                         if alias not in already:
                             new_aliases.append(alias)
                             already.add(alias)
+                    # fixme: buggy, raises not-recognized-array
                     data['aliases'][norm] = new_aliases
                 data['aliases'][lang] = []
                 ret = True
@@ -221,8 +233,11 @@ class WikidataCleanupToolkit(object):
         for dbname, title in sitelinks.items():
             if 'wikinews' in dbname:
                 continue
+            # [[d:Topic:Vedxkcb8ek6ss1pc]]
             if dbname.startswith('alswiki'):
-                # [[d:Topic:Vedxkcb8ek6ss1pc]]
+                continue
+            # [[d:Topic:Vhs5f72i5obvkr3t]]
+            if title.startswith('Wikipedia:Artikelwerkstatt/'):
                 continue
             if ':' not in title and '/' in title:
                 continue
@@ -281,7 +296,7 @@ class WikidataCleanupToolkit(object):
 
     def fix_HTML(self, terms, claims, data):
         ret = False
-        for key in ['labels', 'descriptions']:
+        for key in ('labels', 'descriptions'):
             for lang, value in terms[key].items():
                 while True:
                     new = html2unicode(value.replace('^|^', '&'))
