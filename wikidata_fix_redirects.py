@@ -54,6 +54,8 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
         return False
 
     def treat_page_and_item(self, page, item):
+        if not item.isRedirectPage():
+            return
         target = item.getRedirectTarget()
         while target.isRedirectPage():
             target = target.getRedirectTarget()
@@ -71,6 +73,7 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
             callbacks = []
             update = []
             for claim in chain.from_iterable(entity.claims.values()):
+                claim.on_item = entity  # fixme upstream
                 changed = False
                 if self.update_snak(claim, item, target):
                     changed = True
