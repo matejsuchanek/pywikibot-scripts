@@ -12,9 +12,9 @@ site = pywikibot.Site('wikidata', 'wikidata')
 repo = site.data_repository()
 
 direct = pywikibot.input('File directory: ')
-date = pywikibot.WbTime(year=2019, month=1, day=1, site=repo)
+date = pywikibot.WbTime(year=2020, month=1, day=1, site=repo)
 
-ref_item = 'Q63450605'
+ref_item = 'Q92748479'
 
 with open(direct, 'r', encoding='utf-8') as file_data:
     next(file_data)  # header
@@ -74,5 +74,5 @@ with open(direct, 'r', encoding='utf-8') as file_data:
 
         item.editEntity(
             data, asynchronous=True,
-            summary='Adding [[Property:P1082]]: %d, data from [[Q3504917]], '
+            summary='Adding [[Property:P1082]]: %d per data from [[Q3504917]], '
             'see [[%s]]' % (count, ref_item))
