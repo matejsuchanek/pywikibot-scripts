@@ -62,18 +62,21 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
         pywikibot.output('%s --> %s' % (item, target))
         backlinks = item.backlinks(
             follow_redirects=False,
-            filter_redirects=False,
+            filter_redirects=None,
             namespaces=[0, 120])
-        summary = self.summary % (item.id, target.id)
+        summary = self.summary % (
+            item.title(with_ns=True), target.title(with_ns=True))
         if target != item.getRedirectTarget():
             item.set_redirect_target(target, summary=summary)
         for entity in PreloadingEntityGenerator(backlinks):
             if entity == target:
                 continue
+            if entity.isRedirectPage():
+                entity.set_redirect_target(target, summary=summary)
+                continue
             callbacks = []
             update = []
             for claim in chain.from_iterable(entity.claims.values()):
-                claim.on_item = entity  # fixme upstream
                 changed = False
                 if self.update_snak(claim, item, target):
                     changed = True
