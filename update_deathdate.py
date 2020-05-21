@@ -64,7 +64,7 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
             pywikibot.output('Multiple birthdate categories found')
             return
         birth_date = fullmatch.group(1)
-        search_query = 'linksto:"%s"' % page.title()
+        search_query = 'linksto:"%s"' % page.title()  # todo: sanitize?
         search_query += r' insource:/\[\[[^\[\]]+\]\]'
         search_query += r' +\(\* *\[*%s\]*\)/' % birth_date
         search_query += ' -intitle:"Seznam"'
@@ -78,19 +78,16 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         for ref_page in PreloadingGenerator(
                 SearchPageGenerator(
                     search_query, namespaces=[0], site=self.site)):
-            text = ref_page.text
-            # todo: multiple matches
-            match = regex.search(text)
-            if not match:
-                continue
-            inside, left, year1, right = match.groups('')
-            new_text = text[:match.start()]
-            new_text += replace_pattern.format(
-                inside=inside, left=left, right=right, year1=year1,
-                year2=self.year)
-            new_text += text[match.end():]
-            self.userPut(ref_page, ref_page.text, new_text,
-                         summary='doplnění data úmrtí')
+            new_text, num = regex.subn(self.replace_callback, ref_page.text)
+            if num:
+                self.userPut(ref_page, ref_page.text, new_text,
+                             summary='doplnění data úmrtí')
+
+    def replace_callback(match):
+        inside, left, year1, right = match.groups('')
+        return replace_pattern.format(
+            inside=inside, left=left, right=right, year1=year1,
+            year2=self.year)
 
 
 def main(*args):
