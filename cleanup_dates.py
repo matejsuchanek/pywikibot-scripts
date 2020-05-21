@@ -57,7 +57,7 @@ class DuplicateDatesBot(WikidataEntityBot):
 
     @staticmethod
     def valid_source(source):
-        return bool(source) and 'P143' not in source
+        return bool(source) and not ({'P143', 'P4565'} & set(source))
 
     @classmethod
     def number_of_sources(cls, claim):
@@ -83,8 +83,8 @@ class DuplicateDatesBot(WikidataEntityBot):
                     claim.rank == 'normal' for claim in claims):
                 for pair in combinations(claims, 2):
                     if self.one_inside_another_in_pair(*pair):
-                        cl1, cl2 = tuple(
-                            sorted(pair, key=attrgetter('target.precision')))
+                        cl1, cl2 = sorted(
+                            pair, key=attrgetter('target.precision'))
                         if self.is_unsourced(cl1) and self.is_sourced(cl2):
                             item.removeClaims(cl1, summary=self.summary)
                             item.get(force=True)
