@@ -239,6 +239,9 @@ class WikidataCleanupToolkit(object):
             # [[d:Topic:Vhs5f72i5obvkr3t]]
             if title.startswith('Wikipedia:Artikelwerkstatt/'):
                 continue
+            # [[d:Topic:Vn16a76j30dblqo7]]
+            if dbname == 'zh_yuewiki' and title.startswith('Portal:時人時事/'):
+                continue
             if ':' not in title and '/' in title:
                 continue
             # fixme: 'wikidata' -> ('', 'wiki', 'data')
