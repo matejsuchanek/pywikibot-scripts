@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import pywikibot
 
 from pywikibot import pagegenerators, textlib
-from pywikibot.bot import SingleSiteBot, SkipPageError
+from pywikibot.bot import SingleSiteBot
 
 from .typoloader import TypoRule, TyposLoader
 
@@ -45,13 +45,13 @@ class TypoReportBot(SingleSiteBot):
 
     def skip_page(self, page):
         if page.title() in self.whitelist:
-            pywikibot.warning('Skipped {page} because it is whitelisted'
-                              .format(page=page))
+            pywikibot.warning('Skipped {} because it is whitelisted'
+                              .format(page))
             return True
 
         if self.current_rule.find.search(page.title()):
-            pywikibot.warning('Skipped {page} because the rule matches '
-                              'its title'.format(page=page))
+            pywikibot.warning('Skipped {} because the rule matches its title'
+                              .format(page))
             return True
 
         return super(TypoReportBot, self).skip_page(page)
@@ -73,8 +73,10 @@ class TypoReportBot(SingleSiteBot):
         if (self._generator_completed or self.getOption('anything')
                 ) and outputpage:
             page = pywikibot.Page(self.site, outputpage)
-            page.put('\n'.join(self.data), summary='aktualizace seznamu překlepů',
-                     apply_cosmetic_changes=False, botflag=False, minor=False)
+            page.put('\n'.join(self.data),
+                     summary='aktualizace seznamu překlepů',
+                     apply_cosmetic_changes=False,
+                     botflag=False, minor=False)
         super(TypoReportBot, self).teardown()
 
 

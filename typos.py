@@ -7,7 +7,6 @@ import time
 from operator import attrgetter
 
 from pywikibot import pagegenerators
-from pywikibot.bot import SkipPageError
 
 from .typoloader import TyposLoader
 from .wikitext import WikitextFixingBot
@@ -107,13 +106,13 @@ class TypoBot(WikitextFixingBot):
 
     def skip_page(self, page):
         if page.title() in self.whitelist:
-            pywikibot.warning('Skipped {page} because it is whitelisted'
-                              .format(page=page))
+            pywikibot.warning('Skipped {} because it is whitelisted'
+                              .format(page))
             return True
 
         if self.own_generator and self.current_rule.find.search(page.title()):
-            pywikibot.warning('Skipped {page} because the rule matches '
-                              'its title'.format(page=page))
+            pywikibot.warning('Skipped {} because the rule matches its title'
+                              .format(page))
             return True
 
         return super(TypoBot, self).skip_page(page)
