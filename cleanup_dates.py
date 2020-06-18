@@ -93,17 +93,17 @@ class DuplicateDatesBot(WikidataEntityBot):
             redundant = []
             unmerged = []
             for claim1, claim2 in combinations(claims, 2):
-                if claim1.id in already or claim2.id in already:
+                if claim1.snak in already or claim2.snak in already:
                     continue
                 skip = False
                 for claim in (claim1, claim2):
                     if not bool(claim.getTarget()):
-                        already.add(claim.id)
+                        already.add(claim.snak)
                         skip = True
                 if skip:
                     continue
-                pair = (claim1.getTarget(), claim2.getTarget())
-                if self.first_same_as_second(*pair):
+                targets = lambda c1, c2: (c1.getTarget(), c2.getTarget())
+                if self.first_same_as_second(*targets(claim1, claim2)):
                     if self.is_sourced(claim1) and self.is_sourced(claim2):
                         # todo: merge
                         continue
@@ -112,17 +112,15 @@ class DuplicateDatesBot(WikidataEntityBot):
                     else:
                         cl = claim1
                     unmerged.append(cl)
-                    already.add(cl.id)
+                    already.add(cl.snak)
                     continue
-                pairs = []
-                if not self.is_sourced(claim1):
-                    pairs.append(pair)
-                if not self.is_sourced(claim2):
-                    pairs.append(reversed(pair))
+                pairs = [(claim1, claim2), (claim2, claim1)]
                 for first, second in pairs:
-                    if self.first_inside_second(first, second):
+                    if self.is_sourced(first):
+                        continue
+                    if self.first_inside_second(*targets(first, second)):
                         redundant.append(first)
-                        already.add(first.id)
+                        already.add(first.snak)
                         break
             if redundant or unmerged:
                 if redundant:
