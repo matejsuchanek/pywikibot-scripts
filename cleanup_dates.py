@@ -20,7 +20,7 @@ class DuplicateDatesBot(WikidataEntityBot):
 
     def __init__(self, generator, **kwargs):
         self.availableOptions.update({
-            'limit': 2000,
+            'limit': 1000,
             'props': ['P569', 'P570'],
         })
         super(DuplicateDatesBot, self).__init__(**kwargs)
@@ -116,11 +116,11 @@ class DuplicateDatesBot(WikidataEntityBot):
                     continue
                 pairs = [(claim1, claim2), (claim2, claim1)]
                 for first, second in pairs:
-                    if self.is_sourced(first):
+                    if self.is_sourced(second):
                         continue
                     if self.first_inside_second(*targets(first, second)):
-                        redundant.append(first)
-                        already.add(first.snak)
+                        redundant.append(second)
+                        already.add(second.snak)
                         break
             if redundant or unmerged:
                 if redundant:
