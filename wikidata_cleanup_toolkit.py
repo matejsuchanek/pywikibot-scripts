@@ -390,27 +390,26 @@ class WikidataCleanupToolkit(object):
 
     def deduplicate_claims_list(self, claims, data):
         stack = []
-        changed = []
-        removed = []
-        for claim in claims:
+        changed = set()
+        removed = set()
+        for i, claim in enumerate(claims):
             remove = False
-            for c in stack:
+            for j, c in stack:
                 if self.merge_claims(c, claim):
                     remove = True
-                    if c not in changed:
-                        changed.append(c)
+                    changed.add(j)
                     break
             if remove:
-                removed.append(claim)
+                removed.add(i)
             else:
-                stack.append(claim)
-        for claim in changed:
-            data.append(claim.toJSON())
-        for claim in removed:
-            json = claim.toJSON()
+                stack.append((i, claim))
+        for i in changed:
+            data.append(claims[i].toJSON())
+        for i in sorted(removed, reverse=True):
+            json = claims[i].toJSON()
             json['remove'] = ''
             data.append(json)
-            claims.remove(claim)
+            claims.pop(i)
         return bool(changed)
 
     def merge_claims(self, claim1, claim2):
