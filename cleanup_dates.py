@@ -129,7 +129,7 @@ class DuplicateDatesBot(WikidataEntityBot):
                     summary = self.summary
                 else:
                     summary = 'remove redundant claim(s)'
-                item.removeClaims(remove, summary=summary)
+                item.removeClaims(redundant + unmerged, summary=summary)
 
 
 def main(*args):
