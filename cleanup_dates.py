@@ -15,19 +15,25 @@ from .wikidata import WikidataEntityBot
 
 class DuplicateDatesBot(WikidataEntityBot):
 
-    props = ['P569', 'P570']
+    invalid_refs = {'P143', 'P4656'}
     use_from_page = False
 
     def __init__(self, generator, **kwargs):
+        self.availableOptions.update({
+            'limit': 2000,
+            'props': ['P569', 'P570'],
+        })
         super(DuplicateDatesBot, self).__init__(**kwargs)
         self.store = QueryStore()
         self._generator = generator or self.custom_generator()
 
     def custom_generator(self):
-        for prop in self.props:
-            query = self.store.build_query('duplicate_dates', prop=prop)
-            for item in WikidataSPARQLPageGenerator(query, site=self.repo):
-                yield item
+        for prop in self.getOption('props'):
+            for key in ('duplicate_dates', 'unmerged_dates'):
+                query = self.store.build_query(
+                    key, prop=prop, limit=self.getOption('limit'))
+                for item in WikidataSPARQLPageGenerator(query, site=self.repo):
+                    yield item
 
     @property
     def generator(self):
@@ -35,7 +41,7 @@ class DuplicateDatesBot(WikidataEntityBot):
 
     @property
     def summary(self):
-        return ('remove less precise unsourced date, '
+        return ('remove redundant and less precise unsourced claim(s), '
                 '[[Wikidata:Requests for permissions/Bot/MatSuBot 7|see RfPB]]')
 
     @staticmethod
@@ -49,46 +55,81 @@ class DuplicateDatesBot(WikidataEntityBot):
                         return first.month == second.month
         return False
 
-    @classmethod
-    def one_inside_another_in_pair(cls, cl1, cl2):
-        return bool(cl1.target) and bool(cl2.target) and (
-            cls.first_inside_second(cl1.target, cl2.target) or
-            cls.first_inside_second(cl2.target, cl1.target))
-
     @staticmethod
-    def valid_source(source):
-        return bool(source) and not ({'P143', 'P4565'} & set(source))
+    def first_same_as_second(first, second):
+        if first == second:
+            return True
+        if first.precision == second.precision:
+            if first.precision in {9, 10} and first.year == second.year:
+                if first.precision == 10:
+                    return first.month == second.month
+                else:
+                    return True
+        return False
+
+    @classmethod
+    def is_valid_source(cls, source):
+        return bool(source) and not (set(source) & cls.invalid_refs)
 
     @classmethod
     def number_of_sources(cls, claim):
         number = 0
         for source in claim.sources:
-            if cls.valid_source(source):
-                number += 1
+            number += cls.is_valid_source(source)
         return number
 
     @classmethod
-    def is_unsourced(cls, claim):
-        return cls.number_of_sources(claim) == 0
-
-    @staticmethod
-    def is_sourced(claim):
-        return True
-        #return cls.number_of_sources(claim) > 0
+    def is_sourced(cls, claim):
+        return cls.number_of_sources(claim) > 0
 
     def treat_page_and_item(self, page, item):
-        for prop in self.props:
+        for prop in self.getOption('props'):
             claims = item.claims.get(prop, [])
-            if len(claims) > 1 and all(
-                    claim.rank == 'normal' for claim in claims):
-                for pair in combinations(claims, 2):
-                    if self.one_inside_another_in_pair(*pair):
-                        cl1, cl2 = sorted(
-                            pair, key=attrgetter('target.precision'))
-                        if self.is_unsourced(cl1) and self.is_sourced(cl2):
-                            item.removeClaims(cl1, summary=self.summary)
-                            item.get(force=True)
-                            break
+            if len(claims) < 2:
+                continue
+            if any(claim.rank != 'normal' for claim in claims):
+                continue
+            already = set()
+            redundant = []
+            unmerged = []
+            for claim1, claim2 in combinations(claims, 2):
+                if claim1.id in already or claim2.id in already:
+                    continue
+                skip = False
+                for claim in (claim1, claim2):
+                    if not bool(claim.getTarget()):
+                        already.add(claim.id)
+                        skip = True
+                if skip:
+                    continue
+                pair = (claim1.getTarget(), claim2.getTarget())
+                if self.first_same_as_second(*pair):
+                    if self.is_sourced(claim1) and self.is_sourced(claim2):
+                        # todo: merge
+                        continue
+                    if self.is_sourced(claim1):
+                        cl = claim2
+                    else:
+                        cl = claim1
+                    unmerged.append(cl)
+                    already.add(cl.id)
+                    continue
+                pairs = []
+                if not self.is_sourced(claim1):
+                    pairs.append(pair)
+                if not self.is_sourced(claim2):
+                    pairs.append(reversed(pair))
+                for first, second in pairs:
+                    if self.first_inside_second(first, second):
+                        redundant.append(first)
+                        already.add(first.id)
+                        break
+            if redundant or unmerged:
+                if redundant:
+                    summary = self.summary
+                else:
+                    summary = 'remove redundant claim(s)'
+                item.removeClaims(remove, summary=summary)
 
 
 def main(*args):
@@ -101,8 +142,11 @@ def main(*args):
             continue
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
-            if value != '':
-                options[arg[1:]] = value if not value.isdigit() else int(value)
+            if arg == '-prop':
+                options.setdefault('props', []).append(
+                    value or pywikibot.input('Which property should be treated?'))
+            elif value:
+                options[arg[1:]] = int(value) if value.isdigit() else value
             else:
                 options[arg[1:]] = True
 

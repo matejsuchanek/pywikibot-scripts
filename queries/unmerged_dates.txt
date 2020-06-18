@@ -1,0 +1,9 @@
+SELECT DISTINCT ?item WHERE {
+  ?item p:%(prop)s ?statement1, ?statement2 .
+  FILTER( ?statement1 != ?statement2 ) .
+  FILTER( STR( ?statement1 ) < STR( ?statement2 ) ) .
+  VALUES (?prec1 ?prec2) { (9 9) (10 10) } .
+  ?statement1 psv:P570 [ wikibase:timePrecision ?prec1; wikibase:timeValue ?value1 ] .
+  ?statement2 psv:P570 [ wikibase:timePrecision ?prec2; wikibase:timeValue ?value2 ] .
+  FILTER( ?value1 = ?value2 ).
+} LIMIT %(limit)d
