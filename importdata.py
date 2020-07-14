@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
-import pywikibot
 import re
 
 from datetime import datetime
+
+import pywikibot
 
 pywikibot.handle_args()
 

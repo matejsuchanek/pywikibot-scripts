@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import pywikibot
 
 from pywikibot.pagegenerators import (
@@ -9,6 +7,7 @@ from pywikibot.pagegenerators import (
     NamespaceFilterPageGenerator,
 )
 from pywikibot.tools import first_lower
+
 from .wikidata import WikidataEntityBot
 
 
@@ -18,7 +17,7 @@ class LabelSettingBot(WikidataEntityBot):
         self.availableOptions.update({
             'create': False,
         })
-        super(LabelSettingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.create_missing_item = self.getOption('create') is True
 
     def stripped(self, title):

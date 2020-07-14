@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from itertools import chain
+
 import pywikibot
 
 from pywikibot.pagegenerators import (
@@ -6,8 +8,6 @@ from pywikibot.pagegenerators import (
     PreloadingEntityGenerator,
     WikidataSPARQLPageGenerator,
 )
-
-from itertools import chain
 
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
@@ -22,7 +22,7 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
             'always': True,
             'days': 7,
         })
-        super(WikidataRedirectsFixingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.store = QueryStore()
         self.generator = generator or self.custom_generator()
         self.summary = 'fix redirect [[%s]] → [[%s]]'

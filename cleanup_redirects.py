@@ -3,10 +3,10 @@ import csv
 import re
 import urllib
 
-import pywikibot
-
 from operator import methodcaller
 from urllib.request import urlopen
+
+import pywikibot
 
 from pywikibot.bot import RedirectPageBot, WikidataBot
 
@@ -32,7 +32,7 @@ class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
             'start': None,
             'touch': False,
         })
-        super(WikidataRedirectsBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     @property
     def generator(self):
@@ -82,7 +82,7 @@ class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
 
     @property
     def summary(self):
-        return 'based on [[toollabs:%s/%s/|Alphos\' reports]]' % (
+        return "based on [[toollabs:{}/{}/|Alphos' reports]]".format(
             self.sub_directory, self.getOption('date'))
 
     def user_confirm(self, *args):

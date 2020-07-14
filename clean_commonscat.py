@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+import re
 
 import pywikibot
-import re
 
 from pywikibot import i18n, pagegenerators, textlib
 from pywikibot.exceptions import UnknownExtension
@@ -10,6 +9,7 @@ from pywikibot.exceptions import UnknownExtension
 from .deferred import DeferredCallbacksBot
 from .wikidata import WikidataEntityBot
 from .wikitext import WikitextFixingBot
+
 
 save_summary = {
     'cs': 'odstranění odkazu na neexistující kategorii na Commons',
@@ -25,11 +25,11 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
             'noclean': False,
             'noimport': False,
         })
-        super(CommonscatCleaningBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.commons = pywikibot.Site('commons', 'commons')
 
     def setup(self):
-        super(CommonscatCleaningBot, self).setup()
+        super().setup()
         self.cacheSources()
 
     def treat_page(self):  # todo: treat_page_and_item
@@ -80,8 +80,8 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
             if has_param:
                 regex += r'\| *' + re.escape(cat_name)
             regex += r'[^\}]*\}\}'
-            page_replaced_text = re.sub(regex, '', page.text, flags=re.M | re.U,
-                                        count=1)
+            page_replaced_text = re.sub(
+                regex, '', page.text, flags=re.M, count=1)
             if page_replaced_text != page.text:
                 # todo: l10n etc.
                 templates = (
@@ -92,7 +92,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
                     '(?:' + '|'.join(templates) + ')'
                     r'|\[\[(?:%s):)' % '|'.join(page.site.namespaces[14]),
                     r'\n\n\1',
-                    page_replaced_text, flags=re.M | re.U, count=1)
+                    page_replaced_text, flags=re.M, count=1)
 
             # fixme
             self.doWithCallback(

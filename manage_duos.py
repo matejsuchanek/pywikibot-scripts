@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from operator import methodcaller
 
 import pywikibot
-
-from operator import methodcaller
 
 from pywikibot import pagegenerators
 from pywikibot.data.sparql import SparqlQuery
@@ -83,13 +81,13 @@ class DuosManagingBot(WikidataEntityBot):
             'class': 'Q10648343',
             'min_labels': 1,
         })
-        super(DuosManagingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.store = QueryStore()
         self.sparql = SparqlQuery(repo=self.repo)
         self._generator = generator or self.custom_generator()
 
     def skip_page(self, item):
-        if super(DuosManagingBot, self).skip_page(item):
+        if super().skip_page(item):
             return True
         if 'P31' not in item.claims:
             pywikibot.output('%s is missing P31 property' % item)

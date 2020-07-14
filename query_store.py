@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
 
-class QueryStore(object):
+
+class QueryStore:
 
     '''Interface for loading SPARQL queries from text files'''
 
@@ -19,6 +20,7 @@ class QueryStore(object):
 
     def build_query(self, name, **params):
         return self.get_query(name) % params
+
 
 if __name__ == '__main__':
     print('This script is not runnable from command line.')

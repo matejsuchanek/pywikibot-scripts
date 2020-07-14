@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import re
 
 import pywikibot
 
-FULL_ARTICLE_REGEX = '\A[\s\S]*\Z'
+FULL_ARTICLE_REGEX = r'\A[\s\S]*\Z'
 
 
 class FileRegexHolder(object):
@@ -36,6 +34,7 @@ class FileRegexHolder(object):
 
 
 def deduplicate(arg):
+    # todo: merge with filter_unique?
     for index, member in enumerate(arg, start=1):
         while member in arg[index:]:
             arg.pop(arg.index(member, index))
@@ -43,7 +42,7 @@ def deduplicate(arg):
 
 def parse_image(text, site):
     # TODO: merge with .migrate_infobox.InfoboxMigratingBot.handle_image
-    image, caption = None, None
+    image = caption = None
     imgR = re.compile(r'\[\[\s*(?:%s) *:' % '|'.join(site.namespaces[6]),
                       flags=re.I)
     if imgR.match(text):
@@ -78,13 +77,11 @@ def get_best_statements(statements):
 
 
 def iter_all_snaks(data):
-    for prop, claims in data.items():
+    for claims in data.values():
         for claim in claims:
             yield claim
-            for qprop, snaks in claim.qualifiers.items():
-                for snak in snaks:
-                    yield snak
+            for snaks in claim.qualifiers.values():
+                yield from snaks
             for ref in claim.sources:
-                for ref_prop, snaks in ref.items():
-                    for snak in snaks:
-                        yield snak
+                for snaks in ref.values():
+                    yield from snaks

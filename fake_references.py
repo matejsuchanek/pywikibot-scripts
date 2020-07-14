@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from contextlib import suppress
 
 import pywikibot
 
@@ -22,7 +22,7 @@ class FakeReferencesBot(WikidataEntityBot):
         self.availableOptions.update({
             'limit': None,
         })
-        super(FakeReferencesBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.store = QueryStore()
         self._generator = generator or self.subgenerator()
         self.url_start = self.repo.base_url(self.repo.article_path)
@@ -145,17 +145,13 @@ class FakeReferencesBot(WikidataEntityBot):
             if not url:
                 continue
             target = None
-            try:
+            with suppress(pywikibot.InvalidTitle, ValueError):
                 if url.startswith(self.url_start):
                     target = pywikibot.ItemPage(
                         self.repo, url[len(self.url_start):])
                 elif url.startswith(self.repo.concept_base_uri):
                     target = pywikibot.ItemPage(
                         self.repo, url[len(self.repo.concept_base_uri):])
-            except pywikibot.InvalidTitle:
-                pass
-            except ValueError:
-                pass
             if target:
                 if target.isRedirectPage():
                     target = target.getRedirectTarget()

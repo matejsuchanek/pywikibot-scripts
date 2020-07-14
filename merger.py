@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-import pywikibot
-
 import requests
 import time
 
 from operator import attrgetter, methodcaller
 
+import pywikibot
+
 from pywikibot.data.sparql import SparqlQuery
 
 
-class Merger(object):
+class Merger:
 
     strategies = {
         'id': '_sort_by_id',
@@ -64,8 +64,8 @@ class Merger(object):
 
     @classmethod
     def _conflicts(cls, data1, data2):
-        set1 = set(map(repr, map(attrgetter('target'), data1)))  # hack
-        set2 = set(map(repr, map(attrgetter('target'), data2)))
+        set1 = {repr(x.target) for x in data1}  # hack
+        set2 = {repr(x.target) for x in data2}  # hack
         return not bool(set1 & set2)
 
     @classmethod

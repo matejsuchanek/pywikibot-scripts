@@ -1,13 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+import re
 
 import pywikibot
-import re
 
 from pywikibot import pagegenerators
 from pywikibot.exceptions import UnknownExtension
-
-from operator import attrgetter
 
 from .checkwiki_errors import *
 from .wikitext import WikitextFixingBot
@@ -99,14 +96,12 @@ class CheckWikiErrorGenerator(object):
 
     def __iter__(self):
         for error in self.ids:
-            for page in self.checkwiki.iter_pages(error):
-                yield page
+            yield from self.checkwiki.iter_pages(error)
         already = set(self.ids)
         for prio in self.priorities:
             for error in self.checkwiki.settings.get_errors_by_priority(prio):
                 if error not in already:
-                    for page in self.checkwiki.iter_pages(error):
-                        yield page
+                    yield from self.checkwiki.iter_pages(error)
 
 
 class CheckWiki(object):
@@ -204,13 +199,14 @@ class CheckWiki(object):
             yield error
 
     def apply(self, text, page, replaced=[], fixed=[], errors=[], **kwargs):
+        # todo: use a graph algorithm
         errors = list(self.iter_errors(set(errors)))
         while len(errors) > 0:
             error = errors.pop(0)
-            if error.needsDecision() or error.handledByCC(): # todo
+            if error.needsDecision() or error.handledByCC():  # todo
                 continue
 
-            numbers = list(map(attrgetter('number'), errors))
+            numbers = [err.number for err in errors]
             i = max([numbers.index(num) for num in error.needsFirst
                      if num in numbers] + [0])
             if i > 0:
@@ -275,7 +271,7 @@ class CheckWikiBot(WikitextFixingBot):
 
     def __init__(self, checkwiki, numbers, **kwargs):
         kwargs['checkwiki'] = False
-        super(CheckWikiBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.checkwiki = checkwiki
         self.numbers = numbers
 

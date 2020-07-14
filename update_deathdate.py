@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
-import pywikibot
 import re
 
 from datetime import datetime
 from itertools import chain
+
+import pywikibot
 
 from pywikibot import i18n, textlib
 from pywikibot.bot import ExistingPageBot, SingleSiteBot, NoRedirectPageBot
@@ -35,7 +34,7 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         self.availableOptions.update({
             'year': datetime.today().year,
         })
-        super(DeathDateUpdatingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.categoryR = re.compile(i18n.translate(self.site, birth))
         self.year = self.getOption('year')
 
@@ -44,17 +43,15 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         while True:
             category = pywikibot.Category(
                 self.site, i18n.translate(self.site, death) % self.year)
-            for page in category.articles(content=True, namespaces=[0]):
-                yield page
+            yield from category.articles(content=True, namespaces=[0])
             self.year -= 1
 
     def treat_page(self):
         page = self.current_page
         categories = textlib.getCategoryLinks(page.text, site=self.site)
-        titles = map(
-            lambda cat: cat.title(with_ns=False, with_section=False,
-                                  allow_interwiki=False, insite=self.site),
-            categories)
+        titles = (cat.title(with_ns=False, with_section=False,
+                            allow_interwiki=False, insite=self.site)
+                  for cat in categories)
         matches = list(filter(bool, map(self.categoryR.fullmatch, titles)))
         if not matches:
             pywikibot.output('No birthdate category found')
@@ -69,10 +66,8 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         search_query += r' +\(\* *\[*%s\]*\)/' % birth_date
         search_query += ' -intitle:"Seznam"'
         pattern = r'\[\[((?:%s)(?:\|[^\[\]]+)?)\]\]' % '|'.join(
-            map(lambda p: re.escape(p.title()),
-                chain([page], page.backlinks(
-                    followRedirects=False, filterRedirects=True,
-                    namespaces=[0]))))
+            re.escape(p.title()) for p in chain([page], page.backlinks(
+                followRedirects=False, filterRedirects=True, namespaces=[0])))
         pattern += r' +\(\* *(\[\[)?(%s)(\]\])?\)' % birth_date
         regex = re.compile(pattern)
         for ref_page in PreloadingGenerator(

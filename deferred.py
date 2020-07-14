@@ -1,7 +1,8 @@
-# -*- coding: utf-8  -*-
+# -*- coding: utf-8 -*-
 import pywikibot
 
 from pywikibot.bot import BaseBot
+
 
 class DeferredCallbacksBot(BaseBot):
 
@@ -10,7 +11,7 @@ class DeferredCallbacksBot(BaseBot):
     '''
 
     def __init__(self, **kwargs):
-        super(DeferredCallbacksBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.callbacks = []
 
     def addCallback(self, func, *data, **kwargs):
@@ -35,4 +36,4 @@ class DeferredCallbacksBot(BaseBot):
                 callback = self.callbacks.pop(0)
                 callback()
         finally:
-            super(DeferredCallbacksBot, self).exit()
+            super().exit()

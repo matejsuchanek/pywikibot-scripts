@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
-import pywikibot
 import re
 
 from itertools import chain
 from random import choice
 
-from pywikibot import pagegenerators, textlib
+import pywikibot
 
+from pywikibot import pagegenerators, textlib
 from pywikibot.tools import first_upper
 
 try:
@@ -21,19 +19,24 @@ except ImportError:
     class WikitextFixingBot(SingleSiteBot, NoRedirectPageBot, ExistingPageBot):
         pass
 
+
 class OldParamException(Exception):
     pass
+
 
 class RemoveParamException(Exception):
     pass
 
+
 class UnknownParamException(Exception):
     pass
+
 
 class UnnamedParamException(Exception):
     pass
 
-class IterUnnamed(object):
+
+class IterUnnamed:
 
     def __init__(self, unnamed):
         self.unnamed = unnamed
@@ -43,7 +46,8 @@ class IterUnnamed(object):
             yield self.unnamed.popitem()
 
     def __nonzero__(self):
-        return True # needed? return self.unnamed?
+        return True  # needed? return self.unnamed?
+
 
 class InfoboxMigratingBot(WikitextFixingBot):
 
@@ -77,7 +81,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
         self.new_template = self.normalize(new_template)
         self.start_offset = offset
         self.offset = 0
-        super(InfoboxMigratingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.file_regex = re.compile(
             textlib.FILE_LINK_REGEX % '|'.join(self.site.namespaces[6]), re.X)
         #self.parser = TemplateParser()
@@ -92,7 +96,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
     def treat(self, page):
         self.offset += 1
         if self.offset > self.start_offset:
-            super(InfoboxMigratingBot, self).treat(page)
+            super().treat(page)
 
     def treat_page(self):
         text = self.current_page.text
@@ -184,7 +188,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
                     ballance += text[end:next_close].count('{{') - 1
                     end = next_close + len('}}')
 
-            if not text[start:end].endswith('}}'): # elif?
+            if not text[start:end].endswith('}}'):  # elif?
                 end = text[:end].rindex('}}') + len('}}')
 
             if (end < start or not text[start:end].endswith('}}') or
@@ -201,7 +205,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
             pywikibot.output('No parameters changed')
             return text, 0
 
-        while end < len(text) and text[end].isspace(): # todo: also before
+        while end < len(text) and text[end].isspace():  # todo: also before
             end += 1
 
         lines = []
@@ -409,19 +413,19 @@ class InfoboxMigratingBot(WikitextFixingBot):
             image = pywikibot.page.url2unicode(image)
             image = re.sub('[ _]+', ' ', image).strip()
 
-            if image.lower().startswith(tuple(map(lambda ns: '%s:' % ns.lower(),
-                                                  self.site.namespaces[6]))):
+            if image.lower().startswith(tuple(
+                    '%s:' % ns.lower() for ns in self.site.namespaces[6]))
                 image = image.partition(':')[2].strip()
 
         return image, size, caption
 
     def deduplicate(self, params):
         keys = [i for i, j in params]
-        duplicates = set(filter(lambda x: keys.count(x) > 1, keys))
+        duplicates = {key for key in keys if keys.count(key) > 1}
         if duplicates:
             pywikibot.warning('Duplicate arguments %s' % duplicates)
             for dupe in duplicates:
-                values = list(y for x, y in params if x == dupe)
+                values = [y for x, y in params if x == dupe]
                 #print(dupe)
                 #print(values)
                 if '' in values:
@@ -430,7 +434,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
                 #while len(set(values)) < len(values): todo
 
     def exit(self):
-        super(InfoboxMigratingBot, self).exit()
+        super().exit()
         pywikibot.output('Current offset: %s' % self.offset)
 
 # TODO: prepare for extending
@@ -465,5 +469,6 @@ def main(*args): # bot_class=InfoboxMigratingBot
     bot = InfoboxMigratingBot(generator=generator, **options) # bot_class
     bot.run()
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     main()

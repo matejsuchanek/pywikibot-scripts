@@ -12,7 +12,7 @@ class WikidataCleanupBot(WikidataEntityBot):
     use_from_page = False
 
     def __init__(self, generator, fix, **kwargs):
-        super(WikidataCleanupBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._generator = generator
         self.fix = fix
         self.my_kit = WikidataCleanupToolkit([self.fix])

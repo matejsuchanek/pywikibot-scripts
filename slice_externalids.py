@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-import pywikibot
 import re
+
+import pywikibot
 
 from pywikibot.data.sparql import SparqlQuery
 from pywikibot.pagegenerators import (
@@ -22,7 +23,7 @@ class ExternalIdSlicingBot(WikidataEntityBot):
             'step': 10,
             'offset': 0,
         })
-        super(ExternalIdSlicingBot, self).__init__(**options)
+        super().__init__(**options)
         self.cache = {}
         self.failed = {}
         self.sparql = SparqlQuery(repo=self.repo)
@@ -31,7 +32,11 @@ class ExternalIdSlicingBot(WikidataEntityBot):
     @property
     def generator(self):
         step = self.getOption('step')
-        opts = dict(blacklist=' wd:'.join(self.blacklist), limit=step)
+        opts = {
+            # fixme: don't use this word
+            'blacklist': ' wd:'.join(self.blacklist),
+            'limit': step,
+        }
         offset = self.getOption('offset')
         while True:
             pywikibot.output('\nLoading items (offset %i)...' % offset)
@@ -89,8 +94,8 @@ class ExternalIdSlicingBot(WikidataEntityBot):
             ppage.get()
             if 'P1630' in ppage.claims:
                 if len(ppage.claims['P1630']) > 1:
-                    preferred = list(filter(lambda x: x.rank == 'preferred',
-                                            ppage.claims['P1630']))
+                    preferred = [cl for cl in ppage.claims['P1630']
+                                 if cl.rank == 'preferred']
                     if len(preferred) == 1:
                         formatter = preferred[0].target
                 else:
@@ -98,8 +103,8 @@ class ExternalIdSlicingBot(WikidataEntityBot):
 
             if 'P1793' in ppage.claims:
                 if len(ppage.claims['P1793']) > 1:
-                    preferred = list(filter(lambda x: x.rank == 'preferred',
-                                            ppage.claims['P1793']))
+                    preferred = [cl for cl in ppage.claims['P1793']
+                                 if cl.rank == 'preferred']
                     if len(preferred) == 1:
                         regex = preferred[0].target
                 else:
@@ -145,7 +150,7 @@ class ExternalIdSlicingBot(WikidataEntityBot):
             page = pywikibot.Page(
                 self.repo, 'User:%s/Wrong external ids' % self.repo.username())
             page.put(text, summary='update')
-        super(ExternalIdSlicingBot, self).exit()
+        super().exit()
 
 
 def main(*args):

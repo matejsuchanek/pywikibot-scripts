@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import pywikibot
 
 from pywikibot import pagegenerators
@@ -33,10 +31,10 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
             'offset': 0,
             #'only': None, todo
         })
-        super(DisambigsCheckingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
-    def skip_page(self):
-        return super(DisambigsCheckingBot, self).skip_page(item) or (
+    def skip_page(self, item):
+        return super().skip_page(item) or (
             item.title(as_link=True, insite=self.repo) in self.log_page.text or
             not self.is_disambig(item))
 

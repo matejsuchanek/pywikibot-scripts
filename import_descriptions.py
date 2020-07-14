@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+import re
 
 import pywikibot
-import re
 
 from pywikibot import link_regex as LINK_REGEX
 from pywikibot.pagegenerators import (
@@ -27,7 +26,7 @@ class BaseDescriptionBot(WikidataEntityBot):
         self.availableOptions.update({
             'min_words': 2,
         })
-        super(BaseDescriptionBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.COMMENT_REGEX = re.compile('<!--.*?-->')
         self.FILE_LINK_REGEX = re.compile(
             frpattern % '|'.join(self.site.namespaces[6]), flags=re.I)
@@ -81,7 +80,7 @@ class MissingDescriptionBot(BaseDescriptionBot):
         self.availableOptions.update({
             'allpages': False,
         })
-        super(MissingDescriptionBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.store = QueryStore()
 
     @property
@@ -120,7 +119,7 @@ class MissingDescriptionBot(BaseDescriptionBot):
 class MappingDescriptionBot(BaseDescriptionBot):
 
     def __init__(self, **kwargs):
-        super(MappingDescripitonBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.regex = self.get_regex_for_title(r'[^\[\|\]]+')
 
     def get_pages_with_descriptions(self, text):

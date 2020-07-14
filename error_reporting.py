@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import os
-import pywikibot
 import threading
+
+from contextlib import suppress
+
+import pywikibot
 
 from pywikibot.bot import BaseBot
 
@@ -18,7 +19,7 @@ class ErrorReportingBot(BaseBot):
             'clearonly': False,
             'interval': 5 * 60,
         })
-        super(ErrorReportingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.timer = None
         self.file_lock = threading.Lock()
         self.timer_lock = threading.Lock()
@@ -28,13 +29,12 @@ class ErrorReportingBot(BaseBot):
         self.load_page()
         self.save_file()
         if not self.getOption('clearonly'):
-            super(ErrorReportingBot, self).run()
+            super().run()
 
     def open(self):
-        try:
-            open(os.path.join('..', self.file_name), 'x', encoding='utf-8').close()
-        except OSError:
-            pass
+        with suppress(OSError):
+            open(os.path.join('..', self.file_name), 'x',
+                 encoding='utf-8').close()
 
     def load_page(self):
         self.log_page = pywikibot.Page(
@@ -69,4 +69,4 @@ class ErrorReportingBot(BaseBot):
         with self.timer_lock:
             if self.timer:
                 self.timer.cancel()
-        super(ErrorReportingBot, self).teardown()
+        super().teardown()

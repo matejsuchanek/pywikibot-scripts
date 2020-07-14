@@ -24,7 +24,7 @@ class QualifiersFixingBot(WikidataEntityBot):
             'bad_cache': kwargs.get('bad_cache', []) + list(self.blacklist),
             'good_cache': kwargs.get('good_cache', []) + list(self.whitelist),
         })
-        super(QualifiersFixingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.store = QueryStore()
 
     def filterProperty(self, prop_page):
@@ -84,8 +84,8 @@ class QualifiersFixingBot(WikidataEntityBot):
                                           asynchronous=True)
 
     def makeSummary(self, prop, props):
-        props = list(map(lambda x: '[[Property:P%s]]' % x,
-                         sorted(map(lambda x: int(x[1:]), props))))
+        props = ['[[Property:P%s]]' % pid for pid in sorted(
+            int(pid[1:]) for pid in props)]
         return '[[Property:%s]]: moving misplaced reference%s %s to qualifiers' % (
             prop, 's' if len(props) > 1 else '', '%s and %s' % (
                 ', '.join(props[:-1]), props[-1]) if len(props) > 1 else props[0])

@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+import re
 
 import pywikibot
-import re
 
 from pywikibot import Coordinate, WbMonolingualText, WbQuantity, WbTime
 from .wikidata import WikidataEntityBot
@@ -16,7 +15,7 @@ class QuickStatementsBot(WikidataEntityBot):
         self.availableOptions({
             'always': True,
         })
-        super(QuickStatementsBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.file = file
         self.globeR = re.compile(r'@({0})/({0})'.format(self.decimal_pattern))
         self.quantityR = re.compile(

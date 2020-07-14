@@ -14,7 +14,7 @@ class UnitsFixingBot(WikidataEntityBot):
     use_from_page = False
 
     def __init__(self, **kwargs):
-        super(UnitsFixingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.store = QueryStore()
 
     @property
@@ -33,7 +33,7 @@ class UnitsFixingBot(WikidataEntityBot):
             if claim.snaktype == 'novalue':
                 continue
             if (claim.snaktype == 'value' and
-                claim.target_equals(self.good_item)):
+                    claim.target_equals(self.good_item)):
                 continue
             return False
         return True

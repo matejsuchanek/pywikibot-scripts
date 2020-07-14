@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
 
 import pywikibot
 
@@ -21,7 +20,7 @@ class TypoReportBot(SingleSiteBot):
             'typospage': None,
             'whitelistpage': None,
         })
-        super(TypoReportBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def setup(self):
         loader = TyposLoader(
@@ -40,8 +39,7 @@ class TypoReportBot(SingleSiteBot):
 
             pywikibot.output('Query: "%s"' % rule.query)
             self.current_rule = rule
-            for page in pagegenerators.PreloadingGenerator(rule.querySearch()):
-                yield page
+            yield from pagegenerators.PreloadingGenerator(rule.querySearch())
 
     def skip_page(self, page):
         if page.title() in self.whitelist:
@@ -54,7 +52,7 @@ class TypoReportBot(SingleSiteBot):
                               .format(page))
             return True
 
-        return super(TypoReportBot, self).skip_page(page)
+        return super().skip_page(page)
 
     def treat(self, page):
         match = self.current_rule.find.search(page.text)
@@ -77,7 +75,7 @@ class TypoReportBot(SingleSiteBot):
                      summary='aktualizace seznamu překlepů',
                      apply_cosmetic_changes=False,
                      botflag=False, minor=False)
-        super(TypoReportBot, self).teardown()
+        super().teardown()
 
 
 def main(*args):

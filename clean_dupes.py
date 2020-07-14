@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+from queue import Queue
+from threading import Lock, Thread
+
 import pywikibot
 
 from pywikibot.pagegenerators import (
@@ -6,9 +9,6 @@ from pywikibot.pagegenerators import (
     PreloadingEntityGenerator,
     WikidataSPARQLPageGenerator,
 )
-
-from queue import Queue
-from threading import Lock, Thread
 
 from .merger import Merger
 from .query_store import QueryStore
@@ -25,7 +25,7 @@ class DupesMergingBot(WikidataEntityBot):
         self.availableOptions.update({
             'threads': 1,  # unstable
         })
-        super(DupesMergingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.offset = offset
         self.store = QueryStore()
         self._generator = generator or self.custom_generator()
@@ -44,7 +44,7 @@ class DupesMergingBot(WikidataEntityBot):
                                            result_type=list)
 
     def setup(self):
-        super(DupesMergingBot, self).setup()
+        super().setup()
         count = self.getOption('threads')
         self.workers = []
         if count > 1:
@@ -68,11 +68,10 @@ class DupesMergingBot(WikidataEntityBot):
 
     def init_page(self, item):
         self.offset += 1
-        return super(DupesMergingBot, self).init_page(item)
+        return super().init_page(item)
 
     def skip_page(self, item):
-        return 'P31' not in item.claims or (
-            super(DupesMergingBot, self).skip_page(item))
+        return 'P31' not in item.claims or super().skip_page(item)
 
     def treat_page_and_item(self, page, item):
         if self.getOption('threads') > 1:
@@ -223,10 +222,10 @@ class DupesMergingBot(WikidataEntityBot):
             self.queue.put(None)
         for worker in self.workers:
             worker.join()
-        super(DupesMergingBot, self).teardown()
+        super().teardown()
 
     def exit(self):
-        super(DupesMergingBot, self).exit()
+        super().exit()
         pywikibot.output('\nCurrent offset: %i (use %i)\n' % (
             self.offset, self.offset - self.offset % 50))
 

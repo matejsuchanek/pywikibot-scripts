@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
-import pywikibot
 import time
 
 from operator import attrgetter
 
+import pywikibot
 from pywikibot import pagegenerators
 
 from .typoloader import TyposLoader

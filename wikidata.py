@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from contextlib import suppress
+
 import pywikibot
 
 from pywikibot.bot import NoRedirectPageBot, WikidataBot
@@ -13,7 +15,7 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
     Features:
     * Caches properties so that iterating claims can be faster
     * Wraps around WikibataBot class.
-    * Item cleanup like missing and wrong labels etc.
+    * Item cleanup like missing labels, redundant data etc.
     '''
 
     def __init__(self, **kwargs):
@@ -23,14 +25,12 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         self.bad_cache = set(kwargs.pop('bad_cache', []))
         self.good_cache = set(kwargs.pop('good_cache', []))
         self.kit = WikidataCleanupToolkit()
-        super(WikidataEntityBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def init_page(self, item):
-        try:
+        with suppress(pywikibot.NoPage, pywikibot.IsRedirectPage):
             item.get()
-        except (pywikibot.NoPage, pywikibot.IsRedirectPage):
-            pass
-        return super(WikidataEntityBot, self).init_page(item)
+        return super().init_page(item)
 
     def checkProperty(self, prop):
         if prop in self.good_cache:
@@ -53,7 +53,7 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
             '%s.filterProperty needs overriding in a subclass' % self.__class__
         )
 
-    def user_edit_entity(self, item, data=None, cleanup=None, **kwargs):
+    def user_edit_entity(self, item, data=None, *, cleanup=None, **kwargs):
         # todo: support stub items
         if item.exists() and not (cleanup is False or (
                 self.getOption('nocleanup') and cleanup is not True)):
@@ -63,5 +63,4 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
                 else:
                     kwargs['summary'] = 'cleanup'
         kwargs.setdefault('show_diff', not self.getOption('always'))
-        return super(WikidataEntityBot, self).user_edit_entity(
-            item, data, **kwargs)
+        return super().user_edit_entity(item, data, **kwargs)

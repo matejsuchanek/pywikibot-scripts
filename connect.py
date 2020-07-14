@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import datetime
+
 import pywikibot
 
 from pywikibot import pagegenerators, textlib
@@ -149,7 +148,7 @@ tp_map = {
                 'family': 'commons'
             }
         },
-        'wikinews': dict((str(i), 'wikinews') for i in range(1, 10)),
+        'wikinews': {str(i): 'wikinews' for i in range(1, 10)},
         'wikipediakat': {
             '1': {
                 'lang': 'pl',
@@ -232,12 +231,12 @@ for project in tp_map.keys():
             continue
 
         for template, fields in textlib.extract_templates_and_params(page.text):
-            if first_lower(template) not in tp_map[project].keys():
+            if first_lower(template) not in tp_map[project]:
                 continue
 
             params = tp_map[project][first_lower(template)]
-            for key in fields.keys():
-                if key not in params.keys():
+            for key in fields:
+                if key not in params:
                     continue
 
                 title = fields[key].strip()
@@ -263,7 +262,7 @@ for project in tp_map.keys():
                     title = site.expand_text(title, page.title())
                 target_page = pywikibot.Page(target_site, title)
                 if not target_page.exists():
-                    pywikibot.output('%s doesn\'t exist' % target_page)
+                    pywikibot.output("%s doesn't exist" % target_page)
                     continue
                 while target_page.isRedirectPage():
                     target_page = target_page.getRedirectTarget()
@@ -280,7 +279,7 @@ for project in tp_map.keys():
                     pywikibot.output('Item created')
                     pywikibot.output(data) # todo
                     break
-                if site.dbName() in item.get()['sitelinks'].keys():
+                if site.dbName() in item.get()['sitelinks']:
                     pywikibot.output(page)
                     pywikibot.output('%s already has sitelink to %s%s' % (
                         item, lang, family))
@@ -298,4 +297,4 @@ for project in tp_map.keys():
 
 end = datetime.datetime.now()
 
-pywikibot.output('Complete! Took %s seconds' % (end - start).total_seconds())
+pywikibot.output('Complete! Took %d seconds' % (end - start).total_seconds())

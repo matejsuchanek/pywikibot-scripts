@@ -16,7 +16,7 @@ class LabelsFixingBot(WikidataEntityBot):
             'always': True,
             'limit': 50,
         })
-        super(LabelsFixingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.store = QueryStore()
         self._generator = generator or self.custom_generator()
         self.summary = 'remove prefix from [en] label'

@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+from itertools import combinations
+from operator import attrgetter
+
 import pywikibot
 
 from pywikibot.pagegenerators import (
@@ -6,8 +9,6 @@ from pywikibot.pagegenerators import (
     PreloadingEntityGenerator,
     WikidataSPARQLPageGenerator,
 )
-from itertools import combinations
-from operator import attrgetter
 
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
@@ -23,7 +24,7 @@ class DuplicateDatesBot(WikidataEntityBot):
             'limit': 1000,
             'props': ['P569', 'P570'],
         })
-        super(DuplicateDatesBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.store = QueryStore()
         self._generator = generator or self.custom_generator()
 
@@ -32,8 +33,7 @@ class DuplicateDatesBot(WikidataEntityBot):
             for key in ('duplicate_dates', 'unmerged_dates'):
                 query = self.store.build_query(
                     key, prop=prop, limit=self.getOption('limit'))
-                for item in WikidataSPARQLPageGenerator(query, site=self.repo):
-                    yield item
+                yield from WikidataSPARQLPageGenerator(query, site=self.repo)
 
     @property
     def generator(self):

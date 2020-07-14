@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
 """
 Module holding fixes which can be applied to most articles.
 
@@ -8,11 +7,12 @@ For use in user_fixes.py, please add to the file:
 from scripts.myscripts.custome_fixes import lazy_fixes
 fixes.update((key, fix.dictForUserFixes()) for key, fix in lazy_fixes.items())
 """
-import pywikibot
 import re
 
 from itertools import chain
 from operator import itemgetter, methodcaller
+
+import pywikibot
 
 from pywikibot import pagegenerators, textlib
 from pywikibot.textlib import mwparserfromhell
@@ -24,7 +24,7 @@ from .tools import deduplicate, FULL_ARTICLE_REGEX
 from .typoloader import TypoRule, TyposLoader
 
 
-class FixGenerator(object):
+class FixGenerator:
 
     '''Iterable wrapper around replacements'''
 
@@ -42,7 +42,7 @@ class FixGenerator(object):
         return True
 
 
-class BaseFix(object):
+class BaseFix:
 
     '''Abstract class representing a wikitext fix'''
 
@@ -74,7 +74,7 @@ class BaseFix(object):
         pass
 
     def generator(self):
-        return (x for x in []) # empty
+        return (x for x in [])  # empty
 
 
 class Fix(BaseFix):
@@ -175,14 +175,14 @@ class AdataFix(Fix):
         }
         petscan = pagegenerators.PetScanPageGenerator(
             ['Muži', 'Ženy', 'Žijící_lidé'], subset_combination=False,
-            site=self.site, namespaces=[0], extra_options=extra) # l10n!
-        items = pagegenerators.PreloadingItemGenerator(petscan) # hack
+            site=self.site, namespaces=[0], extra_options=extra)  # l10n!
+        items = pagegenerators.PreloadingItemGenerator(petscan)  # hack
         return pagegenerators.WikidataPageFromItemGenerator(items, self.site)
 
     def apply(self, page, summaries=[], callbacks=[]):
         text = page.text
-        adata = '{{Autoritní data}}' # fixme: l10n
-        if adata.lower() in text.lower(): # fixme: with parameters
+        adata = '{{Autoritní data}}'  # fixme: l10n
+        if adata.lower() in text.lower():  # fixme: with parameters
             return
 
         try:
@@ -349,7 +349,7 @@ class CategoriesFix(LazyFix):
         return before + '\n' + after
 
     def apply(self, page, summaries=[], *args):
-        result = super(CategoriesFix, self).apply(page, summaries, *args)
+        result = super().apply(page, summaries, *args)
         if result:
             categories = textlib.getCategoryLinks(page.text, site=self.site)
             categories.sort(key=self.sortCategories)
@@ -384,7 +384,7 @@ class FilesFix(LazyFix):
 
     @property
     def summary(self):
-        return
+        return None  # ??
 
     def replacements(self):
         yield (self.file_regex.pattern, self.handleFile)
@@ -417,7 +417,7 @@ class FilesFix(LazyFix):
                 i += 1
                 continue
 
-            if re.match(r'\d*x?\d+(%s)$' % '|'.join(
+            if re.fullmatch(r'\d*x?\d+(%s)' % '|'.join(
                 map(re.escape, (x[2:] for x in filter(
                     methodcaller('startswith', '$1'),
                     self.wordtokey)))), split[i]):
@@ -445,7 +445,7 @@ class FilesFix(LazyFix):
         return '[[%s]]' % '|'.join(split)
 
 
-class CheckWikiFix(LazyFix): # todo: make abstract and split
+class CheckWikiFix(LazyFix):  # todo: make abstract and split
 
     '''
     Fixes errors detected by Check Wikipedia project
@@ -457,10 +457,10 @@ class CheckWikiFix(LazyFix): # todo: make abstract and split
     key = 'checkwiki'
     message = 'opravy dle [[WP:WCW|CheckWiki]]'
     options = {
-        'maxsummarycw': 5 # todo: really support
+        'maxsummarycw': 5  # todo: really support
     }
     exceptions = {
-        'inside-tags': CheckWikiError.exceptions[:], # fixme: split
+        'inside-tags': CheckWikiError.exceptions[:],  # fixme: split
     }
 
     def load(self):
@@ -506,7 +506,7 @@ class InterwikiFix(Fix):
         if len(new_sites) == len(iw_links):
             return
 
-        new_links = dict((site, iw_links[site]) for site in new_sites)
+        new_links = {site: iw_links[site] for site in new_sites}
 
         page.text = textlib.replaceLanguageLinks(page.text, new_links, page.site)
         summaries.append('odstranění interwiki')
@@ -533,17 +533,12 @@ class RedirectFix(LazyFix):
     message = 'narovnání přesměrování'
 
     def generator(self):
-##        return chain.from_iterable(
-##            map(methodcaller('backlinks', followRedirects=False,
-##                             filterRedirects=False, namespaces=0),
-##                (pywikibot.Page(self.site, title) for title in self.redirects)))
         for title in self.redirects:
-            for page in pywikibot.Page(self.site, title).backlinks(
-                    followRedirects=False, filterRedirects=False, namespaces=0):
-                yield page
+            yield from pywikibot.Page(self.site, title).backlinks(
+                followRedirects=False, filterRedirects=False, namespaces=0)
 
     def get_redirects(self):
-        redirects = [] # todo: set?
+        redirects = []  # todo: set?
         pywikibot.output('Loading redirects')
         page = pywikibot.Page(self.site, self.page_title)
         text = page.text.partition('{{SHORTTOC}}\n')[2]
@@ -626,11 +621,10 @@ class RedirectFix(LazyFix):
             '[[%s|%s%s]]' % (target, link, trail)
         )
 
-        options = list(map(lambda x: ('%s %s' % x, str(x[0])),
-                           enumerate(options_list, start=1)))
-        options.append(
-            ('Do not replace unpiped links', 'n')
-        )
+        options = [
+            ('%d %s' % (i, opt), str(i))
+            for i, opt in enumerate(options_list, start=1)
+        ] + [('Do not replace unpiped links', 'n')]
 
         pre = match.string[max(0, match.start() - 30):match.start()].rpartition('\n')[2]
         post = match.string[match.end():match.end() + 30].partition('\n')[0]
@@ -650,8 +644,8 @@ class RedirectsFromFileFix(RedirectFix):
     key = 'redirects-file'
 
     def get_redirects(self):
-        return list(map(methodcaller('title'),
-                        pagegenerators.TextfilePageGenerator(site=self.site)))
+        return [page.title() for page in pagegenerators.TextfilePageGenerator(
+            site=self.site)]
         
 
 class RefSortFix(LazyFix):
@@ -796,8 +790,8 @@ class SectionsFix(LazyFix):
 
     def deduplicate(self, sections, code):
         do_more = False
-        for name in set(map(itemgetter('name'), sections)):
-            dupes = list(filter(lambda sect: sect['name'] == name, sections))
+        for name in {sect['name'] for sect in sections}:
+            dupes = [sect for sect in sections if sect['name'] == name]
             if len(dupes) == 1:
                 continue
             do_more = True
@@ -1031,11 +1025,11 @@ class TypoFix(LazyFix):
 
             summaries.append(summary)
 
-lazy_fixes = dict((fix.key, fix) for fix in [
+
+lazy_fixes = {fix.key: fix for fix in (
     CategoriesFix, CheckWikiFix, FilesFix, RedirectFix, RedirectsFromFileFix,
-    RefSortFix, SectionsFix, TemplateFix, TypoFix])
-all_fixes = dict((fix.key, fix) for fix in [
-    AdataFix, InterwikiFix, StyleFix])
+    RefSortFix, SectionsFix, TemplateFix, TypoFix)}
+all_fixes = {fix.key: fix for fix in (AdataFix, InterwikiFix, StyleFix)}
 all_fixes.update(lazy_fixes)
 
 if __name__ == '__main__':

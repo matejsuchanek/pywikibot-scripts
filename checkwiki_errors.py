@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
-import pywikibot
 import re
 import requests
 
+import pywikibot
+
 from pywikibot import textlib
+
 from .tools import deduplicate
 
 
@@ -89,7 +89,8 @@ class DefaultsortError(CheckWikiError):
 
     def pattern(self):
         magic = self.site.getmagicwords('defaultsort')
-        return re.compile(r'\{\{ *(?P<magic>%s)(?P<key>[^}]+)\}\}' % '|'.join(magic))
+        return re.compile(r'\{\{ *(?P<magic>%s)(?P<key>[^}]+)\}\}'
+                          % '|'.join(magic))
 
 
 class PrefixedTemplate(CheckWikiError):
@@ -126,8 +127,7 @@ class BrokenHTMLTag(CheckWikiError):
             '(?P<param>[a-z]+) *= *'
             '(?P<quote>[\'"])?'
             r'(?P<content>(?(quote)(?!(?P=quote)|>).|\w)+)'
-            '(?(quote)(?P=quote)|)',
-            re.U)
+            '(?(quote)(?P=quote)|)')
 
         def replaceTag(match):
             tag = match.group('tag')
@@ -164,7 +164,7 @@ class BrokenHTMLTag(CheckWikiError):
             '<(?P<tag>%s)(?: (?P<params>[^>]+?))? */>' % '|'.join(self.tags),
             replaceTag, text)
 
-        return super(BrokenHTMLTag, self).apply(text, page)
+        return super().apply(text, page)
 
 
 class LowHeadersLevel(HeaderError):
@@ -234,8 +234,8 @@ class NoEndSquareBrackets(CheckWikiError): # fixme
 
     def replacement(self, match):
         inside, after = match.group('inside', 'after')
-        if any(inside.lstrip().lower().startswith(
-            '%s:' % x) for x in list(self.site.namespaces[6])):
+        if any(inside.lstrip().lower().startswith('%s:' % x)
+               for x in list(self.site.namespaces[6])):
             return match.group()
 
         if after == ']]':
@@ -471,7 +471,7 @@ class HeaderHierarchy(HeaderError):
                     if j in levels[i+1:]:
                         index = min(index, levels.index(j, i + 1))
 
-                levels[i+1:index] = list(map(lambda x: x - 1, levels[i+1:index]))
+                levels[i+1:index] = [x - 1 for x in levels[i+1:index]]
             i = index
 
         i = 0
@@ -769,7 +769,7 @@ class RefBeforePunctuation(CheckWikiError):
             all_punct.remove('')
 
         if (len(all_punct) == 1
-            and match.group().lstrip().startswith(all_punct[0])):
+                and match.group().lstrip().startswith(all_punct[0])):
             return match.group()
 
         distinct = set(''.join(all_punct))
@@ -826,7 +826,7 @@ class BadListStructure(CheckWikiError): # todo
             levels[:] = ['']
             return line
 
-        this, rest = re.match('([%s]+)(.*)$' % self.list_chars, line).groups()
+        this, rest = re.fullmatch('([%s]+)(.*)' % self.list_chars, line).groups()
 
         for old, new in levels[1:]:
             if this.startswith(old):
@@ -908,14 +908,13 @@ class DuplicateReferences(CheckWikiError):
         ref_regex = re.compile(
             '<ref(?= |>)(?P<params>[^>]*)'
             '(?: ?/|>(?P<content>(?:(?!</?ref).)+)</ref)>',
-            re.S | re.U)
+            re.S)
 
         param_regex = re.compile(
             '(?P<param>[a-z]+) *= *'
             '(?P<quote>[\'"])?'
             r'(?P<content>(?(quote)(?!(?P=quote)|>).|[\w-])+)'
-            '(?(quote)(?P=quote)|)',
-            re.U)
+            '(?(quote)(?P=quote)|)')
 
         named_contents = {}
         duplicate_named_contents = {}

@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+import re
 
 import pywikibot
-import re
 
 from pywikibot import pagegenerators, textlib
 from pywikibot.tools import first_upper
-
 from pywikibot.textlib import mwparserfromhell
 
 try:
@@ -16,6 +14,7 @@ except ImportError:
 
     class WikitextFixingBot(SingleSiteBot, NoRedirectPageBot, ExistingPageBot):
         pass
+
 
 class TitlesMovingBot(WikitextFixingBot):
 
@@ -29,7 +28,7 @@ class TitlesMovingBot(WikitextFixingBot):
         self.template = self.normalize(template)
         self.start_offset = offset
         self.offset = 0
-        super(TitlesMovingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def normalize(self, template):
         return first_upper(template
@@ -40,7 +39,7 @@ class TitlesMovingBot(WikitextFixingBot):
     def treat(self, page):
         self.offset += 1
         if self.offset > self.start_offset:
-            super(TitlesMovingBot, self).treat(page)
+            super().treat(page)
 
     def treat_page(self):
         page = self.current_page
@@ -106,8 +105,9 @@ class TitlesMovingBot(WikitextFixingBot):
         return before, new_param, after.strip()
 
     def exit(self):
-        super(TitlesMovingBot, self).exit()
-        pywikibot.output('Current offset: %s' % self.offset)
+        super().exit()
+        pywikibot.output('Current offset: %d' % self.offset)
+
 
 def main(*args):
     options = {}
@@ -134,6 +134,7 @@ def main(*args):
 
     bot = TitlesMovingBot(generator=generator, **options)
     bot.run()
+
 
 if __name__ == '__main__':
     if isinstance(mwparserfromhell, Exception):

@@ -25,7 +25,7 @@ class CaptionToImageBot(WikidataEntityBot):
             'removeall': False
         })
         kwargs.setdefault('bad_cache', []).append(self.caption_property)
-        super(CaptionToImageBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.store = QueryStore()
         self._generator = generator or self.custom_generator()
 
@@ -41,7 +41,7 @@ class CaptionToImageBot(WikidataEntityBot):
         return prop_page.type == 'commonsMedia'
 
     def skip_page(self, item):
-        return super(CaptionToImageBot, self).skip_page(item) or (
+        return super().skip_page(item) or (
             self.caption_property not in item.claims)
 
     def _save_entity(self, func, *args, **kwargs):

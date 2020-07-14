@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
-import pywikibot
 import re
 
+from collections import OrderedDict
 from operator import methodcaller
+
+import pywikibot
 
 from pywikibot import pagegenerators, textlib
 
 from pywikibot.textlib import mwparserfromhell
-from pywikibot.tools import first_upper, OrderedDict
+from pywikibot.tools import first_upper
 
 from .tools import get_best_statements
 from .wikidata import WikidataEntityBot
@@ -68,7 +68,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
             'end': None,
             'total': None,
         })
-        super(MetadataHarvestingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._generator = generator or self.custom_generator()
         self.func_dict = {
             'corresponding template': self.get_data_as_item('P2667'),
@@ -114,7 +114,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 break
 
     def skip_page(self, prop):
-        return super(MetadataHarvestingBot, self).skip_page(prop) or (
+        return super().skip_page(prop) or (
             not prop.exists() or prop.isRedirectPage())
 
     def treat_page(self):
@@ -205,7 +205,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
             pywikibot.output('{} is for qualifier use'.format(prop.title()))
             return False
 
-        if prop.type in ['external-id', 'string']:
+        if prop.type in ('external-id', 'string'):
             regex = self.get_regex_from_prop(prop)
             if regex is None:
                 pywikibot.output('Regex for "{}" not found'.format(
@@ -272,7 +272,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
             else:
                 pywikibot.output(
                     '"{}" is not supported datatype for matching examples'
-                    ''.format(prop.type))
+                    .format(prop.type))
                 return False
 
         remove = True
@@ -285,11 +285,11 @@ class MetadataHarvestingBot(WikidataEntityBot):
             pair = re.split(self.regexes['arrow'], match)
             if len(pair) == 1:
                 pywikibot.output('Example pair not recognized in "{}"'
-                                 ''.format(match))
+                                 .format(match))
                 remove = False
                 continue
 
-            pair = [pair[i] for i in [0, -1]]
+            pair = [pair[i] for i in (0, -1)]
             searchObj = self.regexes['wikibase-item'].search(pair[0])
             if searchObj is None:
                 pywikibot.output('No item id found in "{}"'.format(pair[0]))
@@ -303,17 +303,17 @@ class MetadataHarvestingBot(WikidataEntityBot):
             if any(map(methodcaller('target_equals', target),
                        prop.claims.get('P1855', []))):
                 pywikibot.output('There is already one example with "{}"'
-                                 ''.format(item_match))
+                                 .format(item_match))
                 continue
 
             qual_match = regex.search(pair[1])
             if not qual_match:
                 pywikibot.output('Couldn\'t match example value in "{}"'
-                                 ''.format(pair[1]))
+                                 .format(pair[1]))
                 remove = False
                 continue
 
-            for g in ['value', 'value2', 'url']:
+            for g in ('value', 'value2', 'url'):
                 if g in qual_match.groupdict():
                     if qual_match.group(g):
                         qual_target = qual_match.group(g)
@@ -348,7 +348,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                     amount = parse_float(qual_match.group('amount'))
                 except ValueError:
                     pywikibot.output('Couldn\'t parse "{}"'
-                                     ''.format(qual_target))
+                                     .format(qual_target))
                     remove = False
                     continue
                 error = qual_match.group('error')
@@ -358,7 +358,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                         error = parse_float(error)
                     except ValueError:
                         pywikibot.output('Couldn\'t parse "{}"'
-                                         ''.format(qual_target))
+                                         .format(qual_target))
                         remove = False
                         continue
                 if unit:
@@ -384,9 +384,9 @@ class MetadataHarvestingBot(WikidataEntityBot):
 
     def formatter(self, textvalue):
         prop = self.current_page
-        if prop.type not in ['commonsMedia', 'external-id', 'string']:
+        if prop.type not in ('commonsMedia', 'external-id', 'string'):
             pywikibot.output('"{}" datatype doesn\'t make use of formatter'
-                             ''.format(prop.type))
+                             .format(prop.type))
             return True
 
         remove = True
@@ -394,9 +394,9 @@ class MetadataHarvestingBot(WikidataEntityBot):
             if any(map(methodcaller('target_equals', match),
                        prop.claims.get('P1630', []))):
                 pywikibot.output('"{}" already has "{}" as the formatter URL'
-                                 ''.format(prop.title(), match))
+                                 .format(prop.title(), match))
                 continue
-            if match.strip() in ['http://', 'https://']:
+            if match.strip() in ('http://', 'https://'):
                 continue  # ???
             claim = pywikibot.Claim(self.repo, 'P1630')
             claim.setTarget(match)
@@ -479,7 +479,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
         for match in self.regexes['split-break'].split(textvalue):
             if not match.strip():
                 continue
-            regex = self.regexes['url']  # textlib.compileLinkR()
+            regex = self.regexes['url']  # todo: textlib.compileLinkR()
             url_match = regex.findall(match)
             if not url_match:
                 pywikibot.output('Could not match source "{}"'.format(match))
@@ -490,7 +490,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 if any(map(methodcaller('target_equals', target),
                            prop.claims.get('P1896', []))):
                     pywikibot.output('"{}" already has "{}" as the source'
-                                     ''.format(prop.title(), target))
+                                     .format(prop.title(), target))
                     continue
 
                 claim = pywikibot.Claim(self.repo, 'P1896')
@@ -535,7 +535,7 @@ def main(*args):
     for arg in local_args:
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
-            if arg in ['-always', '-importonly', '-start', '-end', '-total']:
+            if arg in ('-always', '-importonly', '-start', '-end', '-total'):
                 if value != '':
                     options[arg[1:]] = int(value) if value.isdigit() else value
                 else:

@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import pywikibot
 
 from pywikibot import pagegenerators
@@ -19,7 +17,7 @@ class RanksShiftingBot(WikidataEntityBot):
         self.availableOptions.update({
             'limit': 500,
         })
-        super(RanksShiftingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.store = QueryStore()
         self._generator = generator or self.custom_generator()
 

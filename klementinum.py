@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+import requests
 
 from collections import OrderedDict
-
-import requests
 
 import pywikibot
 import mwparserfromhell as parser

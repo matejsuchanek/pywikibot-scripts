@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-import pywikibot
 import re
 
 from itertools import chain
-from operator import methodcaller
+from operator import attrgetter, methodcaller
+
+import pywikibot
 
 from pywikibot import pagegenerators
-
 from pywikibot.bot import SingleSiteBot, ExistingPageBot, NoRedirectPageBot
 
 from .custome_fixes import all_fixes
@@ -41,7 +41,7 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
         self.fixes.sort(key=lambda fix: fix.order)
 
-        super(WikitextFixingBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         for fix in self.fixes:
             fix.site = self.site
         if not self.generator:
@@ -89,7 +89,7 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         page.text = newtext
         return self._save_page(page, self.fix_wikitext, page, **kwargs)
 
-    def fix_wikitext(self, page, *data, **kwargs):
+    def fix_wikitext(self, page, *args, **kwargs):
         summaries = [kwargs['summary']]
         callbacks = self.applyFixes(page, summaries)
 
@@ -97,7 +97,7 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         # todo: method
         kwargs['callback'] = lambda _, exc: [cb() for cb in callbacks
                                              if not exc]
-        page.save(*data, **kwargs)
+        page.save(*args, **kwargs)
 
 
 def main(*args):
@@ -119,5 +119,5 @@ def main(*args):
     bot.run()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

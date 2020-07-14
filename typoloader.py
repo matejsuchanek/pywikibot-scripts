@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
-import pywikibot
 import re
 import time
 
 from operator import methodcaller
 
-from pywikibot import pagegenerators, textlib
+import pywikibot
 
+from pywikibot import pagegenerators, textlib
 from pywikibot.tools.formatter import color_format
 
 
@@ -29,7 +27,7 @@ class InvalidExpressionException(Exception):
         self.aspect = aspect
 
 
-class TypoRule(object):
+class TypoRule:
 
     '''Class representing one typo rule'''
 
@@ -43,11 +41,11 @@ class TypoRule(object):
         'mapframe', 'maplink', 'math', 'nowiki', 'poem', 'pre', 'score',
         'section', 'source', 'timeline', 'tt', 'var',
 
-        re.compile(r'\[\[([^][|]+)(\]\]\w*|([^][|]+\|)+)', re.U), # 'target-part' of a wikilink
-        re.compile('<[a-z]+ [^>]+>'), # HTML tag
-        re.compile('„[^\n"“]+["“]'), # quotation marks
-        re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1)[^\n])+\1", re.U), # italics
-        re.compile(r'\b([A-Za-z]+\.)+[a-z]{2,}'), # url fragment
+        re.compile(r'\[\[([^][|]+)(\]\]\w*|([^][|]+\|)+)'),  # 'target-part' of a wikilink
+        re.compile('<[a-z]+ [^>]+>'),  # HTML tag
+        re.compile('„[^\n"“]+["“]'),  # quotation marks
+        re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1)[^\n])+\1"),  # italics
+        re.compile(r'\b([A-Za-z]+\.)+[a-z]{2,}'),  # url fragment
     ]
 
     nowikiR = re.compile('</?nowiki>')
@@ -91,7 +89,7 @@ class TypoRule(object):
 
         find = cls.nowikiR.sub('', parameters['1'])
         try:
-            find = re.compile(find, re.U | re.M)
+            find = re.compile(find, re.M)
         except re.error as exc:
             raise InvalidExpressionException(exc)
 
@@ -175,13 +173,13 @@ class TypoRule(object):
         return text
 
 
-class TyposLoader(object):
+class TyposLoader:
 
     top_id = 0
 
     '''Class loading and holding typo rules'''
 
-    def __init__(self, site, allrules=False, typospage=None, whitelistpage=None):
+    def __init__(self, site, *, allrules=False, typospage=None, whitelistpage=None):
         self.site = site
         self.load_all = allrules
         self.typos_page_name = typospage
