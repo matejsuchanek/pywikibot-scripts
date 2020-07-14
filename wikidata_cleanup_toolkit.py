@@ -194,11 +194,13 @@ class WikidataCleanupToolkit(object):
             if not label:
                 continue
             if norm:
-                if norm in data['labels']:
-                    aliases = data['aliases'].get(norm, [])
-                    if label not in map(first_lower, aliases):
-                        aliases.append(label)
-                        data['aliases'][norm] = aliases
+                norm_label = data['labels'].get(norm)
+                if norm_label:
+                    if first_lower(norm_label) != first_lower(label):
+                        aliases = data['aliases'].get(norm, [])
+                        if first_lower(label) not in map(first_lower, aliases):
+                            aliases.append(label)
+                            data['aliases'][norm] = aliases
                 else:
                     data['labels'][norm] = label
             data['labels'][lang] = ''
@@ -212,20 +214,22 @@ class WikidataCleanupToolkit(object):
                 ret = True
         for lang, norm in self.lang_map.items():
             old_aliases = data['aliases'].get(lang)
-            if old_aliases:
-                if norm:
-                    new_aliases = data['aliases'].get(norm, [])
-                    already = set(map(first_lower, new_aliases))
-                    if norm in data['labels']:
-                        already.add(first_lower(data['labels'][norm]))
-                    for alias in old_aliases:
-                        if alias not in already:
-                            new_aliases.append(alias)
-                            already.add(alias)
-                    # fixme: buggy, raises not-recognized-array
-                    data['aliases'][norm] = new_aliases
-                data['aliases'][lang] = []
-                ret = True
+            if not old_aliases:
+                continue
+            if norm:
+                new_aliases = data['aliases'].get(norm, [])
+                already = set(map(first_lower, new_aliases))
+                norm_label = data['labels'].get(norm)
+                if norm_label:
+                    already.add(first_lower(norm_label))
+                for alias in old_aliases:
+                    if first_lower(alias) not in already:
+                        new_aliases.append(alias)
+                        already.add(first_lower(alias))
+                # fixme: buggy, raises not-recognized-array
+                data['aliases'][norm] = new_aliases
+            data['aliases'][lang] = []
+            ret = True
         return ret
 
     def get_missing_labels(self, sitelinks, dont):
