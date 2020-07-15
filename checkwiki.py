@@ -10,7 +10,7 @@ from .checkwiki_errors import *
 from .wikitext import WikitextFixingBot
 
 
-class CheckWikiSettings(object):
+class CheckWikiSettings:
 
     prio_map = {
         '0': '',
@@ -87,7 +87,7 @@ class CheckWikiSettings(object):
         return cls.new_from_text(page.text, site.dbName())
 
 
-class CheckWikiErrorGenerator(object):
+class CheckWikiErrorGenerator:
 
     def __init__(self, checkwiki, priorities=None, ids=None):
         self.checkwiki = checkwiki
@@ -104,7 +104,7 @@ class CheckWikiErrorGenerator(object):
                     yield from self.checkwiki.iter_pages(error)
 
 
-class CheckWiki(object):
+class CheckWiki:
 
     url = 'https://tools.wmflabs.org/checkwiki/cgi-bin/checkwiki_bots.cgi'
 

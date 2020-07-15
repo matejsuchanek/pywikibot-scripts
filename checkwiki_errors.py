@@ -9,7 +9,7 @@ from pywikibot import textlib
 from .tools import deduplicate
 
 
-class CheckWikiError(object):
+class CheckWikiError:
 
     '''Abstract class for each error to extend'''
 

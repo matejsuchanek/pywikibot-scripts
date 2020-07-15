@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 import time
 
-from operator import attrgetter
-
 import pywikibot
 from pywikibot import pagegenerators
 
@@ -25,7 +23,7 @@ class TypoBot(WikitextFixingBot):
     * -whitelistpage: - what page holds pages which should be skipped
     '''
 
-    def __init__(self, generator, offset=0, **kwargs):
+    def __init__(self, generator, *, offset=0, **kwargs):
         self.availableOptions.update({
             'allrules': False,
             'quick': False,
@@ -40,7 +38,7 @@ class TypoBot(WikitextFixingBot):
         else:
             self.generator = generator
 
-        super(TypoBot, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.offset = offset
 
     def setup(self):
@@ -54,7 +52,7 @@ class TypoBot(WikitextFixingBot):
 
     @property
     def is_rule_accurate(self):
-        threshold = float(self.getOption('threshold'))
+        threshold = self.getOption('threshold')
         result = (self.processed < threshold or
                   self.processed / threshold < self.replaced)
         return result
@@ -113,19 +111,20 @@ class TypoBot(WikitextFixingBot):
                               .format(page))
             return True
 
-        return super(TypoBot, self).skip_page(page)
+        return super().skip_page(page)
 
     def init_page(self, page):
-        super(TypoBot, self).init_page(page)
+        out = super().init_page(page)
         if self.own_generator:
             self.processed += 1
+        return out
 
     def treat_page(self):
         page = self.current_page
         text = page.text
         done_replacements = []
         quickly = self.getOption('quick') is True
-        start = time.clock()
+        start = time.time()
         if self.own_generator:
             text = self.current_rule.apply(page.text, done_replacements)
             if page.text == text:
@@ -145,7 +144,7 @@ class TypoBot(WikitextFixingBot):
                 continue
 
             text = rule.apply(text, done_replacements)
-            stop = time.clock()
+            stop = time.time()
             if quickly and stop - start > 15:
                 pywikibot.warning('Other typos exceeded 15s, skipping')
                 break
@@ -157,12 +156,12 @@ class TypoBot(WikitextFixingBot):
         if self.getOption('always'):
             return True
 
-        options = [('yes', 'y'), ('no', 'n'), ('all', 'a'),
-                   ('open in browser', 'b'), ('quit', 'q')]
-        if self.own_generator:
-            options.insert(3, ('skip rule', 's'))
+        options = [('yes', 'y'), ('no', 'n'), ('all', 'a')]
         if self.fp_page.exists():
-            options.insert(3, ('false positive', 'f'))
+            options.append(('false positive', 'f'))
+        if self.own_generator:
+            options.append(('skip rule', 's'))
+        options += [('open in browser', 'b'), ('quit', 'q')]
 
         choice = pywikibot.input_choice(question, options, default='N',
                                         automatic_quit=False)
@@ -191,16 +190,16 @@ class TypoBot(WikitextFixingBot):
         return True
 
     def teardown(self):
-        rules = sorted(filter(lambda rule: not rule.needs_decision(),
-                              self.typoRules),
-                       key=attrgetter('longest'), reverse=True)[:3]
+        rules = sorted(
+            (rule for rule in self.typoRules if not rule.needs_decision()),
+            key=lambda rule: rule.longest, reverse=True)[:3]
         pywikibot.output('\nSlowest autonomous rules:')
         for i, rule in enumerate(rules, start=1):
             pywikibot.output(
                 '%d. "%s" - %f' % (i, rule.find.pattern, rule.longest))
         if self.own_generator:
             pywikibot.output('\nCurrent offset: %d\n' % self.offset)
-        super(TypoBot, self).teardown()
+        super().teardown()
 
 
 def main(*args):

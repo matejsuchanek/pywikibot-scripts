@@ -6,7 +6,7 @@ import pywikibot
 FULL_ARTICLE_REGEX = r'\A[\s\S]*\Z'
 
 
-class FileRegexHolder(object):
+class FileRegexHolder:
 
     replaceR = None
     FLOAT_PATTERN = r'\d+(?:\.\d+)?'

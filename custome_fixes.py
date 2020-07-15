@@ -9,6 +9,7 @@ fixes.update((key, fix.dictForUserFixes()) for key, fix in lazy_fixes.items())
 """
 import re
 
+from collections import defaultdict
 from itertools import chain
 from operator import itemgetter, methodcaller
 
@@ -62,7 +63,7 @@ class BaseFix:
     @property
     def site(self):
         if not hasattr(self, '_site'):
-            self._site = pywikibot.Site() # todo: is this correct? should load?
+            self._site = pywikibot.Site()  # todo: is this correct? should load?
         return self._site
 
     @site.setter
@@ -168,7 +169,7 @@ class AdataFix(Fix):
     def generator(self):
         extra = {
             'common_wiki': 'wikidata',
-            'templates_no': 'Autoritní data', # l10n!
+            'templates_no': 'Autoritní data',  # l10n!
             'wikidata_source_sites': self.site.dbName(),
             'wikidata_item': 'with',
             'wikidata_prop_item_use': ','.join(self.props),
@@ -193,13 +194,13 @@ class AdataFix(Fix):
         claims = item.get().get('claims')
         if not any(st.target_equals(self.human_item)
                    for st in claims.get('P31', [])):
-            return # fixme: not mandatory
+            return  # fixme: not mandatory
 
         if len(self.props & set(claims.keys())) < self.minprops:
             return
 
         new_text = re.sub(r'(\{\{[Pp]ortály\|)', r'%s\n\1' % adata, text,
-                          count=1) # fixme: l10n
+                          count=1)  # fixme: l10n
         if new_text == text:
             new_text = re.sub(
                 r'\{\{ *(%s)' % '|'.join(
@@ -227,7 +228,7 @@ class CategoriesFix(LazyFix):
     message = 'oprava řazení kategorií'
 
     def generator(self):
-        pass # incategory:"Muži|Ženy|Žijící lidé" insource:/\[\[Kategorie:[^]|[]+\|[^],]+,/
+        pass  # incategory:"Muži|Ženy|Žijící lidé" insource:/\[\[Kategorie:[^]|[]+\|[^],]+,/
 
     def load(self):
         magic_words = map(re.escape, self.site.getmagicwords('defaultsort'))
@@ -302,7 +303,7 @@ class CategoriesFix(LazyFix):
         if changed:
             categories.sort(key=self.sort_category)
             before, _, after = textlib.replaceCategoryLinks(
-                text, categories, self.site).rpartition('\n\n') # fixme: safer
+                text, categories, self.site).rpartition('\n\n')  # fixme: safer
             return before + '\n' + after
         else:
             return text
@@ -312,7 +313,7 @@ class CategoriesFix(LazyFix):
         if self.defaultsortR.search(text):
             return text
 
-        keys = {}
+        keys = defaultdict(lambda: 0.0)
         categories = textlib.getCategoryLinks(text, site=self.site)
         if not any(category.title(with_ns=False) in (
                 'Muži', 'Žijící lidé', 'Ženy') for category in categories):
@@ -324,7 +325,6 @@ class CategoriesFix(LazyFix):
                 key = self.tidy_sortkey(key)
                 if not key.strip():
                     continue
-                keys.setdefault(key, 0.0)
                 keys[key] += 1
                 if len(keys) > 1:
                     return text
@@ -345,7 +345,7 @@ class CategoriesFix(LazyFix):
         text = textlib.removeCategoryLinks(text, self.site)
         text += '\n\n{{DEFAULTSORT:%s}}' % key
         before, _, after = textlib.replaceCategoryLinks(
-            text, categories, self.site).rpartition('\n\n') # fixme: safer
+            text, categories, self.site).rpartition('\n\n')  # fixme: safer
         return before + '\n' + after
 
     def apply(self, page, summaries=[], *args):
@@ -361,12 +361,12 @@ class CategoriesFix(LazyFix):
 class FilesFix(LazyFix):
 
     key = 'files'
-    magic = ['img_alt', 'img_baseline', 'img_border', 'img_bottom',
+    magic = ('img_alt', 'img_baseline', 'img_border', 'img_bottom',
              'img_center', 'img_class', 'img_framed', 'img_frameless',
              'img_lang', 'img_left', 'img_link', 'img_lossy', 'img_manualthumb',
              'img_middle', 'img_none', 'img_page', 'img_right', 'img_sub',
              'img_super', 'img_text_bottom', 'img_text_top', 'img_thumbnail',
-             'img_top', 'img_upright', 'img_width']
+             'img_top', 'img_upright', 'img_width')
     message = 'úpravy obrázků'
     regex = r'\[\[\s*(?:%s)\s*:\s*[^]|[]+(?:\|(?:[^]|[]|\[\[[^]]+\]\])+)+\]\]'
 
@@ -378,8 +378,8 @@ class FilesFix(LazyFix):
         self.keytolocal = {}
         for magic in self.magic:
             words = self.site.getmagicwords(magic)
-            self.keytolocal[magic] = words.pop(0)
-            for word in words:
+            self.keytolocal[magic] = words[0]
+            for word in words[1:]:
                 self.wordtokey[word] = magic
 
     @property
@@ -390,13 +390,14 @@ class FilesFix(LazyFix):
         yield (self.file_regex.pattern, self.handleFile)
 
     def handleFile(self, match):
-        if self.file_regex.search(match.group()[2:-2]):
+        inner = match.group()[2:-2]
+        if self.file_regex.search(inner):
             return match.group() # todo
 
 ##      if match.group().count('[[') != match.group().count(']]'):
 ##          return match.group()
 
-        split = match.group()[2:-2].split('|')
+        split = inner.split('|')
 
         split[0] = pywikibot.page.url2unicode(split[0].strip())
         split[0] = re.sub('[ _]+', ' ', split[0]).strip()
@@ -417,10 +418,10 @@ class FilesFix(LazyFix):
                 i += 1
                 continue
 
-            if re.fullmatch(r'\d*x?\d+(%s)' % '|'.join(
-                map(re.escape, (x[2:] for x in filter(
-                    methodcaller('startswith', '$1'),
-                    self.wordtokey)))), split[i]):
+            regex = re.compile(r'\d*x?\d+(%s)' % '|'.join(
+                re.escape(word[2:]) for word in self.wordtokey
+                if word.startswith('$1')))
+            if regex.fullmatch(split[i]):
                 i += 1
                 continue
 
@@ -464,7 +465,7 @@ class CheckWikiFix(LazyFix):  # todo: make abstract and split
     }
 
     def load(self):
-        from .checkwiki import CheckWiki # fixme
+        from .checkwiki import CheckWiki  # fixme
         self.checkwiki = CheckWiki(self.site)
 
     #def generator(self): todo
@@ -478,7 +479,7 @@ class CheckWikiFix(LazyFix):  # todo: make abstract and split
         replaced = []
         fixed = []
         page.text = self.checkwiki.apply(page.text, page, replaced, fixed)
-        if len(replaced) > 0: # todo: maxsummarycw
+        if len(replaced) > 0:  # todo: maxsummarycw
             summaries.append('[[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced))
             callbacks.append(
                 lambda: self.checkwiki.mark_as_fixed_multiple(page, fixed))
@@ -656,7 +657,7 @@ class RefSortFix(LazyFix):
 
     key = 'sortref'
     message = 'seřazení referencí'
-    order = 2 # after checkwiki
+    order = 2  # after checkwiki
 
     def load(self):
         self.regex_single = re.compile(
@@ -839,7 +840,7 @@ class SectionsFix(LazyFix):
 
     def clean_empty(self, sections, code, do_more):
         to_remove = []
-        for sect in sections[:-1]: # todo
+        for sect in sections[:-1]:  # todo
             if sect['name'] == self.root_header:
                 continue
             if not ''.join(map(str, sect['nodes'][1:])).strip():
@@ -886,10 +887,10 @@ class SectionsFix(LazyFix):
         return str(code)
 
 
-class StyleFix(Fix): # todo: split and delete
+class StyleFix(Fix):  # todo: split and delete
 
     key = 'mos'
-    order = 2 # after checkwiki
+    order = 2  # after checkwiki
 
     def apply(self, page, *args):
         # remove empty list items
@@ -954,8 +955,8 @@ class TemplateFix(LazyFix):
             return match.group()
 
         if template_name != first_upper(template_name):
-            if all(map(methodcaller('islower'), filter(
-                    methodcaller('isalpha'), target.partition(' ')[0][1:]))):
+            if all(part.islower() for part in target.partition(' ')[0][1:]
+                   if part.isalpha()):
                 target = first_lower(target)
 
         return match.group('before') + target + match.group('after')
@@ -979,11 +980,11 @@ class TypoFix(LazyFix):
         'typospage': None,
         'whitelistpage': None,
     }
-    exceptions = { # todo: whitelist
-        'inside-tags': TypoRule.exceptions[:], # fixme: split
+    exceptions = {  # todo: whitelist
+        'inside-tags': TypoRule.exceptions[:],  # fixme: split
     }
     message = 'oprava překlepů'
-    order = 1 # after redirects
+    order = 1  # after redirects
 
     def load(self):
         loader = TyposLoader(self.site)
@@ -996,8 +997,8 @@ class TypoFix(LazyFix):
                 filter(methodcaller('canSearch', self.typoRules))))
 
     def replacements(self):
-        return map(lambda rule: (rule.find.pattern, rule.replacements[0]),
-                   self.typoRules)
+        return ((rule.find.pattern, rule.replacements[0])
+                for rule in self.typoRules)
 
     def apply(self, page, summaries=[], callbacks=[]):
         title = page.title()
@@ -1011,7 +1012,7 @@ class TypoFix(LazyFix):
             text = rule.apply(text, replaced)
         page.text = text
         count = len(replaced)
-        if count > 0: # todo: separate function
+        if count > 0:  # todo: separate function
             if count > 1:
                 max_typos = self.maxsummarytypos
                 summary = 'oprava překlepů: %s' % ', '.join(replaced[:max_typos])
