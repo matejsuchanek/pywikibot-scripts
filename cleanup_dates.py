@@ -97,7 +97,7 @@ class DuplicateDatesBot(WikidataEntityBot):
                     continue
                 skip = False
                 for claim in (claim1, claim2):
-                    if not bool(claim.getTarget()):
+                    if not bool(claim.getTarget()) or bool(claim.qualifiers):
                         already.add(claim.snak)
                         skip = True
                 if skip:
