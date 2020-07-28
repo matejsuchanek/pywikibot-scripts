@@ -3,17 +3,13 @@ import re
 
 import pywikibot
 
-from pywikibot import link_regex as LINK_REGEX
+from pywikibot import textlib
 from pywikibot.pagegenerators import (
     GeneratorFactory,
     PreloadingEntityGenerator,
     PreloadingGenerator,
     SearchPageGenerator,
     WikidataSPARQLPageGenerator,
-)
-from pywikibot.textlib import (
-    FILE_LINK_REGEX as frpattern,
-    NESTED_TEMPLATE_REGEX,
 )
 
 from .query_store import QueryStore
@@ -27,10 +23,7 @@ class BaseDescriptionBot(WikidataEntityBot):
             'min_words': 2,
         })
         super().__init__(**kwargs)
-        self.COMMENT_REGEX = re.compile('<!--.*?-->')
-        self.FILE_LINK_REGEX = re.compile(
-            frpattern % '|'.join(self.site.namespaces[6]), flags=re.I)
-        self.FORMATTING_REGEX = re.compile("('{5}|'{2,3})")
+        self.FORMATTING_REGEX = re.compile("'{5}|'{2,3}")
         self.REF_REGEX = re.compile(r'<ref.*?(>.*?</ref|/)>')
 
     def get_regex_for_title(self, escaped_title):
@@ -51,13 +44,13 @@ class BaseDescriptionBot(WikidataEntityBot):
         return (bool(desc) and len(desc.split()) >= self.getOption('min_words'))
 
     def parse_description(self, text):
-        desc = self.COMMENT_REGEX.sub('', text)
-        desc = NESTED_TEMPLATE_REGEX.sub('', desc)
-        desc = self.FILE_LINK_REGEX.sub('', desc)
+        desc = textlib.removeDisabledParts(
+            text,
+            ['comment', 'file', 'nowiki', 'template', self.FORMATTING_REGEX,
+             self.REF_REGEX])
         desc = LINK_REGEX.sub(self.handle_link, desc)
-        desc = self.FORMATTING_REGEX.sub('', desc).replace('&nbsp;', ' ')
-        desc = self.REF_REGEX.sub('', desc.strip())
-        desc = re.sub(r' *\([^)]+\)$', '', desc.rstrip())
+        desc = desc.replace('&nbsp;', ' ').strip()
+        desc = re.sub(r' *\([^)]+\)$', '', desc)
         desc = desc.partition(';')[0]
         desc = re.sub(r'^.*\) [-–] +', '', desc)
         desc = re.sub(r'^\([^)]+\) +', '', desc)
@@ -65,10 +58,12 @@ class BaseDescriptionBot(WikidataEntityBot):
             desc = desc.replace(' ' * 2, ' ')
         if re.search('[^IVX]\.$', desc) or desc.endswith(tuple(',:')):
             desc = desc[:-1].rstrip()
+        if desc.startswith(('a ', 'an ')):
+            desc = desc.partition(' ')[2]
         return desc
 
     def get_summary(self, page, desc):
-        return 'importing [%s] description "%s" from %s' % (
+        return 'importing [{}] description "{}" from {}'.format(
             page.site.lang, desc, page.title(as_link=True, insite=self.repo))
 
 
@@ -136,7 +131,7 @@ class MappingDescriptionBot(BaseDescriptionBot):
         for item in PreloadingEntityGenerator(descriptions.keys()):
             if self.site.lang in item.descriptions:
                 continue
-            target = pywikibot.Page(self.site, item.getSitelink(self.site))
+            target = pywikibot.Page(item.sitelinks[self.site])
             desc = descriptions.get(target)
             if not self.validate_description(desc):
                 continue
