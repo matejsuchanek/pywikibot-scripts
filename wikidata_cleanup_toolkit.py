@@ -234,6 +234,8 @@ class WikidataCleanupToolkit:
         for dbname, title in sitelinks.items():
             if 'wikinews' in dbname:
                 continue
+            if ':' not in title and '/' in title:
+                continue
             # [[d:Topic:Vedxkcb8ek6ss1pc]]
             if dbname.startswith('alswiki'):
                 continue
