@@ -49,7 +49,7 @@ class WikidataCleanupToolkit:
         'fiu-vro': 'vro',
         'hu-formal': 'hu',
         'incubator': None,
-        'media': None,
+        'mediawiki': None,
         'meta': 'en',
         'nl-informal': 'nl',
         'no': 'nb',
@@ -243,11 +243,13 @@ class WikidataCleanupToolkit:
             # [[d:Topic:Vn16a76j30dblqo7]]
             if dbname == 'zh_yuewiki' and title.startswith('Portal:時人時事/'):
                 continue
-            if ':' not in title and '/' in title:
-                continue
-            # fixme: 'wikidata' -> ('', 'wiki', 'data')
-            # fixme: 'mediawikiwiki' -> ('media', 'wiki', 'wiki')
-            lang = self.normalize_lang(dbname.partition('wik')[0])
+            # [[d:Topic:Vrel33kwnco2xp55]]
+            if dbname.endswith('wikisource'):
+                site = pywikibot.site.APISite.fromDBName(dbname)
+                link = pywikibot.Link(title, site)
+                if link.namespace == site.namespaces.lookup_name('Author'):
+                    title = title.partition(':')[2]
+            lang = self.normalize_lang(dbname.rpartition('wik')[0])
             if lang and lang not in dont:
                 # [[d:Topic:Uhdjlv9aae6iijuc]]
                 # todo: create a lib for this
