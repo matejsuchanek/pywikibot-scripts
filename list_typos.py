@@ -1,16 +1,21 @@
 # -*- coding: utf-8 -*-
+import re
+
+from collections import defaultdict
 
 import pywikibot
 
-from pywikibot import pagegenerators, textlib
-from pywikibot.bot import SingleSiteBot
+from pywikibot import textlib
+from pywikibot.bot import SingleSiteBot, ExistingPageBot
+from pywikibot.pagegenerators import PreloadingGenerator
+from pywikibot.tools import itergroup
 
 from .typoloader import TypoRule, TyposLoader
 
 
 class TypoReportBot(SingleSiteBot):
 
-    pattern = '# {} – {}'
+    pattern = '# {} \u2013 {}'
 
     def __init__(self, **kwargs):
         self.availableOptions.update({
@@ -21,14 +26,14 @@ class TypoReportBot(SingleSiteBot):
             'whitelistpage': None,
         })
         super().__init__(**kwargs)
-
-    def setup(self):
-        loader = TyposLoader(
+        self.loader = TyposLoader(
             self.site, allrules=True, typospage=self.getOption('typospage'),
             whitelistpage=self.getOption('whitelistpage'))
-        self.typoRules = loader.loadTypos()
-        self.fp_page = loader.getWhitelistPage()
-        self.whitelist = loader.loadWhitelist()
+
+    def setup(self):
+        self.typoRules = self.loader.loadTypos()
+        self.fp_page = self.loader.getWhitelistPage()
+        self.whitelist = self.loader.loadWhitelist()
         self.data = []
 
     @property
@@ -39,7 +44,7 @@ class TypoReportBot(SingleSiteBot):
 
             pywikibot.output('Query: "%s"' % rule.query)
             self.current_rule = rule
-            yield from pagegenerators.PreloadingGenerator(rule.querySearch())
+            yield from PreloadingGenerator(rule.querySearch())
 
     def skip_page(self, page):
         if page.title() in self.whitelist:
@@ -54,12 +59,15 @@ class TypoReportBot(SingleSiteBot):
 
         return super().skip_page(page)
 
+    def remove_disabled_parts(self, text):
+        return textlib.removeDisabledParts(
+            text, TypoRule.exceptions, site=self.site)
+
     def treat(self, page):
         match = self.current_rule.find.search(page.text)
         if not match:
             return
-        text = textlib.removeDisabledParts(
-            page.text, TypoRule.exceptions, site=self.site)
+        text = self.remove_disabled_parts(page.text)
         match = self.current_rule.find.search(text)
         if match:
             text = self.pattern.format(page.title(as_link=True), match.group(0))
@@ -78,17 +86,62 @@ class TypoReportBot(SingleSiteBot):
         super().teardown()
 
 
+class PurgeTypoReportBot(SingleSiteBot, ExistingPageBot):
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.helper = TypoReportBot(**kwargs)
+
+    def setup(self):
+        super().setup()
+        self.whitelist = self.helper.loader.loadWhitelist()
+        outputpage = self.helper.getOption('outputpage')
+        self.generator = [pywikibot.Page(self.site, outputpage)]
+        self.put = []
+        self.cache = defaultdict(list)
+
+    def line_iterator(self, page):
+        regex = re.compile(self.helper.pattern.format(
+            r'\[\[([^]]+)\]\]', '(.+)'))
+        for line in page.text.splitlines():
+            match = regex.fullmatch(line)
+            if match:
+                title, text = match.groups()
+                entry = pywikibot.Page(self.site, title)
+                self.cache[entry.title()].append(text)
+                yield entry
+            else:
+                self.put.append(line)
+
+    def treat(self, page):
+        pattern = self.helper.pattern
+        for entry in PreloadingGenerator(self.line_iterator(page)):
+            text = self.helper.remove_disabled_parts(entry.text)
+            title = entry.title()
+            for string in self.cache.pop(title):
+                if string in text:
+                    self.put.append(pattern.format('[[%s]]' % title, string))
+
+        page.put('\n'.join(self.put),
+                 summary='odstranění vyřešených překlepů',
+                 apply_cosmetic_changes=False,
+                 botflag=False, minor=False)
+
+
 def main(*args):
     options = {}
+    cls = TypoReportBot
     for arg in pywikibot.handle_args(args):
-        if arg.startswith('-'):
+        if arg == 'purge':
+            cls = PurgeTypoReportBot
+        elif arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':
                 options[arg[1:]] = int(value) if value.isdigit() else value
             else:
                 options[arg[1:]] = True
 
-    bot = TypoReportBot(**options)
+    bot = cls(**options)
     bot.run()
 
 
