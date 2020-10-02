@@ -79,10 +79,9 @@ class TypoReportBot(SingleSiteBot):
         if (self._generator_completed or self.getOption('anything')
                 ) and outputpage:
             page = pywikibot.Page(self.site, outputpage)
-            page.put('\n'.join(self.data),
-                     summary='aktualizace seznamu překlepů',
-                     apply_cosmetic_changes=False,
-                     botflag=False, minor=False)
+            page.text = '\n'.join(self.data)
+            page.save(summary='aktualizace seznamu překlepů', minor=False,
+                      botflag=False, apply_cosmetic_changes=False)
         super().teardown()
 
 
@@ -116,16 +115,21 @@ class PurgeTypoReportBot(SingleSiteBot, ExistingPageBot):
     def treat(self, page):
         pattern = self.helper.pattern
         for entry in PreloadingGenerator(self.line_iterator(page)):
+            key = title = entry.title()
+            if not entry.exists():
+                self.cache.pop(key)
+                continue
+            while entry.isRedirectPage():
+                entry = entry.getRedirectTarget()
+                title = entry.title()
             text = self.helper.remove_disabled_parts(entry.text)
-            title = entry.title()
-            for string in self.cache.pop(title):
+            for string in self.cache.pop(key):
                 if string in text:
                     self.put.append(pattern.format('[[%s]]' % title, string))
 
-        page.put('\n'.join(self.put),
-                 summary='odstranění vyřešených překlepů',
-                 apply_cosmetic_changes=False,
-                 botflag=False, minor=False)
+        page.text = '\n'.join(self.put)
+        page.save(summary='odstranění vyřešených překlepů', minor=True,
+                  botflag=True, apply_cosmetic_changes=False)
 
 
 def main(*args):
