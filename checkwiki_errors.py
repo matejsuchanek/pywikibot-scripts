@@ -149,7 +149,7 @@ class BrokenHTMLTag(CheckWikiError):
                     re.finditer('<%s(?: (?P<params>[^>]+))?(?<!/)>' % tag,
                                 match.string[:match.start()])
                     )
-                if len(tags_before) > 0:
+                if tags_before:
                     last = tags_before[-1]
                     if '</%s>' % tag not in match.string[last.end():match.start()]:
                         return '</%s>' % tag
@@ -1167,7 +1167,7 @@ class ReferenceQuotes(CheckWikiError):
                 ends = '"' if '"' in ends else "'"
 
             quote = starts
-            if starts != ends and len(starts) == 0:
+            if starts != ends and not starts:
                 quote = ends
 
             return '{param}={quote}{content}{quote}'.format(

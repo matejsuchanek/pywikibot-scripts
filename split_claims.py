@@ -37,7 +37,7 @@ class ClaimsSplittingBot(WikidataEntityBot):
     def can_divide(self, claim):
         qualifiers = (claim.qualifiers.get(self.start_prop, [])
                       + claim.qualifiers.get(self.end_prop, []))
-        return (len(claim.sources) == 0
+        return (not claim.sources
                 and set(claim.qualifiers.keys()) == {
                     self.start_prop, self.end_prop}
                 and all(qual.snaktype == 'value' for qual in qualifiers))

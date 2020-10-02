@@ -98,7 +98,7 @@ class CaptionToImageBot(WikidataEntityBot):
                                qualifier):
                 remove_claims.append(caption)
 
-        if len(remove_claims) > 0:
+        if remove_claims:
             self._save_page(item, self._save_entity, item.removeClaims,
                             remove_claims, summary='removing redundant property')
 

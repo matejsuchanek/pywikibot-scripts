@@ -100,7 +100,7 @@ class TypoRule:
                     '', parameters[key]))
                 replacements.append(replacement)
 
-        if len(replacements) == 0:
+        if not replacements:
             raise IncompleteTypoRuleException('No replacements found')
 
         query = None

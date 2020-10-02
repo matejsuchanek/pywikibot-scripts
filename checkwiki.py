@@ -201,7 +201,7 @@ class CheckWiki:
     def apply(self, text, page, replaced=[], fixed=[], errors=[], **kwargs):
         # todo: use a graph algorithm
         errors = list(self.iter_errors(set(errors)))
-        while len(errors) > 0:
+        while errors:
             error = errors.pop(0)
             if error.needsDecision() or error.handledByCC():  # todo
                 continue

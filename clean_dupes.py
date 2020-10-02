@@ -176,17 +176,17 @@ class DupesMergingBot(WikidataEntityBot):
                     if snak.target_equals(item):
                         target_claims.append(claim)
 
-        if len(sitelinks) > 0:
+        if sitelinks:
             self._save_page(
                 item, self._save_entity, item.removeSitelinks, sitelinks,
                 summary='removing sitelink(s) to non-existing page(s)')
-        if len(claims) > 0:
+        if claims:
             self._save_page(item, self._save_entity, item.removeClaims, claims)
-        if len(target_sitelinks) > 0:
+        if target_sitelinks:
             self._save_page(
                 target, self._save_entity, target.removeSitelinks, target_sitelinks,
                 summary='removing sitelink(s) to non-existing page(s)')
-        if len(target_claims) > 0:
+        if target_claims:
             self._save_page(
                 target, self._save_entity, target.removeClaims, target_claims)
 

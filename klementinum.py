@@ -3,8 +3,8 @@ import requests
 
 from collections import OrderedDict
 
-import pywikibot
 import mwparserfromhell as parser
+import pywikibot
 
 from .lua_formatter import format_dictionary
 
@@ -30,14 +30,15 @@ def main():
             tags = tr.contents.filter_tags()
             if len(tags) != 6:
                 break
-            avg, mx, mx_year, mn, mn_year = [tag.contents for tag in tags][1:]
-            mn_year, mx_year = map(get_single_year, (mn_year, mx_year))
-            month[day] = OrderedDict()
-            month[day]['avg'] = avg
-            month[day]['max'] = mx
-            month[day]['max_year'] = mx_year
-            month[day]['min'] = mn
-            month[day]['min_year'] = mn_year
+            _, *cells = [tag.contents for tag in tags]
+            avg, mx, mx_year, mn, mn_year = cells
+            month[day] = OrderedDict([
+                ('avg', avg),
+                ('max', mx),
+                ('max_year', get_single_year(mx_year)),
+                ('min', mn),
+                ('min_year', get_single_year(mn_year)),
+            ])
         data[i] = month
         text += '\n-- ' + url
     page = pywikibot.Page(site, 'Modul:Klementinum/data')

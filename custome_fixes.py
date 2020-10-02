@@ -479,7 +479,7 @@ class CheckWikiFix(LazyFix):  # todo: make abstract and split
         replaced = []
         fixed = []
         page.text = self.checkwiki.apply(page.text, page, replaced, fixed)
-        if len(replaced) > 0:  # todo: maxsummarycw
+        if replaced:  # todo: maxsummarycw
             summaries.append('[[WP:WCW|CheckWiki]]: %s' % ', '.join(replaced))
             callbacks.append(
                 lambda: self.checkwiki.mark_as_fixed_multiple(page, fixed))
@@ -493,7 +493,7 @@ class InterwikiFix(Fix):
 
     def apply(self, page, summaries=[], callbacks=[]):
         iw_links = textlib.getLanguageLinks(page.text, page.site)
-        if len(iw_links) == 0:
+        if not iw_links:
             return
 
         try:
@@ -705,7 +705,7 @@ class RefSortFix(LazyFix):
             else:
                 all_names.append((name, match.start()))
 
-        if len(all_names) > 0:
+        if all_names:
             callback = lambda match: self.replace_refs(match, all_names)
             text = self.regex_adjacent.sub(callback, text)
 
