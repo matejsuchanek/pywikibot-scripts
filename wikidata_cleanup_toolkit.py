@@ -129,6 +129,11 @@ class WikidataCleanupToolkit:
 ##            item.claims,
 ##            data.setdefault('claims', [])
 ##        ) or ret
+##        ret = self.exec_fix(
+##            'deduplicate_references',
+##            item.claims,
+##            data.setdefault('claims', [])
+##        ) or ret
         for key in keys + ('claims',):
             if not data[key]:
                 data.pop(key)
@@ -150,8 +155,9 @@ class WikidataCleanupToolkit:
             terms['labels']
         ) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
-        ret = self.exec_fix('fix_quantities', item.claims, []) or ret
+##        ret = self.exec_fix('fix_quantities', item.claims, []) or ret
         ret = self.exec_fix('deduplicate_claims', item.claims, []) or ret
+        ret = self.exec_fix('deduplicate_references', item.claims, []) or ret
         return ret
 
     def move_alias_to_label(self, terms):  # todo: not always desired
@@ -387,6 +393,32 @@ class WikidataCleanupToolkit:
             ret = True
         return ret
 
+    def deduplicate_references(self, claims, data):
+        ret = False
+        for claims_list in claims.values():
+            for claim in claims_list:
+                hashes = set()
+                to_remove = []
+
+                for i, source in enumerate(claim.sources):
+                    my_hashes = set()
+                    for values in source.values():
+                        for ref in values:
+                            h = ref.hash
+                            if h in my_hashes:
+                                continue
+                            my_hashes.add(h)
+                            if h in hashes:
+                                to_remove.append(i)
+                            else:
+                                hashes.add(h)
+
+                for i in reversed(to_remove):
+                    claim.sources.pop(i)
+                    ret = True
+
+        return ret
+
     def deduplicate_claims(self, claims, data):
         ret = False
         for claims_list in claims.values():
@@ -417,8 +449,26 @@ class WikidataCleanupToolkit:
             claims.pop(i)
         return bool(changed)
 
-    def merge_claims(self, claim1, claim2):
+    @staticmethod
+    def claims_are_same(claim1, claim2):
         if claim1 == claim2:
+            return True
+
+        if claim1.type == 'time' == claim2.type:
+            first, second = claim1.getTarget(), claim2.getTarget()
+            if not first or not second:
+                return False
+            if first.precision == second.precision:
+                if first.precision in {9, 10} and first.year == second.year:
+                    if first.precision == 10:
+                        return first.month == second.month
+                    else:
+                        return True
+
+        return False
+
+    def merge_claims(self, claim1, claim2):
+        if self.claims_are_same(claim1, claim2):
             if claim1.rank != claim2.rank:
                 if claim1.rank == 'normal':
                     claim1.rank = claim2.rank

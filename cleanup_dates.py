@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-from itertools import combinations
+from itertools import chain, combinations
 from operator import attrgetter
 
 import pywikibot
 
+from pywikibot import Claim
 from pywikibot.pagegenerators import (
     GeneratorFactory,
     PreloadingEntityGenerator,
@@ -105,9 +106,12 @@ class DuplicateDatesBot(WikidataEntityBot):
                 targets = lambda c1, c2: (c1.getTarget(), c2.getTarget())
                 if self.first_same_as_second(*targets(claim1, claim2)):
                     if self.is_sourced(claim1) and self.is_sourced(claim2):
-                        # todo: merge
-                        continue
-                    if self.is_sourced(claim1):
+                        cl = claim2
+                        for source in cl.sources:
+                            if self.is_valid_source(source):
+                                claim1.addSources([
+                                    c.copy() for c in chain(*source.values())])
+                    elif self.is_sourced(claim1):
                         cl = claim2
                     else:
                         cl = claim1
