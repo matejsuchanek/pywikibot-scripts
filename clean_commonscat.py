@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import itertools
 import re
 
 import pywikibot
@@ -136,11 +137,11 @@ def main(*args):
             pywikibot.output("%s doesn't have an appropriate category" % site)
             return
 
-        gen_combined = pagegenerators.CombinedPageGenerator(
-            [category.articles(namespaces=0), category.subcategories()])
+        gen_combined = itertools.chain(
+            category.articles(namespaces=0), category.subcategories())
         generator = pagegenerators.WikibaseItemFilterPageGenerator(gen_combined)
 
-    bot = CommonscatCleaningBot(generator, site=site, **options)
+    bot = CommonscatCleaningBot(generator=generator, site=site, **options)
     bot.run()
 
 
