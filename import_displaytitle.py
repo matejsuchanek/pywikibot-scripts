@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import pywikibot
 
 from pywikibot.pagegenerators import (
@@ -14,11 +14,11 @@ from .wikidata import WikidataEntityBot
 class LabelSettingBot(WikidataEntityBot):
 
     def __init__(self, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'create': False,
         })
         super().__init__(**kwargs)
-        self.create_missing_item = self.getOption('create') is True
+        self.create_missing_item = self.opt['create'] is True
 
     def stripped(self, title):
         if title.endswith(')'):

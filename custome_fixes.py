@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module holding fixes which can be applied to most articles.
 

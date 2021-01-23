@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import re
 
 from collections import defaultdict
@@ -18,7 +18,7 @@ class TypoReportBot(SingleSiteBot):
     pattern = '# {} \u2013 {}'
 
     def __init__(self, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'always': True,
             'anything': False,
             'outputpage': None,
@@ -27,8 +27,8 @@ class TypoReportBot(SingleSiteBot):
         })
         super().__init__(**kwargs)
         self.loader = TyposLoader(
-            self.site, allrules=True, typospage=self.getOption('typospage'),
-            whitelistpage=self.getOption('whitelistpage'))
+            self.site, allrules=True, typospage=self.opt['typospage'],
+            whitelistpage=self.opt['whitelistpage'])
 
     def setup(self):
         self.typoRules = self.loader.loadTypos()
@@ -75,8 +75,8 @@ class TypoReportBot(SingleSiteBot):
             self.data.append(text)
 
     def teardown(self):
-        outputpage = self.getOption('outputpage')
-        if (self._generator_completed or self.getOption('anything')
+        outputpage = self.opt['outputpage']
+        if (self._generator_completed or self.opt['anything']
                 ) and outputpage:
             page = pywikibot.Page(self.site, outputpage)
             page.text = '\n'.join(self.data)
@@ -94,7 +94,7 @@ class PurgeTypoReportBot(SingleSiteBot, ExistingPageBot):
     def setup(self):
         super().setup()
         self.whitelist = self.helper.loader.loadWhitelist()
-        outputpage = self.helper.getOption('outputpage')
+        outputpage = self.helper.opt['outputpage']
         self.generator = [pywikibot.Page(self.site, outputpage)]
         self.put = []
         self.cache = defaultdict(list)

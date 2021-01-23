@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import pywikibot
 
 from pywikibot import pagegenerators
@@ -12,7 +12,7 @@ class LabelsFixingBot(WikidataEntityBot):
     use_from_page = False
 
     def __init__(self, generator, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'always': True,
             'limit': 50,
         })
@@ -27,7 +27,7 @@ class LabelsFixingBot(WikidataEntityBot):
 
     def custom_generator(self):
         query = self.store.build_query('commons_labels',
-                                       limit=self.getOption('limit'))
+                                       limit=self.opt['limit'])
         return pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo)
 
     def treat_page_and_item(self, page, item):

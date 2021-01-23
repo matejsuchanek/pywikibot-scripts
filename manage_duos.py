@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 from operator import methodcaller
 
 import pywikibot
@@ -76,7 +76,7 @@ class DuosManagingBot(WikidataEntityBot):
     use_from_page = False
 
     def __init__(self, generator, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'always': True,
             'class': 'Q10648343',
             'min_labels': 1,
@@ -98,7 +98,7 @@ class DuosManagingBot(WikidataEntityBot):
         return False
 
     def custom_generator(self):
-        kwargs = {'class': self.getOption('class')}
+        kwargs = {'class': self.opt['class']}
         query = self.store.build_query('duos', **kwargs)
         return pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo)
 
@@ -151,7 +151,7 @@ class DuosManagingBot(WikidataEntityBot):
             pywikibot.output('No labels, skipping...')
             return
 
-        if count < self.getOption('min_labels'):
+        if count < self.opt['min_labels']:
             pywikibot.output('Too few labels (%i), skipping...' % count)
             return
 

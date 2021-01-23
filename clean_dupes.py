@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 from queue import Queue
 from threading import Lock, Thread
 
@@ -22,7 +22,7 @@ class DupesMergingBot(WikidataEntityBot):
     use_from_page = False
 
     def __init__(self, generator, offset=0, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'threads': 1,  # unstable
         })
         super().__init__(**kwargs)
@@ -45,7 +45,7 @@ class DupesMergingBot(WikidataEntityBot):
 
     def setup(self):
         super().setup()
-        count = self.getOption('threads')
+        count = self.opt['threads']
         self.workers = []
         if count > 1:
             self.queue = Queue(count)
@@ -74,7 +74,7 @@ class DupesMergingBot(WikidataEntityBot):
         return 'P31' not in item.claims or super().skip_page(item)
 
     def treat_page_and_item(self, page, item):
-        if self.getOption('threads') > 1:
+        if self.opt['threads'] > 1:
             self.queue.put(item)
         else:
             self.process_item(item)

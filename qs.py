@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import re
 
 import pywikibot
@@ -9,20 +9,20 @@ from .wikidata import WikidataEntityBot
 
 class QuickStatementsBot(WikidataEntityBot):
 
-    decimal_pattern = r'[+-]?\d+(?:\.\d+)?'
+    decimal_pattern = r'[+-]?(?:[1-9]\d*|0)(?:\.\d+)?'
 
     def __init__(self, file, **kwargs):
-        self.availableOptions({
+        self.available_options({
             'always': True,
         })
         super().__init__(**kwargs)
         self.file = file
         self.globeR = re.compile(r'@({0})/({0})'.format(self.decimal_pattern))
         self.quantityR = re.compile(
-            r'({0})(?:~({0}))?(?:U(\d+))?'
+            r'({0})(?:~({0}))?(?:U([1-9]\d*))?'
             .format(self.decimal_pattern))
         self.quantity_oldR = re.compile(
-            r'({0})(?:\[({0}),({0})\])(?:U(\d+))?'
+            r'({0})(?:\[({0}),({0})\])(?:U([1-9]\d*))?'
             .format(self.decimal_pattern))
 
     def teardown(self):

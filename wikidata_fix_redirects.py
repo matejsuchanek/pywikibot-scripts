@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 from itertools import chain
 
 import pywikibot
@@ -18,7 +18,7 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
     use_from_page = False
 
     def __init__(self, generator, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'always': True,
             'days': 7,
         })
@@ -28,7 +28,7 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
         self.summary = 'fix redirect [[%s]] → [[%s]]'
 
     def custom_generator(self):
-        query = self.store.build_query('redirects', days=self.getOption('days'))
+        query = self.store.build_query('redirects', days=self.opt['days'])
         return WikidataSPARQLPageGenerator(query, site=self.repo)
 
     def skip_page(self, item):

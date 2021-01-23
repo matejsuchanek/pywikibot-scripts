@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 from contextlib import suppress
 
 import pywikibot
@@ -19,7 +19,7 @@ class FakeReferencesBot(WikidataEntityBot):
     whitelist_props = {'P813', 'P4656'}
 
     def __init__(self, generator, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'limit': None,
         })
         super().__init__(**kwargs)
@@ -28,7 +28,7 @@ class FakeReferencesBot(WikidataEntityBot):
         self.url_start = self.repo.base_url(self.repo.article_path)
 
     def subgenerator(self):
-        limit = self.getOption('limit')
+        limit = self.opt['limit']
         for ident in self.item_ids:
             from_item = pywikibot.ItemPage(self.repo, ident)
             for item in pagegenerators.WikibaseItemGenerator(

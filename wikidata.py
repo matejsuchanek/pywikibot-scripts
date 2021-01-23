@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from contextlib import suppress
 
 import pywikibot
@@ -19,7 +18,7 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
     '''
 
     def __init__(self, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'nocleanup': False,
         })
         self.bad_cache = set(kwargs.pop('bad_cache', []))
@@ -56,11 +55,11 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
     def user_edit_entity(self, item, data=None, *, cleanup=None, **kwargs):
         # todo: support stub items
         if item.exists() and not (cleanup is False or (
-                self.getOption('nocleanup') and cleanup is not True)):
+                self.opt['nocleanup'] and cleanup is not True)):
             if self.kit.cleanup(item, data):
                 if kwargs.get('summary'):
                     kwargs['summary'] += '; cleanup'
                 else:
                     kwargs['summary'] = 'cleanup'
-        kwargs.setdefault('show_diff', not self.getOption('always'))
+        kwargs.setdefault('show_diff', not self.opt['always'])
         return super().user_edit_entity(item, data, **kwargs)

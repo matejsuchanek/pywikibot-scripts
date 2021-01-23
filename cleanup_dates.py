@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 from itertools import chain, combinations
 from operator import attrgetter
 
@@ -21,7 +21,7 @@ class DuplicateDatesBot(WikidataEntityBot):
     use_from_page = False
 
     def __init__(self, generator, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'limit': 1000,
             'props': ['P569', 'P570'],
         })
@@ -30,10 +30,10 @@ class DuplicateDatesBot(WikidataEntityBot):
         self._generator = generator or self.custom_generator()
 
     def custom_generator(self):
-        for prop in self.getOption('props'):
+        for prop in self.opt['props']:
             for key in ('duplicate_dates', 'unmerged_dates'):
                 query = self.store.build_query(
-                    key, prop=prop, limit=self.getOption('limit'))
+                    key, prop=prop, limit=self.opt['limit'])
                 yield from WikidataSPARQLPageGenerator(query, site=self.repo)
 
     @property
@@ -84,7 +84,7 @@ class DuplicateDatesBot(WikidataEntityBot):
         return cls.number_of_sources(claim) > 0
 
     def treat_page_and_item(self, page, item):
-        for prop in self.getOption('props'):
+        for prop in self.opt['props']:
             claims = item.claims.get(prop, [])
             if len(claims) < 2:
                 continue
@@ -109,8 +109,11 @@ class DuplicateDatesBot(WikidataEntityBot):
                         cl = claim2
                         for source in cl.sources:
                             if self.is_valid_source(source):
-                                claim1.addSources([
-                                    c.copy() for c in chain(*source.values())])
+                                try:
+                                    claim1.addSources([
+                                        c.copy() for c in chain(*source.values())])
+                                except pywikibot.data.api.APIError:
+                                    pass  # duplicate reference present
                     elif self.is_sourced(claim1):
                         cl = claim2
                     else:

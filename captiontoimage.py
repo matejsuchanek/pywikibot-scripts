@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import pywikibot
 
 from pywikibot import pagegenerators
@@ -21,7 +21,7 @@ class CaptionToImageBot(WikidataEntityBot):
     use_from_page = False
 
     def __init__(self, generator, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'removeall': False
         })
         kwargs.setdefault('bad_cache', []).append(self.caption_property)
@@ -63,7 +63,7 @@ class CaptionToImageBot(WikidataEntityBot):
                         return
 
         remove_claims = []
-        remove_all = self.getOption('removeall') is True
+        remove_all = self.opt['removeall'] is True
         if our_prop is None:
             pywikibot.output('No media property found')
             if remove_all:

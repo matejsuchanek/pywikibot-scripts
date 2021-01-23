@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import pywikibot
 
 from pywikibot import pagegenerators
@@ -14,7 +14,7 @@ class ClaimsSplittingBot(WikidataEntityBot):
     use_from_page = False
 
     def __init__(self, generator, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'limit': 500,
         })
         super().__init__(**kwargs)
@@ -23,7 +23,7 @@ class ClaimsSplittingBot(WikidataEntityBot):
 
     def custom_generator(self):
         query = self.store.build_query(
-            'mixed_claims', limit=self.getOption('limit'))
+            'mixed_claims', limit=self.opt['limit'])
         return pagegenerators.WikidataSPARQLPageGenerator(query, site=self.repo)
 
     @property

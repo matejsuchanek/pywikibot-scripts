@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import pywikibot
 
 from pywikibot.bot import BaseBot

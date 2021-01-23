@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 """This script is obsolete!"""
 import pywikibot
 

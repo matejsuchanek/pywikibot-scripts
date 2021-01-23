@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import csv
 import re
 import urllib
@@ -24,7 +24,7 @@ class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
     treat_missing_item = False
 
     def __init__(self, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'always': False,
             'date': None,
             'force': False,
@@ -36,25 +36,25 @@ class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
 
     @property
     def generator(self):
-        if not self.getOption('date'):
+        if not self.opt['date']:
             self.options['date'] = pywikibot.input(
                 'Enter the date when the reports were created')
 
         url = '%s/%s/%s/' % (self.labs_url, self.sub_directory,
-                             self.getOption('date'))
+                             self.opt['date'])
         response = urlopen(url)
         regex = re.compile('href="([^"]+)"')
-        not_yet = bool(self.getOption('start'))
+        not_yet = bool(self.opt['start'])
         for match in regex.finditer(response.read().decode()):
             file_name = match.group(1)
             dbname = file_name.partition('-')[0]
             if not_yet:
-                if dbname == self.getOption('start'):
+                if dbname == self.opt['start']:
                     not_yet = False
                 else:
                     continue
 
-            if dbname in self.getOption('skip'):
+            if dbname in self.opt['skip']:
                 continue
 
             try:
@@ -83,7 +83,7 @@ class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
     @property
     def summary(self):
         return "based on [[toollabs:{}/{}/|Alphos' reports]]".format(
-            self.sub_directory, self.getOption('date'))
+            self.sub_directory, self.opt['date'])
 
     def user_confirm(self, *args):
         return True
@@ -102,12 +102,12 @@ class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
 
         Merger.sort_for_merge(items, key=['sitelinks', 'id'])
         if not self._save_page(items[1], Merger.clean_merge, items[1], items[0],
-                               safe=not self.getOption('force'),
+                               safe=not self.opt['force'],
                                ignore_conflicts=['description'],
                                summary=self.summary, **self.ignore):
             return
 
-        if self.getOption('touch') is True:
+        if self.opt['touch'] is True:
             self._save_page(target, target.touch, **self.ignore)
 
 

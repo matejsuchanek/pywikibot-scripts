@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import re
 
 from datetime import datetime
@@ -31,12 +31,12 @@ replace_pattern = '[[{inside}]] ({left}{year1}{right}–{left}{year2}{right})'
 class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
     def __init__(self, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'year': datetime.today().year,
         })
         super().__init__(**kwargs)
         self.categoryR = re.compile(i18n.translate(self.site, birth))
-        self.year = self.getOption('year')
+        self.year = self.opt['year']
 
     @property
     def generator(self):

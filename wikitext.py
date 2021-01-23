@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import re
 
 from itertools import chain
@@ -78,7 +78,7 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
 
         self.current_page = page
 
-        show_diff = kwargs.pop('show_diff', not self.getOption('always'))
+        show_diff = kwargs.pop('show_diff', not self.opt['always'])
 
         if show_diff:
             pywikibot.showDiff(oldtext, newtext)

@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import re
 
 import pywikibot
@@ -19,7 +19,7 @@ from .wikidata import WikidataEntityBot
 class BaseDescriptionBot(WikidataEntityBot):
 
     def __init__(self, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'min_words': 2,
         })
         super().__init__(**kwargs)
@@ -41,7 +41,7 @@ class BaseDescriptionBot(WikidataEntityBot):
             return m.group('title').strip()
 
     def validate_description(self, desc):
-        return (bool(desc) and len(desc.split()) >= self.getOption('min_words'))
+        return (bool(desc) and len(desc.split()) >= self.opt['min_words'])
 
     def parse_description(self, text):
         desc = textlib.removeDisabledParts(
@@ -72,7 +72,7 @@ class MissingDescriptionBot(BaseDescriptionBot):
     use_from_page = False
 
     def __init__(self, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'allpages': False,
         })
         super().__init__(**kwargs)
@@ -100,7 +100,7 @@ class MissingDescriptionBot(BaseDescriptionBot):
             match = regex.search(ref_page.text)
             if not match:
                 continue
-            if not self.getOption('allpages') and not ref_page.isDisambig():
+            if not self.opt['allpages'] and not ref_page.isDisambig():
                 continue
             desc = self.parse_description(match.group(2))
             if not self.validate_description(desc):

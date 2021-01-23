@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 __all__ = (
     'format_dictionary',
     'format_list',

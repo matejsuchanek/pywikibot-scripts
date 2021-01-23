@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import re
 
 import pywikibot
@@ -19,7 +19,7 @@ class ExternalIdSlicingBot(WikidataEntityBot):
     use_from_page = False
 
     def __init__(self, **options):
-        self.availableOptions.update({
+        self.available_options.update({
             'step': 10,
             'offset': 0,
         })
@@ -31,13 +31,13 @@ class ExternalIdSlicingBot(WikidataEntityBot):
 
     @property
     def generator(self):
-        step = self.getOption('step')
+        step = self.opt['step']
         opts = {
             # fixme: don't use this word
             'blacklist': ' wd:'.join(self.blacklist),
             'limit': step,
         }
-        offset = self.getOption('offset')
+        offset = self.opt['offset']
         while True:
             pywikibot.output('\nLoading items (offset %i)...' % offset)
             opts['offset'] = offset
@@ -47,8 +47,7 @@ class ExternalIdSlicingBot(WikidataEntityBot):
             query = self.store.build_query('external-ids', **opts)
             gen = PreloadingEntityGenerator(
                 WikidataSPARQLPageGenerator(query, site=self.repo))
-            for item in gen:
-                yield item
+            yield from gen
             offset += step
 
     def treat_page_and_item(self, page, item):
@@ -91,7 +90,6 @@ class ExternalIdSlicingBot(WikidataEntityBot):
         if prop not in self.cache:
             formatter = regex = None
             ppage = pywikibot.PropertyPage(self.repo, prop)
-            ppage.get()
             if 'P1630' in ppage.claims:
                 if len(ppage.claims['P1630']) > 1:
                     preferred = [cl for cl in ppage.claims['P1630']

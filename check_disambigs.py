@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import pywikibot
 
 from pywikibot import pagegenerators
@@ -25,7 +25,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
     use_from_page = False
 
     def __init__(self, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'limit': 1000,
             'min_sitelinks': 1,
             'offset': 0,
@@ -56,8 +56,8 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
 } AS %%disambig WHERE {
   INCLUDE %%disambig .
   BIND( MD5( CONCAT( STR( ?item ), STR( RAND() ) ) ) AS ?hash ) .
-} ORDER BY ?hash''' % (self.disambig_item, self.getOption('min_sitelinks'),
-                       self.getOption('offset'), self.getOption('limit'))
+} ORDER BY ?hash''' % (self.disambig_item, self.opt['min_sitelinks'],
+                       self.opt['offset'], self.opt['limit'])
 
         return pagegenerators.PreloadingEntityGenerator(
             pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=self.repo,

@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import re
 
 from collections import OrderedDict
@@ -61,7 +61,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
     use_from_page = False
 
     def __init__(self, generator, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'always': False,
             'importonly': False,
             'start': 'P1',
@@ -105,10 +105,10 @@ class MetadataHarvestingBot(WikidataEntityBot):
                     self.repo, page.title(with_ns=False))
 
     def custom_generator(self):
-        end = self.getOption('end')
+        end = self.opt['end']
         for page in pagegenerators.AllpagesPageGenerator(
-                start=self.getOption('start'), namespace=120,
-                site=self.repo, total=self.getOption('total')):
+                start=self.opt['start'], namespace=120,
+                site=self.repo, total=self.opt['total']):
             yield page
             if page.title(with_ns=False) == end:
                 break
@@ -157,7 +157,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                     remove = False
                 if remove:
                     clear_params.append(key)
-        if self.getOption('importonly'):
+        if self.opt['importonly']:
             return
 
         for par in clear_params:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import os
 import threading
 
@@ -15,7 +14,7 @@ class ErrorReportingBot(BaseBot):
     page_pattern = None
 
     def __init__(self, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'clearonly': False,
             'interval': 5 * 60,
         })
@@ -28,7 +27,7 @@ class ErrorReportingBot(BaseBot):
         self.open()
         self.load_page()
         self.save_file()
-        if not self.getOption('clearonly'):
+        if not self.opt['clearonly']:
             super().run()
 
     def open(self):
@@ -62,7 +61,7 @@ class ErrorReportingBot(BaseBot):
                     f.truncate()  # and delete everything
         with self.timer_lock:
             self.timer = threading.Timer(
-                self.getOption('interval'), self.save_file)
+                self.opt['interval'], self.save_file)
             self.timer.start()
 
     def teardown(self):

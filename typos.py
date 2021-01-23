@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/python
 import time
 
 import pywikibot
@@ -24,7 +24,7 @@ class TypoBot(WikitextFixingBot):
     '''
 
     def __init__(self, generator, *, offset=0, **kwargs):
-        self.availableOptions.update({
+        self.available_options.update({
             'allrules': False,
             'quick': False,
             'threshold': 10,
@@ -43,16 +43,16 @@ class TypoBot(WikitextFixingBot):
 
     def setup(self):
         loader = TyposLoader(
-            self.site, allrules=self.getOption('allrules'),
-            typospage=self.getOption('typospage'),
-            whitelistpage=self.getOption('whitelistpage'))
+            self.site, allrules=self.opt['allrules'],
+            typospage=self.opt['typospage'],
+            whitelistpage=self.opt['whitelistpage'])
         self.typoRules = loader.loadTypos()
         self.fp_page = loader.getWhitelistPage()
         self.whitelist = loader.loadWhitelist()
 
     @property
     def is_rule_accurate(self):
-        threshold = self.getOption('threshold')
+        threshold = self.opt['threshold']
         result = (self.processed < threshold or
                   self.processed / threshold < self.replaced)
         return result
@@ -123,7 +123,7 @@ class TypoBot(WikitextFixingBot):
         page = self.current_page
         text = page.text
         done_replacements = []
-        quickly = self.getOption('quick') is True
+        quickly = self.opt['quick'] is True
         start = time.time()
         if self.own_generator:
             text = self.current_rule.apply(page.text, done_replacements)
@@ -153,7 +153,7 @@ class TypoBot(WikitextFixingBot):
             text, summary='oprava překlepů: %s' % ', '.join(done_replacements))
 
     def user_confirm(self, question):
-        if self.getOption('always'):
+        if self.opt['always']:
             return True
 
         options = [('yes', 'y'), ('no', 'n'), ('all', 'a')]
