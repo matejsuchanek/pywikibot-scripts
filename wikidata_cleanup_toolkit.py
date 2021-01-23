@@ -449,14 +449,19 @@ class WikidataCleanupToolkit:
         return bool(changed)
 
     @staticmethod
-    def claims_are_same(claim1, claim2):
-        if claim1 == claim2:
+    def _same_value(snak1, snak2):
+        if snak1.same_as(snak2, ignore_rank=True, ignore_quals=True,
+                         ignore_refs=True):
             return True
 
-        if claim1.type == 'time' == claim2.type:
-            first, second = claim1.getTarget(), claim2.getTarget()
+        if snak1.type == 'time' == snak2.type:
+            first, second = snak1.getTarget(), snak2.getTarget()
             if not first or not second:
                 return False
+
+            if first.calendarmodel != second.calendarmodel:
+                return False
+
             if first.precision == second.precision:
                 if first.precision in {9, 10} and first.year == second.year:
                     if first.precision == 10:
@@ -465,6 +470,27 @@ class WikidataCleanupToolkit:
                         return True
 
         return False
+
+    @classmethod
+    def claims_are_same(cls, claim1, claim2):
+        if not cls._same_value(claim1, claim2):
+            return False
+
+        if claim1.qualifiers == claim2.qualifiers:
+            return True
+
+        if claim1.qualifiers.keys() != claim2.qualifiers.keys():
+            return False
+
+        for key, values in claim1.qualifiers.items():
+            other = claim2.qualifiers[key]
+            if len(other) != len(values):
+                return False
+            for this in values:
+                if not any(cls._same_value(this, val) for val in other):
+                    return False
+
+        return True
 
     def merge_claims(self, claim1, claim2):
         if self.claims_are_same(claim1, claim2):
