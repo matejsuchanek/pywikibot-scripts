@@ -50,8 +50,10 @@ class WikidataCleanupToolkit:
         'incubator': None,
         'mediawiki': None,
         'meta': 'en',
+        'mul': None,
         'nl-informal': 'nl',
         'no': 'nb',
+        'old': None,
         'roa-rup': 'rup',
         'simple': 'en',
         'species': 'en',
@@ -150,7 +152,7 @@ class WikidataCleanupToolkit:
         #ret = self.exec_fix('move_alias_to_label', terms) or ret
         ret = self.exec_fix(
             'add_missing_labels',
-            self.get_sitelinks(item),
+            item.sitelinks,
             terms['labels']
         ) or ret
         ret = self.exec_fix('cleanup_labels', terms) or ret
@@ -236,40 +238,46 @@ class WikidataCleanupToolkit:
 
     def get_missing_labels(self, sitelinks, dont):
         labels = {}
-        for dbname, title in sitelinks.items():
-            if 'wikinews' in dbname:
-                continue
-            if ':' not in title and '/' in title:
-                continue
+        for dbname in sitelinks:
             # [[d:Topic:Vedxkcb8ek6ss1pc]]
             if dbname.startswith('alswiki'):
                 continue
+            lang = self.normalize_lang(dbname.rpartition('wik')[0])
+            if not lang or lang in dont:
+                continue
+
+            # try to defer this as much as possible
+            link = sitelinks[dbname]
+            title = link.canonical_title()
+
+            # todo: check if this is still needed
+            if ':' not in title and '/' in title:
+                continue
             # [[d:Topic:Vhs5f72i5obvkr3t]]
             if title.startswith('Wikipedia:Artikelwerkstatt/'):
+                continue
+            # [[d:Topic:Topic:Vw8cayiif34m2eem]]
+            if dbname.endswith('wikinews') and link.namespace == 14:
                 continue
             # [[d:Topic:Vn16a76j30dblqo7]]
             if dbname == 'zh_yuewiki' and title.startswith('Portal:時人時事/'):
                 continue
             # [[d:Topic:Vrel33kwnco2xp55]]
             if dbname.endswith('wikisource'):
-                site = pywikibot.site.APISite.fromDBName(dbname)
-                link = pywikibot.Link(title, site)
-                if link.namespace == site.namespaces.lookup_name('Author'):
+                if link.namespace == link.site.namespaces.lookup_name('Author'):
                     title = title.partition(':')[2]
-            lang = self.normalize_lang(dbname.rpartition('wik')[0])
-            if lang and lang not in dont:
-                # [[d:Topic:Uhdjlv9aae6iijuc]]
-                # todo: create a lib for this
-                if lang == 'fr' and title.startswith(
-                        ('Abbaye ', 'Cathédrale ', 'Chapelle ', 'Cloître ',
-                         'Couvent ', 'Monastère ', 'Église ')):
-                    title = first_lower(title)
-                label = labels.get(lang)
-                if label and first_lower(label) != first_lower(title):
-                    labels.pop(lang)  # todo: better handling
-                    dont.add(lang)
-                    continue
-                labels[lang] = title
+            # [[d:Topic:Uhdjlv9aae6iijuc]]
+            # todo: create a lib for this
+            if lang == 'fr' and title.startswith(
+                    ('Abbaye ', 'Cathédrale ', 'Chapelle ', 'Cloître ',
+                     'Couvent ', 'Monastère ', 'Église ')):
+                title = first_lower(title)
+            label = labels.get(lang)
+            if label and first_lower(label) != first_lower(title):
+                labels.pop(lang)  # todo: better handling
+                dont.add(lang)
+                continue
+            labels[lang] = title
         return labels
 
     def add_missing_labels(self, sitelinks, data):
