@@ -256,7 +256,7 @@ class WikidataCleanupToolkit:
             # [[d:Topic:Vhs5f72i5obvkr3t]]
             if title.startswith('Wikipedia:Artikelwerkstatt/'):
                 continue
-            # [[d:Topic:Topic:Vw8cayiif34m2eem]]
+            # [[d:Topic:Vw8cayiif34m2eem]]
             if dbname.endswith('wikinews') and link.namespace == 14:
                 continue
             # [[d:Topic:Vn16a76j30dblqo7]]

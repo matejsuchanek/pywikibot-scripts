@@ -97,7 +97,7 @@ class LazyFix(BaseFix):
 
     exceptions = {
         'inside': [],
-        'inside-tags': ['comment', 'nowiki', 'pre', 'source'],
+        'inside-tags': ['comment', 'nowiki', 'pre', 'syntaxhighlight'],
         'text-contains': [],
         'title': []
     }
@@ -527,7 +527,7 @@ class RedirectFix(LazyFix):
     }
     page_title = 'Wikipedista:PastoriBot/narovnaná přesměrování'
     exceptions = {
-        'inside-tags': ['comment', 'nowiki', 'pre', 'source'],
+        'inside-tags': ['comment', 'nowiki', 'pre', 'syntaxhighlight'],
         'text-contains': ['{{Rozcestník', '{{rozcestník'],
     }
     message = 'narovnání přesměrování'

@@ -12,8 +12,8 @@ class CheckWikiError:
 
     '''Abstract class for each error to extend'''
 
-    exceptions = ['ce', 'comment', 'graph', 'hiero', 'math', 'nowiki',
-                  'pre', 'score', 'source', 'startspace']
+    exceptions = ['ce', 'comment', 'graph', 'hiero', 'math', 'nowiki', 'pre',
+                  'score', 'startspace', 'syntaxhighlight']
     needsFirst = []
 
     def __init__(self, checkwiki):

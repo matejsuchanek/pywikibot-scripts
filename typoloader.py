@@ -1,8 +1,6 @@
 import re
 import time
 
-from operator import methodcaller
-
 import pywikibot
 
 from pywikibot import pagegenerators, textlib
@@ -30,19 +28,19 @@ class TypoRule:
 
     '''Class representing one typo rule'''
 
-    # todo: remove 'template' or 'startspace'
     exceptions = [
         'category', 'comment', 'header', 'hyperlink', 'interwiki', 'invoke',
-        'property', 'startspace', 'template',
+        'property', 'template',
 
         # tags
         'ce', 'chem', 'code', 'gallery', 'graph', 'imagemap', 'kbd',
         'mapframe', 'maplink', 'math', 'nowiki', 'poem', 'pre', 'score',
-        'section', 'source', 'timeline', 'tt', 'var',
+        'section', 'syntaxhighlight', 'timeline', 'tt', 'var',
 
-        re.compile(r'\[\[([^][|]+)(\]\]\w*|([^][|]+\|)+)'),  # 'target-part' of a wikilink
-        re.compile('<[a-z]+ [^>]+>'),  # HTML tag
-        re.compile('„[^\n"“]+["“]'),  # quotation marks
+        # "target-part" of a wikilink
+        re.compile(r'\[\[([^][|]+)(\]\]\w*|([^][|]+\|)+)'),
+        re.compile('<[a-z]+ [^>]+>|</[a-z]+>'),  # HTML tag
+        re.compile('„[^\n"„“]+["“]'),  # quotation marks
         re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1)[^\n])+\1"),  # italics
         re.compile(r'\b([A-Za-z]+\.)+[a-z]{2,}'),  # url fragment
     ]
@@ -154,11 +152,13 @@ class TypoRule:
         if old != new:
             fragment = ' → '.join(underscores(re.sub('\n', r'\\n', i))
                                   for i in (old, new))
-            if fragment.lower() not in map(methodcaller('lower'), replaced):
+            if fragment.lower() not in map(str.lower, replaced):
                 replaced.append(fragment)
         return new
 
-    def apply(self, text, replaced=list()):
+    def apply(self, text, replaced=None):
+        if replaced is None:
+            replaced = []
         hook = lambda match: self.summary_hook(match, replaced)
         start = time.clock()
         text = textlib.replaceExcept(
