@@ -7,6 +7,8 @@ from pywikibot import pagegenerators
 from pywikibot.textlib import mwparserfromhell as parser, removeDisabledParts
 from pywikibot.data.sparql import *
 
+from .tools import get_best_statements
+
 
 def get_sources(page):
     wiki = pywikibot.Claim(repo, 'P143', is_reference=True)
@@ -89,8 +91,9 @@ for page in generator:
 
         if item and not template.has('Commons', ignore_empty=True):
             ccat = None
-            if item.claims.get('P373'):
-                ccat = item.claims['P373'][0].getTarget()
+            best = get_best_statements(item.claims.get('P373', []))
+            if best:
+                ccat = best[0].getTarget()
             if not ccat:
                 link = item.sitelinks.get('commonswiki')
                 if link and link.namespace == 14:
@@ -98,11 +101,28 @@ for page in generator:
             if ccat:
                 template.add('Commons', ccat)
                 change = True
+            del best
+
         if item and not template.has('Článek', ignore_empty=True):
             article = item.sitelinks.get('cswiki')
             if article:
                 template.add('Článek', article.ns_title())
                 change = True
+
+        if item and not (
+            template.has('Zeměpisná_šířka', ignore_empty=True)
+            and template.has('Zeměpisná_délka', ignore_empty=True)
+        ):
+            coord = None
+            best = get_best_statements(item.claims.get('P625', []))
+            if best:
+                coord = best[0].getTarget()
+            if coord:
+                template.add('Zeměpisná_šířka', str(coord.lat))
+                template.add('Zeměpisná_délka', str(coord.lon))
+                change = True
+            del best
+
         if item and template.has('Obrázek', ignore_empty=True):
             image = pywikibot.FilePage(
                 image_repo, tidy(template.get('Obrázek').value))
