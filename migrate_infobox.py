@@ -443,7 +443,7 @@ def main(*args): # bot_class=InfoboxMigratingBot
     local_args = pywikibot.handle_args(args)
     genFactory = pagegenerators.GeneratorFactory()
     for arg in local_args:
-        if genFactory.handleArg(arg):
+        if genFactory.handle_arg(arg):
             continue
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
@@ -463,7 +463,7 @@ def main(*args): # bot_class=InfoboxMigratingBot
 
     generator = genFactory.getCombinedGenerator()
     if not generator:
-        genFactory.handleArg('-transcludes:%s' % options['template'])
+        genFactory.handle_arg('-transcludes:%s' % options['template'])
         generator = genFactory.getCombinedGenerator()
 
     bot = InfoboxMigratingBot(generator=generator, **options) # bot_class

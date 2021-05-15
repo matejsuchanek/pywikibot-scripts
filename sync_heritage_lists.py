@@ -1,10 +1,11 @@
 #!/usr/bin/python
 from collections import defaultdict
 
+import mwparserfromhell
 import pywikibot
 
 from pywikibot import pagegenerators
-from pywikibot.textlib import mwparserfromhell as parser, removeDisabledParts
+from pywikibot.textlib import removeDisabledParts
 from pywikibot.data.sparql import *
 
 from .tools import get_best_statements
@@ -29,12 +30,12 @@ repo = site.data_repository()
 image_repo = site.image_repository()
 
 genFactory = pagegenerators.GeneratorFactory(site=site)
-genFactory.handleArg('-ns:0')
+genFactory.handle_arg('-ns:0')
 for arg in args:
-    genFactory.handleArg(arg)
+    genFactory.handle_arg(arg)
 generator = genFactory.getCombinedGenerator(preload=True)
 if not generator:
-    genFactory.handleArg('-ref:Template:Památky v Česku')
+    genFactory.handle_arg('-ref:Template:Památky v Česku')
     generator = genFactory.getCombinedGenerator(preload=True)
 
 
@@ -54,7 +55,7 @@ del result
 
 for page in generator:
     pywikibot.output(page)
-    code = parser.parse(page.text)
+    code = mwparserfromhell.parse(page.text)
     change = False
     for template in code.ifilter_templates(
             matches=lambda t: t.name.matches('Památky v Česku')):

@@ -171,7 +171,7 @@ def main(*args):
     site = pywikibot.Site()
     genFactory = pagegenerators.GeneratorFactory(site=site)
     for arg in local_args:
-        if genFactory.handleArg(arg):
+        if genFactory.handle_arg(arg):
             continue
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')

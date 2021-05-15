@@ -541,7 +541,7 @@ def main(*args):
                 else:
                     options[arg[1:]] = True
             else:
-                genFactory.handleArg(arg + sep + value)
+                genFactory.handle_arg(arg + sep + value)
 
     generator = genFactory.getCombinedGenerator()
 

@@ -114,7 +114,7 @@ def main(*args):
     local_args = pywikibot.handle_args(args)
     genFactory = pagegenerators.GeneratorFactory()
     for arg in local_args:
-        if genFactory.handleArg(arg):
+        if genFactory.handle_arg(arg):
             continue
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
@@ -129,7 +129,7 @@ def main(*args):
 
     generator = genFactory.getCombinedGenerator(preload=True)
     if not generator:
-        genFactory.handleArg('-transcludes:%s' % options['template'])
+        genFactory.handle_arg('-transcludes:%s' % options['template'])
         generator = genFactory.getCombinedGenerator(preload=True)
 
     bot = TitlesMovingBot(generator=generator, **options)

@@ -1,10 +1,10 @@
 #!/usr/bin/python
 import re
 
+import mwparserfromhell
 import pywikibot
 
 from pywikibot import pagegenerators
-from pywikibot.textlib import mwparserfromhell as parser
 from pywikibot.tools import first_upper
 
 args = pywikibot.handle_args()
@@ -14,12 +14,12 @@ repo = site.data_repository()
 #image_repo = site.image_repository()
 
 genFactory = pagegenerators.GeneratorFactory(site=site)
-genFactory.handleArg('-ns:0')
+genFactory.handle_arg('-ns:0')
 for arg in args:
-    genFactory.handleArg(arg)
+    genFactory.handle_arg(arg)
 generator = genFactory.getCombinedGenerator(preload=True)
 if not generator:
-    genFactory.handleArg('-cat:Seznamy památných stromů v Česku podle okresů')
+    genFactory.handle_arg('-cat:Seznamy památných stromů v Česku podle okresů')
     generator = genFactory.getCombinedGenerator(preload=True)
 
 # todo: cache all in a single query
@@ -31,7 +31,7 @@ titleR = re.compile(r'(\s*)([^[|\]<>]+?)((?: *†| *\(x\))?\s*)')
 
 for page in generator:
     pywikibot.output(page)
-    code = parser.parse(page.text)
+    code = mwparserfromhell.parse(page.text)
     change = False
     for table in code.ifilter_tags(matches=lambda t: t.tag == 'table'):
         rows = table.contents.ifilter_tags(matches=lambda t: t.tag == 'tr')

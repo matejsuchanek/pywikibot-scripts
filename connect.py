@@ -222,8 +222,8 @@ for project in tp_map.keys():
             continue
         if family == 'wikisource' and ns == 0:
             continue
-        genFactory.handleArg('-ns:%i' % ns)
-    genFactory.handleArg('-unconnectedpages')
+        genFactory.handle_arg('-ns:%i' % ns)
+    genFactory.handle_arg('-unconnectedpages')
     generator = genFactory.getCombinedGenerator(preload=True)
 
     for page in generator:

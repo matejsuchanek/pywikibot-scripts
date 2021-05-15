@@ -301,7 +301,7 @@ def main(*args):
     numbers = []
     gens = []
     for arg in local_args:
-        if genFactory.handleArg(arg):
+        if genFactory.handle_arg(arg):
             continue
         if arg.startswith('-checkwiki:'):
             ids, priorities = checkwiki.parse_option(arg.partition(':')[2])

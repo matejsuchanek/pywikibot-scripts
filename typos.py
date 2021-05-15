@@ -206,9 +206,9 @@ def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
     genFactory = pagegenerators.GeneratorFactory()
-    genFactory.handleArg('-ns:0')
+    genFactory.handle_arg('-ns:0')
     for arg in local_args:
-        if genFactory.handleArg(arg):
+        if genFactory.handle_arg(arg):
             continue
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')

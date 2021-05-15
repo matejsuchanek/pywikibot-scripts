@@ -4,7 +4,7 @@ import pywikibot
 
 from pywikibot import Claim, html2unicode
 from pywikibot.tools import first_lower
-from pywikibot.tools.chars import invisible_regex
+from pywikibot.tools.chars import INVISIBLE_REGEX as invisible_regex
 
 
 class DataWrapper(MutableMapping):
