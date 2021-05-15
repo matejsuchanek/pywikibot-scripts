@@ -11,9 +11,9 @@ site = pywikibot.Site('wikidata', 'wikidata')
 repo = site.data_repository()
 
 direct = pywikibot.input('File directory: ')
-date = pywikibot.WbTime(year=2020, month=1, day=1, site=repo)
+date = pywikibot.WbTime(year=2021, month=1, day=1, site=repo)
 
-ref_item = 'Q92748479'
+ref_item = 'Q106655495'
 
 with open(direct, 'r', encoding='utf-8') as file_data:
     next(file_data)  # header
