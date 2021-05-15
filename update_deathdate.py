@@ -78,7 +78,7 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
                 self.userPut(ref_page, ref_page.text, new_text,
                              summary='doplnění data úmrtí')
 
-    def replace_callback(match):
+    def replace_callback(self, match):
         inside, left, year1, right = match.groups('')
         return replace_pattern.format(
             inside=inside, left=left, right=right, year1=year1,
