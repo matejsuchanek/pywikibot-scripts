@@ -8,10 +8,7 @@ import pywikibot
 
 from pywikibot import i18n, textlib
 from pywikibot.bot import ExistingPageBot, SingleSiteBot, NoRedirectPageBot
-from pywikibot.pagegenerators import (
-    PreloadingGenerator,
-    SearchPageGenerator,
-)
+from pywikibot.pagegenerators import PreloadingGenerator
 
 birth = {
     'wikipedia': {
@@ -52,7 +49,8 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         titles = (cat.title(with_ns=False, with_section=False,
                             allow_interwiki=False, insite=self.site)
                   for cat in categories)
-        matches = list(filter(bool, map(self.categoryR.fullmatch, titles)))
+        matches = [match for match in map(self.categoryR.fullmatch, titles)
+                   if match]
         if not matches:
             pywikibot.output('No birthdate category found')
             return
@@ -67,12 +65,11 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
         search_query += ' -intitle:"Seznam"'
         pattern = r'\[\[((?:%s)(?:\|[^\[\]]+)?)\]\]' % '|'.join(
             re.escape(p.title()) for p in chain([page], page.backlinks(
-                followRedirects=False, filterRedirects=True, namespaces=[0])))
+                follow_redirects=False, filter_redirects=True, namespaces=[0])))
         pattern += r' +\(\* *(\[\[)?(%s)(\]\])?\)' % birth_date
         regex = re.compile(pattern)
         for ref_page in PreloadingGenerator(
-                SearchPageGenerator(
-                    search_query, namespaces=[0], site=self.site)):
+                page.site.search(search_query, namespaces=[0])):
             new_text, num = regex.subn(self.replace_callback, ref_page.text)
             if num:
                 self.userPut(ref_page, ref_page.text, new_text,
