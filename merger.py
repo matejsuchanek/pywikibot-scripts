@@ -42,20 +42,9 @@ class Merger:
 
         cls.merge(item_from, item_to, **kwargs)
         if not item_from.isRedirectPage():
-            item_from.get(force=True)
-            data = {'claims': [], 'descriptions': {}, 'sitelinks': []}
-            for lang in item_from.descriptions:
-                data['descriptions'][lang] = '' # fixme upstream
-            for dbname in item_from.sitelinks:
-                data['sitelinks'].append({'site': dbname, 'title': ''})
-            for prop, claims in item_from.claims.items():
-                for claim in claims:
-                    json = claim.toJSON()
-                    json['remove'] = ''
-                    data['claims'].append(json)
             try:
                 item_from.editEntity(
-                    data, summary='Clearing item to prepare for redirect')
+                    {}, clear=True, summary='Clearing item to prepare for redirect')
             except pywikibot.data.api.APIError as e:
                 raise pywikibot.OtherPageSaveError(item_from, e)
 
