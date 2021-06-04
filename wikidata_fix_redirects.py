@@ -21,11 +21,12 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
         self.available_options.update({
             'always': True,
             'days': 7,
+            'editgroups': False,
         })
         super().__init__(**kwargs)
         self.store = QueryStore()
         self.generator = generator or self.custom_generator()
-        self.summary = 'fix redirect [[%s]] → [[%s]]'
+        self.summary = 'fix redirect [[{}]] → [[{}]]'
 
     def custom_generator(self):
         query = self.store.build_query('redirects', days=self.opt['days'])
@@ -37,19 +38,19 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
     def _make_callback(self, callback, *args, **kwargs):
         return lambda: callback(*args, **kwargs)
 
-    def update_snak(self, snak, old, target):
+    def update_snak(self, snak, old_target, new_target):
         if snak.snaktype != 'value':
             return False
         if snak.type == 'wikibase-item':
-            eq = snak.target_equals(old)
+            eq = snak.target_equals(old_target)
             if eq:
-                snak.setTarget(target)
+                snak.setTarget(new_target)
             return eq
         #elif snak.type == 'wikibase-lexeme':
         elif snak.type == 'quantity':
-            eq = snak.target.unit == target.concept_uri()
+            eq = snak.target.unit == old_target.concept_uri()
             if eq:
-                snak.target._unit = target
+                snak.target._unit = new_target
             return eq
         return False
 
@@ -59,13 +60,14 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
         target = item.getRedirectTarget()
         while target.isRedirectPage():
             target = target.getRedirectTarget()
-        pywikibot.output('%s --> %s' % (item, target))
-        backlinks = item.backlinks(
-            follow_redirects=False,
-            filter_redirects=None,
-            namespaces=[0, 120])
-        summary = self.summary % (
+        pywikibot.output('{} --> {}'.format(item, target))
+        backlinks = item.backlinks(follow_redirects=False,
+                                   filter_redirects=None,
+                                   namespaces=[0, 120])
+        summary = self.summary.format(
             item.title(with_ns=True), target.title(with_ns=True))
+        if self.opt.editgroups:
+            summary += ' ({})'.format(self.new_editgroups_summary())
         if target != item.getRedirectTarget():
             item.set_redirect_target(target, summary=summary)
         for entity in PreloadingEntityGenerator(backlinks):
@@ -81,7 +83,7 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
                 if self.update_snak(claim, item, target):
                     changed = True
                     callbacks.append(self._make_callback(
-                        claim.changeTarget, target, summary=summary))
+                        claim.changeTarget, claim.target, summary=summary))
                 for snak in chain.from_iterable(claim.qualifiers.values()):
                     if self.update_snak(snak, item, target):
                         changed = True
@@ -89,13 +91,16 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
                             claim.repo.editQualifier, claim, snak,
                             summary=summary))
                 for source in claim.sources:
+                    source_changed = False
                     snaks = list(chain.from_iterable(source.values()))
                     for snak in snaks:
                         if self.update_snak(snak, item, target):
-                            changed = True
-                            callbacks.append(self._make_callback(
-                                claim.repo.editSource, claim, snaks,
-                                summary=summary))
+                            source_changed = True
+                    if source_changed:
+                        changed = True
+                        callbacks.append(self._make_callback(
+                            claim.repo.editSource, claim, snaks,
+                            summary=summary))
                 if changed:
                     update.append(claim)
             if len(callbacks) > 1:

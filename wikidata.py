@@ -1,4 +1,5 @@
 from contextlib import suppress
+import random
 
 import pywikibot
 
@@ -52,6 +53,11 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         raise NotImplementedError(
             '%s.filterProperty needs overriding in a subclass' % self.__class__
         )
+
+    def new_editgroups_summary(self):
+        # https://www.wikidata.org/wiki/Wikidata:Edit_groups/Adding_a_tool
+        return '[[:toollabs:editgroups/b/CB/{:x}|details]]'.format(
+            random.randrange(0, 2**48))
 
     def user_edit_entity(self, item, data=None, *, cleanup=None, **kwargs):
         # todo: support stub items
