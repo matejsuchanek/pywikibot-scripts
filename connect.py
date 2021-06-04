@@ -4,6 +4,7 @@ import datetime
 import pywikibot
 
 from pywikibot import pagegenerators, textlib
+from pywikibot.exceptions import NoPageError
 from pywikibot.tools import first_lower
 
 pywikibot.handle_args()
@@ -218,7 +219,7 @@ for project in tp_map.keys():
 
     genFactory = pagegenerators.GeneratorFactory(site=site)
     for ns in (0, 14, 100):
-        if family != 'wikisource' and ns == 100: # fixme: cswikiquote
+        if family != 'wikisource' and ns == 100:  # fixme: cswikiquote
             continue
         if family == 'wikisource' and ns == 0:
             continue
@@ -272,14 +273,14 @@ for project in tp_map.keys():
 
                 try:
                     item = target_page.data_item()
-                except pywikibot.NoPage:
+                except NoPageError:
                     repo = site.data_repository()
-                    # fixme: unused
+                    # fixme: unused return value
                     data = repo.linkTitles(page, target_page)
                     pywikibot.output('Item created')
-                    pywikibot.output(data) # todo
+                    pywikibot.output(data)  # todo
                     break
-                if site.dbName() in item.get()['sitelinks']:
+                if site.dbName() in item.sitelinks:
                     pywikibot.output(page)
                     pywikibot.output('%s already has sitelink to %s%s' % (
                         item, lang, family))

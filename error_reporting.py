@@ -6,6 +6,7 @@ from contextlib import suppress
 import pywikibot
 
 from pywikibot.bot import BaseBot
+from pywikibot.exceptions import NoPageError
 
 
 class ErrorReportingBot(BaseBot):
@@ -40,7 +41,7 @@ class ErrorReportingBot(BaseBot):
             self.repo, self.page_pattern % self.repo.username())
         try:
             self.log_page.get()
-        except pywikibot.NoPage:
+        except NoPageError:
             self.log_page.text = ''
 
     def append(self, text):

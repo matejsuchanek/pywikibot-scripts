@@ -3,6 +3,7 @@ from contextlib import suppress
 import pywikibot
 
 from pywikibot.bot import NoRedirectPageBot, WikidataBot
+from pywikibot.exceptions import NoPageError, IsRedirectPageError
 
 from .wikidata_cleanup_toolkit import WikidataCleanupToolkit
 
@@ -27,7 +28,7 @@ class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
         super().__init__(**kwargs)
 
     def init_page(self, item):
-        with suppress(pywikibot.NoPage, pywikibot.IsRedirectPage):
+        with suppress(NoPageError, IsRedirectPageError):
             item.get()
         return super().init_page(item)
 

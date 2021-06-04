@@ -2,6 +2,7 @@
 import pywikibot
 
 from pywikibot import pagegenerators
+from pywikibot.exceptions import NoPageError
 
 from .error_reporting import ErrorReportingBot
 from .wikidata import WikidataEntityBot
@@ -80,7 +81,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
                 target = page.getRedirectTarget()
                 try:
                     target_item = target.data_item()
-                except pywikibot.NoPage:
+                except NoPageError:
                     link = "''no item''"
                 else:
                     link = target_item.title(as_link=True, insite=self.repo)

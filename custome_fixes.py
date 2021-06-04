@@ -12,10 +12,11 @@ from collections import defaultdict
 from itertools import chain
 from operator import itemgetter, methodcaller
 
+import mwparserfromhell
 import pywikibot
 
 from pywikibot import pagegenerators, textlib
-from pywikibot.textlib import mwparserfromhell
+from pywikibot.exceptions import NoPageError
 from pywikibot.tools import first_lower, first_upper
 from pywikibot.tools.formatter import color_format
 
@@ -187,7 +188,7 @@ class AdataFix(Fix):
 
         try:
             item = page.data_item()
-        except pywikibot.NoPage:
+        except NoPageError:
             return
 
         claims = item.get().get('claims')
@@ -498,7 +499,7 @@ class InterwikiFix(Fix):
         try:
             item = page.data_item()
             item.get()
-        except pywikibot.NoPage:
+        except NoPageError:
             return
 
         sitelinks = item.iterlinks(family=page.site.family)

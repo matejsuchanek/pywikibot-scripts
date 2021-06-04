@@ -9,6 +9,7 @@ from urllib.request import urlopen
 import pywikibot
 
 from pywikibot.bot import RedirectPageBot, WikidataBot
+from pywikibot.exceptions import NoPageError
 
 from .merger import Merger
 
@@ -95,7 +96,7 @@ class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
         try:
             items.append(target.data_item())
             target.get()
-        except pywikibot.NoPage:
+        except NoPageError:
             self._save_page(items[0], items[0].setSitelink, target,
                             **self.ignore)  # todo: summary
             return

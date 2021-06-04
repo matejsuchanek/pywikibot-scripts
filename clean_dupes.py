@@ -4,6 +4,7 @@ from threading import Lock, Thread
 
 import pywikibot
 
+from pywikibot.exceptions import NoPageError
 from pywikibot.pagegenerators import (
     GeneratorFactory,
     PreloadingEntityGenerator,
@@ -109,7 +110,7 @@ class DupesMergingBot(WikidataEntityBot):
                     if page.isRedirectPage():
                         try:
                             target = page.getRedirectTarget().data_item()
-                        except pywikibot.NoPage:
+                        except NoPageError:
                             pass
                         else:
                             targets.add(target)
@@ -138,7 +139,7 @@ class DupesMergingBot(WikidataEntityBot):
             with self.get_lock_for(site):
                 try:
                     target_link = target.getSitelink(site)
-                except pywikibot.NoPage:
+                except NoPageError:
                     continue
 
                 if not page.exists():
