@@ -73,10 +73,10 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
                 pywikibot.output("Category doesn't exist on Commons, "
                                  'cleanup restricted')
                 return
-            regex = r'(?:\n?|^)(?:\* *)?\{\{ *[Cc]ommons(?:cat|[_ ]?category) *'
+            regex = r'(?:\n?|^)(?:\* *)?\{\{ *[Cc]ommons(?:cat|[_ ]?category)'
             if has_param:
-                regex += r'\| *' + re.escape(cat_name)
-            regex += r'[^}]*\}\}'
+                regex += r' *\| *' + re.escape(cat_name)
+            regex += r' *\}\}'
             page_replaced_text = re.sub(
                 regex, '', page.text, flags=re.M, count=1)
             if page_replaced_text != page.text:
