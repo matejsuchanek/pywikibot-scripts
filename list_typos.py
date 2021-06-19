@@ -24,17 +24,30 @@ class TypoReportBot(SingleSiteBot):
             'outputpage': None,
             'typospage': None,
             'whitelistpage': None,
+            'false_positives': None,
         })
         super().__init__(**kwargs)
         self.loader = TyposLoader(
-            self.site, allrules=True, typospage=self.opt['typospage'],
-            whitelistpage=self.opt['whitelistpage'])
+            self.site, allrules=True, typospage=self.opt.typospage,
+            whitelistpage=self.opt.whitelistpage)
+        self.false_positives = set()
 
     def setup(self):
+        super().setup()
         self.typoRules = self.loader.loadTypos()
-        self.fp_page = self.loader.getWhitelistPage()
+        #self.fp_page = self.loader.getWhitelistPage()
         self.whitelist = self.loader.loadWhitelist()
         self.data = []
+        self.load_false_positives()
+
+    def load_false_positives(self):
+        if not self.opt.false_positives:
+            return
+        page = pywikibot.Page(self.site, self.opt.false_positives)
+        fps = self.false_positives
+        for line in page.text.splitlines():
+            if line.startswith(('#', '*')):
+                fps.add(line.lstrip('#* '))
 
     @property
     def generator(self):
@@ -70,14 +83,15 @@ class TypoReportBot(SingleSiteBot):
         text = self.remove_disabled_parts(page.text)
         match = self.current_rule.find.search(text)
         if match:
-            text = self.pattern.format(page.title(as_link=True), match.group(0))
-            pywikibot.stdout(text)
-            self.data.append(text)
+            put_text = self.pattern.format(
+                page.title(as_link=True), match.group(0))
+            if put_text.lstrip('# ') not in self.false_positives:
+                pywikibot.stdout(put_text)
+                self.data.append(put_text)
 
     def teardown(self):
-        outputpage = self.opt['outputpage']
-        if (self._generator_completed or self.opt['anything']
-                ) and outputpage:
+        outputpage = self.opt.outputpage
+        if (self._generator_completed or self.opt.anything) and outputpage:
             page = pywikibot.Page(self.site, outputpage)
             page.text = '\n'.join(self.data)
             page.save(summary='aktualizace seznamu překlepů', minor=False,
@@ -88,16 +102,16 @@ class TypoReportBot(SingleSiteBot):
 class PurgeTypoReportBot(SingleSiteBot, ExistingPageBot):
 
     def __init__(self, **kwargs):
-        super().__init__()
         self.helper = TypoReportBot(**kwargs)
+        super().__init__(site=self.helper.site)
+        self.put = []
+        self.cache = defaultdict(list)
 
     def setup(self):
         super().setup()
         self.whitelist = self.helper.loader.loadWhitelist()
-        outputpage = self.helper.opt['outputpage']
-        self.generator = [pywikibot.Page(self.site, outputpage)]
-        self.put = []
-        self.cache = defaultdict(list)
+        self.generator = [pywikibot.Page(self.site, self.helper.opt.outputpage)]
+        self.helper.load_false_positives()
 
     def line_iterator(self, page):
         regex = re.compile(self.helper.pattern.format(
@@ -124,8 +138,12 @@ class PurgeTypoReportBot(SingleSiteBot, ExistingPageBot):
                 title = entry.title()
             text = self.helper.remove_disabled_parts(entry.text)
             for string in self.cache.pop(key):
-                if string in text:
-                    self.put.append(pattern.format('[[%s]]' % title, string))
+                if string not in text:
+                    continue
+                put_text = pattern.format('[[%s]]' % title, string)
+                if put_text.lstrip('# ') in self.helper.false_positives:
+                    continue
+                self.put.append(put_text)
 
         page.text = '\n'.join(self.put)
         page.save(summary='odstranění vyřešených překlepů', minor=True,
