@@ -33,15 +33,16 @@ class TypoRule:
         'property', 'template',
 
         # tags
-        'ce', 'chem', 'code', 'gallery', 'graph', 'imagemap', 'kbd',
-        'mapframe', 'maplink', 'math', 'nowiki', 'poem', 'pre', 'score',
-        'section', 'syntaxhighlight', 'timeline', 'tt', 'var',
+        'code', 'gallery', 'graph', 'imagemap', 'kbd', 'mapframe', 'maplink',
+        'math', 'nowiki', 'poem', 'pre', 'score', 'section', 'syntaxhighlight',
+        'timeline', 'tt', 'var',
 
         # "target-part" of a wikilink
         re.compile(r'\[\[([^][|]+)(\]\]\w*|([^][|]+\|)+)'),
-        re.compile('<[a-z]+ [^>]+>|</[a-z]+>'),  # HTML tag
-        re.compile('„[^\n"„“]+["“]'),  # quotation marks
-        re.compile(r"((?<!\w)\"|(?<!')'')(?:(?!\1)[^\n])+\1"),  # italics
+
+        re.compile('<[a-z]+ [^<>]+>|</[a-z]+>'),  # HTML tag
+        re.compile(r'„[^\n"„“]+["“]|(?<!\w)"[^"\n]+"'),  # quotation marks
+        # FIXME: re.compile(r"(?<!')''(?!')(?:(?!'')[^\n])+''"),  # italics
         re.compile(r'\b([A-Za-z]+\.)+[a-z]{2,}'),  # url fragment
     ]
 
@@ -108,7 +109,7 @@ class TypoRule:
             else:
                 try:
                     re.compile(part)
-                    query = 'insource:/%s/i' % part
+                    query = 'insource:/{}/'.format(part)
                 except re.error as exc:
                     raise InvalidExpressionException(exc, 'query')
 
@@ -167,7 +168,7 @@ class TypoRule:
         delta = finish - start
         self.longest = max(delta, self.longest)
         if delta > 5:
-            pywikibot.warning('Slow typo rule "%s" (%f)' % (
+            pywikibot.warning('Slow typo rule "{}" ({})'.format(
                 self.find.pattern, delta))
         return text
 
@@ -178,7 +179,8 @@ class TyposLoader:
 
     '''Class loading and holding typo rules'''
 
-    def __init__(self, site, *, allrules=False, typospage=None, whitelistpage=None):
+    def __init__(self, site, *, allrules=False, typospage=None,
+                 whitelistpage=None):
         self.site = site
         self.load_all = allrules
         self.typos_page_name = typospage
@@ -213,7 +215,7 @@ class TyposLoader:
                     pywikibot.warning(exc.message)  # pwb.exception?
                 except InvalidExpressionException as exc:
                     if 'fixed-width' not in exc.message:
-                        pywikibot.warning('Invalid %s %s: %s' % (
+                        pywikibot.warning('Invalid {} {}: {}'.format(
                             exc.aspect, fielddict['1'], exc.message))
                 else:
                     rule.id = self.top_id
@@ -222,14 +224,13 @@ class TyposLoader:
                     if load_all or not rule.needs_decision():
                         self.typoRules.append(rule)
 
-        pywikibot.output('%d typo rules loaded' % len(self.typoRules))
+        pywikibot.output('{} typo rules loaded'.format(len(self.typoRules)))
         return self.typoRules
 
     def loadWhitelist(self):
         self.whitelist = []
         self.fp_page = self.getWhitelistPage()
         if self.fp_page.exists():
-            content = self.fp_page.get()
-            for match in re.finditer(r'\[\[([^]|]+)\]\]', content):
+            for match in re.finditer(r'\[\[([^]|]+)\]\]', self.fp_page.text):
                 self.whitelist.append(match.group(1).strip())
         return self.whitelist

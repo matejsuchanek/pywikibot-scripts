@@ -113,10 +113,10 @@ class PurgeTypoReportBot(SingleSiteBot, ExistingPageBot):
         self.generator = [pywikibot.Page(self.site, self.helper.opt.outputpage)]
         self.helper.load_false_positives()
 
-    def line_iterator(self, page):
+    def line_iterator(self, text):
         regex = re.compile(self.helper.pattern.format(
             r'\[\[([^]]+)\]\]', '(.+)'))
-        for line in page.text.splitlines():
+        for line in text.splitlines():
             match = regex.fullmatch(line)
             if match:
                 title, text = match.groups()
@@ -128,7 +128,7 @@ class PurgeTypoReportBot(SingleSiteBot, ExistingPageBot):
 
     def treat(self, page):
         pattern = self.helper.pattern
-        for entry in PreloadingGenerator(self.line_iterator(page)):
+        for entry in PreloadingGenerator(self.line_iterator(page.text)):
             key = title = entry.title()
             if not entry.exists():
                 self.cache.pop(key)
