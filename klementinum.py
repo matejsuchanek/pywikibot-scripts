@@ -16,11 +16,11 @@ def get_single_year(year):
 def main():
     pywikibot.handle_args()
     site = pywikibot.Site()
-    url_pattern = 'http://portal.chmi.cz/files/portal/docs/meteo/ok/extrklem{0}_cs.html'
+    url_pattern = 'https://www.chmi.cz/files/portal/docs/meteo/ok/klementinum/extrklem{:02d}_cs.html'
     text = '-- Zdroj dat:'
     data = OrderedDict()
     for i in range(1, 13):
-        url = url_pattern.format('%02d' % i)
+        url = url_pattern.format(i)
         response = requests.get(url)
         code = parser.parse(response.text)
         month = OrderedDict()
@@ -30,8 +30,7 @@ def main():
             tags = tr.contents.filter_tags()
             if len(tags) != 6:
                 break
-            _, *cells = [tag.contents for tag in tags]
-            avg, mx, mx_year, mn, mn_year = cells
+            _, avg, mx, mx_year, mn, mn_year = [tag.contents for tag in tags]
             month[day] = OrderedDict([
                 ('avg', avg),
                 ('max', mx),
