@@ -3,7 +3,7 @@ import time
 
 import pywikibot
 
-from pywikibot import pagegenerators, textlib
+from pywikibot import textlib
 from pywikibot.tools.formatter import color_format
 
 
@@ -48,10 +48,9 @@ class TypoRule:
 
     nowikiR = re.compile('</?nowiki>')
 
-    def __init__(self, find, replacements, site, auto=False, query=None):
+    def __init__(self, find, replacements, auto=False, query=None):
         self.find = find
         self.replacements = replacements
-        self.site = site
         self.auto = auto
         self.query = query
         self.longest = 0
@@ -66,22 +65,15 @@ class TypoRule:
         return not self.__eq__(other)
 
     def __repr__(self):
-        return '{0!r}({1!r}, {2!r}, {3!r}, {4!r}, {5!r})'.format(
-            self.__class__.name, find, replacements, site, auto, query)
+        return '{0!r}({1!r}, {2!r}, {3!r}, {4!r})'.format(
+            self.__class__.name, self.find, self.replacements,
+            self.auto, self.query)
 
     def needs_decision(self):
         return not self.auto or len(self.replacements) > 1
 
-    def canSearch(self):
-        return self.query is not None
-
-    def querySearch(self):
-        # todo: remove
-        return pagegenerators.SearchPageGenerator(
-            self.query, namespaces=[0], site=self.site)
-
     @classmethod
-    def newFromParameters(cls, parameters, site):
+    def newFromParameters(cls, parameters):
         if '1' not in parameters:
             raise IncompleteTypoRuleException('Missing find expression')
 
@@ -115,7 +107,7 @@ class TypoRule:
 
         auto = parameters.get('auto') == 'ano'
 
-        return cls(find, replacements, site, auto, query)
+        return cls(find, replacements, auto, query)
 
     def summary_hook(self, match, replaced):
         def underscores(string):
@@ -210,7 +202,7 @@ class TyposLoader:
                 text, remove_disabled_parts=False, strip=False):
             if template.lower() == 'typo':
                 try:
-                    rule = TypoRule.newFromParameters(fielddict, self.site)
+                    rule = TypoRule.newFromParameters(fielddict)
                 except IncompleteTypoRuleException as exc:
                     pywikibot.warning(exc.message)  # pwb.exception?
                 except InvalidExpressionException as exc:

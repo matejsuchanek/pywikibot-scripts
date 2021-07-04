@@ -52,12 +52,13 @@ class TypoReportBot(SingleSiteBot):
     @property
     def generator(self):
         for rule in self.typoRules:
-            if not rule.canSearch():
+            if rule.query is None:
                 continue
 
             pywikibot.output('Query: "%s"' % rule.query)
             self.current_rule = rule
-            yield from PreloadingGenerator(rule.querySearch())
+            yield from PreloadingGenerator(
+                self.site.search(rule.query, namespaces=[0]))
 
     def skip_page(self, page):
         if page.title() in self.whitelist:
@@ -66,7 +67,7 @@ class TypoReportBot(SingleSiteBot):
             return True
 
         if self.current_rule.find.search(page.title()):
-            pywikibot.warning('Skipped {} because the rule matches its title'
+            pywikibot.warning('Skipped {} because the rule matches the title'
                               .format(page))
             return True
 

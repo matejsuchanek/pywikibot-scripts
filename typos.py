@@ -61,7 +61,7 @@ class TypoBot(WikitextFixingBot):
         for i, rule in enumerate(self.typoRules[:]):
             if self.offset > i:
                 continue
-            if not rule.canSearch():
+            if rule.query is None:
                 continue
 
             # todo: if not allrules:...
@@ -73,7 +73,7 @@ class TypoBot(WikitextFixingBot):
             self.skip_rule = False
             self.processed = 0.0
             self.replaced = 0.0
-            for page in rule.querySearch():
+            for page in self.site.search(rule.query, namespaces=[0]):
                 if self.skip_rule:
                     break
                 yield page
@@ -107,7 +107,7 @@ class TypoBot(WikitextFixingBot):
             return True
 
         if self.own_generator and self.current_rule.find.search(page.title()):
-            pywikibot.warning('Skipped {} because the rule matches its title'
+            pywikibot.warning('Skipped {} because the rule matches the title'
                               .format(page))
             return True
 

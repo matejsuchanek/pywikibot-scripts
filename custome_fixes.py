@@ -10,7 +10,7 @@ import re
 
 from collections import defaultdict
 from itertools import chain
-from operator import itemgetter, methodcaller
+from operator import itemgetter
 
 import mwparserfromhell
 import pywikibot
@@ -683,7 +683,7 @@ class RefSortFix(LazyFix):
         refs.sort(key=lambda ref: self.sortkey(ref, all_names, match.start()))
         space_before = match.group()[
             :len(match.group()) - len(match.group().lstrip())]
-        return space_before + ''.join(map(methodcaller('group'), refs))
+        return space_before + ''.join(ref.group() for ref in refs)
 
     def replacements(self):
         yield (FULL_ARTICLE_REGEX, self.replace)
@@ -993,8 +993,8 @@ class TypoFix(LazyFix):
 
     def generator(self):
         return chain.from_iterable(
-            map(methodcaller('querySearch'),
-                filter(methodcaller('canSearch', self.typoRules))))
+            self.site.search(rule.query, namespaces=[0])
+            for rule in self.typoRules if rule.query is not None)
 
     def replacements(self):
         return ((rule.find.pattern, rule.replacements[0])
