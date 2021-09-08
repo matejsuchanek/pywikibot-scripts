@@ -38,6 +38,7 @@ if not generator:
     genFactory.handle_arg('-ref:Template:Památky v Česku')
     generator = genFactory.getCombinedGenerator(preload=True)
 
+ignore_images = {'Noimage 2-1.png'}
 
 pywikibot.output('Loading all identifiers...')
 
@@ -127,9 +128,11 @@ for page in generator:
         if item and template.has('Obrázek', ignore_empty=True):
             image = pywikibot.FilePage(
                 image_repo, tidy(template.get('Obrázek').value))
-            if not image.exists() or image.isRedirectPage():
-                continue
-            if not item.claims.get('P18'):
+            if (
+                image.exists() and not image.isRedirectPage()
+                and image.title(with_ns=False) not in ignore_images
+                and not item.claims.get('P18')
+            ):
                 # todo: check unique
                 claim = pywikibot.Claim(repo, 'P18')
                 claim.setTarget(image)
