@@ -24,6 +24,7 @@ class QuickStatementsBot(WikidataEntityBot):
         })
         super().__init__(**kwargs)
         self.generator = generator
+
         self.globeR = re.compile(r'@({0})/({0})'.format(self.decimal_pattern))
         self.quantity_errR = re.compile(
             r'({0})(?:~({0}))?(?:U([1-9]\d*))?'
@@ -32,6 +33,7 @@ class QuickStatementsBot(WikidataEntityBot):
             r'({0})(?:\[({0}),({0})\])(?:U([1-9]\d*))?'
             .format(self.decimal_pattern))
         self.commentR = re.compile(r' */\*(.*?)\*/$')
+
         self.entity_types = frozenset(
             key for key, val in Property.value_types.items()
             if val == 'wikibase-entityid')
@@ -207,11 +209,11 @@ class QuickStatementsBot(WikidataEntityBot):
                 return
 
         # TODO: this is currently unused but might become handy
-        # when consecutive edits to an item can be squashed
+        # if consecutive edits to an item are squashed
         self.current = item
 
         pred = split[1]
-        if pred.startswith(tuple(self.attr_mapping)):
+        if pred.startswith(tuple(self.attr_mapping)) and not minus:
             literal = self.valid_text_literal(split[2], allow_empty=True)
             if literal is None:
                 pywikibot.warning('Invalid literal for {}-command'
@@ -292,9 +294,11 @@ class QuickStatementsBot(WikidataEntityBot):
                 return
             collection.append(snak)
 
+        has_qualifiers = list(chain(*claim.qualifiers.values()))
         for qual in qualifiers:
-            if qual not in chain(*claim.qualifiers.values()):
+            if qual not in has_qualifiers:
                 claim.addQualifier(qual)
+                has_qualifiers.append(qual)
         if references:
             # TODO: check for duplicity
             claim.addSources(references)

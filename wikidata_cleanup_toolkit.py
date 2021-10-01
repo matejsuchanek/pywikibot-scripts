@@ -56,8 +56,8 @@ class WikidataCleanupToolkit:
         'old': None,
         'roa-rup': 'rup',
         'simple': 'en',
-        'species': 'en',
         'sources': None,
+        'species': 'en',
         'wikidata': 'en',
         'wikimania': 'en',
         'zh-classical': 'lzh',
@@ -287,10 +287,12 @@ class WikidataCleanupToolkit:
 
     @staticmethod
     def can_strip(part, description):
-        words = {  # [[d:Topic:Uljziilm6l85hsp3]]
+        words = {
+            # [[d:Topic:Uljziilm6l85hsp3]]
             'vrouwen', 'mannen', 'jongens', 'meisjes', 'enkel', 'dubbel',
             'mannenenkel', 'vrouwenenkel', 'jongensenkel', 'meisjesenkel',
             'mannendubbel', 'vrouwendubbel', 'jongensdubbel', 'meisjesdubbel',
+            'kwalificatie',  # [[d:Topic:Wh6ieq0p9uc0jbwo]]
         }
         if part[-1].isdigit() or part in words:
             return False
