@@ -1,6 +1,4 @@
 #!/usr/bin/python
-from operator import methodcaller
-
 import pywikibot
 
 from pywikibot import pagegenerators
@@ -59,19 +57,23 @@ class DuosManagingBot(WikidataEntityBot):
         'vi': ' và ',
         'war': ' ngan ',
     }
-    distribute_properties = {
+    distribute_properties = [
         'P21', 'P22', 'P25', 'P27', 'P40', 'P53', 'P106', 'P1412',
-    }
+    ]
     class_to_relation = [
+        ('Q106925878', 'father-son'),
         ('Q14756018', 'twin'),
         ('Q14073567', 'sibling'),
         ('Q3046146', 'spouse'),
+        # TODO: ('Q1141470', 'comedians'), not a "relation by blood"
     ]
     relation_map = {
-        #'partner': 'P451', todo
         'sibling': 'P3373',
         'spouse': 'P26',
         'twin': 'P3373',
+        # TODO: 'partner': 'P451',
+        #'father-son': '', we don't know who is who
+        #'comedians': 'P1327',
     }
     use_from_page = False
 
@@ -115,7 +117,7 @@ class DuosManagingBot(WikidataEntityBot):
 
     def get_labels(self, item, relation):
         labels = [{}, {}]
-        for lang in set(item.labels.keys()) & set(self.conj.keys()):
+        for lang in item.labels.keys() & self.conj.keys():
             for conj in (self.conj[lang], ' & '):
                 label = item.labels[lang].partition(' (')[0]
                 if ', ' in label:
@@ -127,18 +129,19 @@ class DuosManagingBot(WikidataEntityBot):
                 split1 = split[1].split()
                 if split1[0].islower():
                     continue
+                # TODO: if len(split1) > 1 and split1[0][-1] == '.':
                 if len(split1) > len(split0):
                     if len(split1) > 2 and split1[-2].islower():
                         split1[-2:] = [' '.join(split1[-2:])]
                     if len(split1) - len(split0) == 1:
-                        # if items are in a relation, then they probably share
-                        # their surname
+                        # if items are in a relation, then
+                        # they probably share their surname
                         if relation:
                             split[0] += ' %s' % split1[-1]
                             split0.append(split1[-1])
                 if len(split0) > 1 or len(split1) == 1:
-                    for i in [0, 1]:
-                        labels[i][lang] = split[i]
+                    labels[0][lang] = split[0]
+                    labels[1][lang] = split[1]
                     break
 
         return labels
@@ -183,19 +186,22 @@ class DuosManagingBot(WikidataEntityBot):
                 claim.id, claim.getTarget()))
             json = claim.toJSON()
             json['remove'] = ''
-            self.user_edit_entity(
-                item, {'claims':[json]},
-                summary='moved [[Property:%s]] to %s' % (
-                    claim.id, ' & '.join(map(methodcaller(
-                        'title', as_link=True, insite=self.repo), items))))
+            summary = 'moved [[Property:{}]] to {} & {}'.format(
+                claim.id,
+                items[0].title(as_link=True, insite=self.repo),
+                items[1].title(as_link=True, insite=self.repo)
+            )
+            self.user_edit_entity(item, {'claims':[json]}, summary=summary)
 
     def create_item(self, item, labels, relation, to_add):
         pywikibot.output('Creating item (relation "%s")...' % relation)
         new_item = pywikibot.ItemPage(self.repo)
-        data = {'labels': labels}
         self.user_edit_entity(
-            new_item, data, summary='based on data in %s' % item.title(
-                as_link=True, insite=self.repo), asynchronous=False)
+            new_item,
+            {'labels': labels},
+            asynchronous=False,
+            summary='based on data in %s' % item.title(
+                as_link=True, insite=self.repo))
 
         claim = pywikibot.Claim(self.repo, 'P31')
         claim.setTarget(pywikibot.ItemPage(self.repo, 'Q5'))
