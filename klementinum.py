@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import re
 import requests
 
 from collections import OrderedDict
@@ -11,6 +12,10 @@ from .lua_formatter import format_dictionary
 
 def get_single_year(year):
     return year.rpartition(', ')[2]
+
+
+def format_number(val):
+    return re.sub(r'^\-', '\u2212', str(val))
 
 
 def main():
@@ -32,14 +37,12 @@ def main():
                 break
             _, avg, mx, mx_year, mn, mn_year = [tag.contents for tag in tags]
             month[day] = OrderedDict([
-                ('avg', avg),
-                ('max', mx),
+                ('avg', format_number(avg)),
+                ('max', format_number(mx)),
                 ('max_year', get_single_year(mx_year)),
-                ('min', mn),
+                ('min', format_number(mn)),
                 ('min_year', get_single_year(mn_year)),
             ])
-            for k in ('avg', 'max', 'min'):
-                month[day][k] = re.sub(r'^\-', '\u2212', str(month[day][k]))
         data[i] = month
         text += '\n-- ' + url
     page = pywikibot.Page(site, 'Modul:Klementinum/data')
