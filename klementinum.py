@@ -38,6 +38,8 @@ def main():
                 ('min', mn),
                 ('min_year', get_single_year(mn_year)),
             ])
+            for k in ('avg', 'max', 'min'):
+                month[day][k] = re.sub(r'^\-', '\u2212', str(month[day][k]))
         data[i] = month
         text += '\n-- ' + url
     page = pywikibot.Page(site, 'Modul:Klementinum/data')
