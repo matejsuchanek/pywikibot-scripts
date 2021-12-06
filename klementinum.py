@@ -15,7 +15,7 @@ def get_single_year(year):
 
 
 def format_number(val):
-    return re.sub(r'^\-', '\u2212', str(val))
+    return re.sub(r'(\d+),(\d+)', r'\1.\2', str(val))
 
 
 def main():
