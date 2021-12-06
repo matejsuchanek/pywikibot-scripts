@@ -256,6 +256,8 @@ class WikidataCleanupToolkit:
             # [[d:Topic:Vhs5f72i5obvkr3t]]
             if title.startswith('Wikipedia:Artikelwerkstatt/'):
                 continue
+            if title.startswith('Wikipédia:Candidatos a artigo/'):
+                continue
             # [[d:Topic:Vw8cayiif34m2eem]]
             if dbname.endswith('wikinews') and link.namespace == 14:
                 continue
@@ -292,7 +294,8 @@ class WikidataCleanupToolkit:
             'vrouwen', 'mannen', 'jongens', 'meisjes', 'enkel', 'dubbel',
             'mannenenkel', 'vrouwenenkel', 'jongensenkel', 'meisjesenkel',
             'mannendubbel', 'vrouwendubbel', 'jongensdubbel', 'meisjesdubbel',
-            'kwalificatie',  # [[d:Topic:Wh6ieq0p9uc0jbwo]]
+            # [[d:Topic:Wh6ieq0p9uc0jbwo]]
+            'kwalificatie', 'rolstoelvrouwen', 'rolstoelvrouwendubbel',
         }
         if part[-1].isdigit() or part in words:
             return False
