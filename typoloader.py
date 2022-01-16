@@ -33,9 +33,9 @@ class TypoRule:
         'property', 'template',
 
         # tags
-        'code', 'gallery', 'graph', 'imagemap', 'kbd', 'mapframe', 'maplink',
-        'math', 'nowiki', 'poem', 'pre', 'score', 'section', 'syntaxhighlight',
-        'timeline', 'tt', 'var',
+        'blockquote', 'code', 'gallery', 'graph', 'imagemap', 'kbd',
+        'mapframe', 'maplink', 'math', 'nowiki', 'poem', 'pre', 'score',
+        'section', 'syntaxhighlight', 'timeline', 'tt', 'var',
 
         # "target-part" of a wikilink
         re.compile(r'\[\[([^][|]+)(\]\]\w*|([^][|]+\|)+)'),
