@@ -61,6 +61,7 @@ class TypoReportBot(SingleSiteBot):
                 self.site.search(rule.query, namespaces=[0]))
 
     def skip_page(self, page):
+        # TODO: better terminology
         if page.title() in self.whitelist:
             pywikibot.warning('Skipped {} because it is whitelisted'
                               .format(page))
@@ -82,10 +83,13 @@ class TypoReportBot(SingleSiteBot):
         if not match:
             return
         text = self.remove_disabled_parts(page.text)
-        match = self.current_rule.find.search(text)
-        if match:
-            put_text = self.pattern.format(
-                page.title(as_link=True), match.group(0))
+        found = set()
+        for matched in self.current_rule.find.findall(text):
+            if matched in found:
+                continue
+            found.add(matched)
+            title = page.title(as_link=True)
+            put_text = self.pattern.format(title, matched)
             if put_text.lstrip('# ') not in self.false_positives:
                 pywikibot.stdout(put_text)
                 self.data.append(put_text)
