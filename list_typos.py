@@ -37,7 +37,8 @@ class TypoReportBot(SingleSiteBot):
         self.typoRules = self.loader.loadTypos()
         #self.fp_page = self.loader.getWhitelistPage()
         self.whitelist = self.loader.loadWhitelist()
-        self.data = []
+        self.data = defaultdict(list)
+        self.order = []  # remove when dictionaries are ordered
         self.load_false_positives()
 
     def load_false_positives(self):
@@ -92,13 +93,18 @@ class TypoReportBot(SingleSiteBot):
             put_text = self.pattern.format(title, matched)
             if put_text.lstrip('# ') not in self.false_positives:
                 pywikibot.stdout(put_text)
-                self.data.append(put_text)
+                self.order.append(title)
+                self.data[title].append(matched)
 
     def teardown(self):
         outputpage = self.opt.outputpage
         if (self._generator_completed or self.opt.anything) and outputpage:
+            put = []
+            for title in self.order:
+                for match in self.data[title]:
+                    put.append(self.pattern.format(title, match))
             page = pywikibot.Page(self.site, outputpage)
-            page.text = '\n'.join(self.data)
+            page.text = '\n'.join(put)
             page.save(summary='aktualizace seznamu překlepů', minor=False,
                       botflag=False, apply_cosmetic_changes=False)
         super().teardown()
