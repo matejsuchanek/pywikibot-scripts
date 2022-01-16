@@ -91,7 +91,8 @@ class TypoRule:
                 replacements.append(replacement)
 
         if not replacements:
-            raise IncompleteTypoRuleException('No replacements found')
+            raise IncompleteTypoRuleException(
+                'No replacements found for rule "{}"'.format(find.pattern))
 
         query = None
         if parameters.get('hledat'):

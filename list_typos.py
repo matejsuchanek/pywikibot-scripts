@@ -85,16 +85,17 @@ class TypoReportBot(SingleSiteBot):
             return
         text = self.remove_disabled_parts(page.text)
         found = set()
-        for matched in self.current_rule.find.findall(text):
-            if matched in found:
+        for match in self.current_rule.find.finditer(text):
+            match_text = match.group(0)
+            if match_text in found:
                 continue
-            found.add(matched)
+            found.add(match_text)
             title = page.title(as_link=True)
-            put_text = self.pattern.format(title, matched)
+            put_text = self.pattern.format(title, match_text)
             if put_text.lstrip('# ') not in self.false_positives:
                 pywikibot.stdout(put_text)
                 self.order.append(title)
-                self.data[title].append(matched)
+                self.data[title].append(match_text)
 
     def teardown(self):
         outputpage = self.opt.outputpage
