@@ -56,7 +56,7 @@ class TypoReportBot(SingleSiteBot):
             if rule.query is None:
                 continue
 
-            pywikibot.output('Query: "%s"' % rule.query)
+            pywikibot.output('Query: "{}"'.format(rule.query))
             self.current_rule = rule
             yield from PreloadingGenerator(
                 self.site.search(rule.query, namespaces=[0]))
@@ -85,25 +85,28 @@ class TypoReportBot(SingleSiteBot):
             return
         text = self.remove_disabled_parts(page.text)
         found = set()
+        added = False
         for match in self.current_rule.find.finditer(text):
             match_text = match.group(0)
             if match_text in found:
                 continue
             found.add(match_text)
-            title = page.title(as_link=True)
-            put_text = self.pattern.format(title, match_text)
-            if put_text.lstrip('# ') not in self.false_positives:
+            link = page.title(as_link=True)
+            put_text = self.pattern.format(link, match_text)
+            if put_text[2:] not in self.false_positives:
                 pywikibot.stdout(put_text)
-                self.order.append(title)
-                self.data[title].append(match_text)
+                self.data[link].append(match_text)
+                if not added:
+                    self.order.append(link)
+                    added = True
 
     def teardown(self):
         outputpage = self.opt.outputpage
         if (self._generator_completed or self.opt.anything) and outputpage:
             put = []
-            for title in self.order:
-                for match in self.data[title]:
-                    put.append(self.pattern.format(title, match))
+            for link in self.order:
+                for match in self.data[link]:
+                    put.append(self.pattern.format(link, match))
             page = pywikibot.Page(self.site, outputpage)
             page.text = '\n'.join(put)
             page.save(summary='aktualizace seznamu překlepů', minor=False,
@@ -153,7 +156,7 @@ class PurgeTypoReportBot(SingleSiteBot, ExistingPageBot):
                 if string not in text:
                     continue
                 put_text = pattern.format('[[%s]]' % title, string)
-                if put_text.lstrip('# ') in self.helper.false_positives:
+                if put_text[2:] in self.helper.false_positives:
                     continue
                 self.put.append(put_text)
 
