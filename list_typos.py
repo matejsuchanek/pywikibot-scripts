@@ -85,7 +85,6 @@ class TypoReportBot(SingleSiteBot):
             return
         text = self.remove_disabled_parts(page.text)
         found = set()
-        added = False
         for match in self.current_rule.find.finditer(text):
             match_text = match.group(0)
             if match_text in found:
@@ -95,14 +94,13 @@ class TypoReportBot(SingleSiteBot):
             put_text = self.pattern.format(link, match_text)
             if put_text[2:] not in self.false_positives:
                 pywikibot.stdout(put_text)
-                self.data[link].append(match_text)
-                if not added:
+                if not self.data.get(link):
                     self.order.append(link)
-                    added = True
+                self.data[link].append(match_text)
 
     def teardown(self):
         outputpage = self.opt.outputpage
-        if (self._generator_completed or self.opt.anything) and outputpage:
+        if (self.generator_completed or self.opt.anything) and outputpage:
             put = []
             for link in self.order:
                 for match in self.data[link]:
