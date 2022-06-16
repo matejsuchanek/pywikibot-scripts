@@ -7,7 +7,7 @@ from itertools import chain
 import pywikibot
 
 from pywikibot import i18n, textlib
-from pywikibot.bot import ExistingPageBot, SingleSiteBot, NoRedirectPageBot
+from pywikibot.bot import ExistingPageBot, SingleSiteBot
 from pywikibot.pagegenerators import PreloadingGenerator
 
 birth = {
@@ -25,7 +25,9 @@ death = {
 replace_pattern = '[[{inside}]] ({left}{year1}{right}–{left}{year2}{right})'
 
 
-class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
+class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot):
+
+    use_redirects = False
 
     def __init__(self, **kwargs):
         self.available_options.update({

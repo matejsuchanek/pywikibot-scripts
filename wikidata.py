@@ -3,13 +3,15 @@ import random
 
 import pywikibot
 
-from pywikibot.bot import NoRedirectPageBot, WikidataBot
+from pywikibot.bot import WikidataBot
 from pywikibot.exceptions import NoPageError, IsRedirectPageError
 
 from .wikidata_cleanup_toolkit import WikidataCleanupToolkit
 
 
-class WikidataEntityBot(WikidataBot, NoRedirectPageBot):
+class WikidataEntityBot(WikidataBot):
+
+    use_redirects = False
 
     '''
     Bot editing Wikidata entities

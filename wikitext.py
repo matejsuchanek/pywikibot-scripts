@@ -7,12 +7,14 @@ from operator import attrgetter, methodcaller
 import pywikibot
 
 from pywikibot import pagegenerators
-from pywikibot.bot import SingleSiteBot, ExistingPageBot, NoRedirectPageBot
+from pywikibot.bot import SingleSiteBot, ExistingPageBot
 
 from .custome_fixes import all_fixes
 
 
-class WikitextFixingBot(SingleSiteBot, ExistingPageBot, NoRedirectPageBot):
+class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
+
+    use_redirects = False
 
     '''
     Class for bots that save wikitext. It uses all demanded fixes from

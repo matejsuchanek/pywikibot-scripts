@@ -8,13 +8,13 @@ from urllib.request import urlopen
 
 import pywikibot
 
-from pywikibot.bot import RedirectPageBot, WikidataBot
+from pywikibot.bot import WikidataBot
 from pywikibot.exceptions import NoPageError
 
 from .merger import Merger
 
 
-class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
+class WikidataRedirectsBot(WikidataBot):
 
     labs_url = 'https://tools.wmflabs.org'
     sub_directory = 'wikidata-redirects-conflicts-reports/reports'
@@ -23,6 +23,7 @@ class WikidataRedirectsBot(WikidataBot, RedirectPageBot):
               'ignore_server_errors': True,
               }
     treat_missing_item = False
+    use_redirects = True
 
     def __init__(self, **kwargs):
         self.available_options.update({

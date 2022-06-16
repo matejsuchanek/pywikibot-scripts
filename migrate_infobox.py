@@ -14,10 +14,10 @@ try:
     # TODO: from .tools import .
     from .custome_fixes import FilesFix
 except ImportError:
-    from pywikibot.bot import SingleSiteBot, ExistingPageBot, NoRedirectPageBot
+    from pywikibot.bot import SingleSiteBot, ExistingPageBot
 
-    class WikitextFixingBot(SingleSiteBot, NoRedirectPageBot, ExistingPageBot):
-        pass
+    class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
+        use_redirects = False
 
 
 class OldParamException(Exception):
