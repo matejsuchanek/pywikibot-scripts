@@ -5,7 +5,7 @@ import re
 import pywikibot
 
 from pywikibot import i18n, pagegenerators, textlib
-from pywikibot.exceptions import UnknownExtension
+from pywikibot.exceptions import UnknownExtensionError
 
 from .deferred import DeferredCallbacksBot
 from .wikidata import WikidataEntityBot
@@ -127,7 +127,7 @@ def main(*args):
     if not generator:
         try:
             category = site.page_from_repository('Q11925744')
-        except (NotImplementedError, UnknownExtension) as e:
+        except (NotImplementedError, UnknownExtensionError) as e:
             pywikibot.error(e)
             return
 
