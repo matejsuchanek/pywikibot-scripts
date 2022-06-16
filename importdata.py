@@ -10,19 +10,18 @@ pywikibot.handle_args()
 site = pywikibot.Site('wikidata', 'wikidata')
 repo = site.data_repository()
 
-direct = pywikibot.input('File directory: ')
-date = pywikibot.WbTime(year=2021, month=1, day=1, site=repo)
+path = pywikibot.input('Path to file: ')
+date = pywikibot.WbTime(year=2022, month=1, day=1, site=repo)
 
-ref_item = 'Q106655495'
+ref_item = 'Q111804439'
 
-with open(direct, 'r', encoding='utf-8') as file_data:
+with open(path, 'r', encoding='utf-8') as file_data:
     next(file_data)  # header
     for line in file_data:
         if not line:
             continue
         split = line.split('\t')
         item = pywikibot.ItemPage(repo, split[0])
-        item.get()
         hasNewClaim = False
         upToDateClaims = []
         count = int(split[1])
