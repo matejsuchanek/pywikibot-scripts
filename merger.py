@@ -5,6 +5,7 @@ from operator import attrgetter, methodcaller
 
 import pywikibot
 
+from pywikibot.exceptions import APIError, OtherPageSaveError
 from pywikibot.data.sparql import SparqlQuery
 
 
@@ -30,14 +31,14 @@ class Merger:
     def merge(cls, item_from, item_to, **kwargs):
         try:
             item_from.mergeInto(item_to, **kwargs)
-        except pywikibot.data.api.APIError as e:
-            raise pywikibot.OtherPageSaveError(item_from, e)
+        except APIError as e:
+            raise OtherPageSaveError(item_from, e)
 
     @classmethod
     def clean_merge(cls, item_from, item_to, safe=False, quick=True, **kwargs):
         kwargs.pop('asynchronous', None)  # fixme
         if safe and not cls.can_merge(item_from, item_to, quick=quick):
-            raise pywikibot.OtherPageSaveError(
+            raise OtherPageSaveError(
                 item_from, 'Cannot merge %s with %s' % (item_from, item_to))
 
         cls.merge(item_from, item_to, **kwargs)
@@ -45,8 +46,8 @@ class Merger:
             try:
                 item_from.editEntity(
                     {}, clear=True, summary='Clearing item to prepare for redirect')
-            except pywikibot.data.api.APIError as e:
-                raise pywikibot.OtherPageSaveError(item_from, e)
+            except APIError as e:
+                raise OtherPageSaveError(item_from, e)
 
             cls.merge(item_from, item_to)
 

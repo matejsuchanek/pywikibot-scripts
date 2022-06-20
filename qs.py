@@ -7,7 +7,11 @@ from itertools import chain
 import pywikibot
 
 from pywikibot import Coordinate, WbMonolingualText, WbQuantity, WbTime
-from pywikibot.exceptions import NoWikibaseEntityError, WikiBaseError
+from pywikibot.exceptions import (
+    APIError,
+    NoWikibaseEntityError,
+    WikiBaseError,
+)
 from pywikibot.page import Property
 
 from .wikidata import WikidataEntityBot
@@ -164,7 +168,7 @@ class QuickStatementsBot(WikidataEntityBot):
     def set_target(self, snak, value):
         try:
             return self._set_target(snak, value)
-        except pywikibot.data.api.APIError:
+        except APIError:
             pass  # warning was printed down the stack
         except WikiBaseError as e:
             pywikibot.error(e)

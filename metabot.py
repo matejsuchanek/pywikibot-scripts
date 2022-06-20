@@ -8,6 +8,7 @@ import pywikibot
 
 from pywikibot import pagegenerators, textlib
 
+from pywikibot.exceptions import APIError
 from pywikibot.textlib import mwparserfromhell
 from pywikibot.tools import first_upper
 
@@ -153,7 +154,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                 pywikibot.output('Found param "{}"'.format(key))
                 try:
                     remove = self.func_dict[key](param)
-                except pywikibot.data.api.APIError as exc:
+                except APIError:
                     remove = False
                 if remove:
                     clear_params.append(key)
@@ -250,7 +251,7 @@ class MetadataHarvestingBot(WikidataEntityBot):
                     r')(?:["\'>]?$|\]))')
                 try:
                     regex = re.compile(full_regex)
-                except re.error:
+                except re.error as e:
                     pywikibot.output("Couldn't create a regex")
                     pywikibot.exception(e)
                     return False

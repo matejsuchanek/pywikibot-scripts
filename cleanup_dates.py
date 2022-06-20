@@ -5,6 +5,7 @@ from operator import attrgetter
 import pywikibot
 
 from pywikibot import Claim
+from pywikibot.exceptions import APIError
 from pywikibot.pagegenerators import (
     GeneratorFactory,
     PreloadingEntityGenerator,
@@ -112,7 +113,7 @@ class DuplicateDatesBot(WikidataEntityBot):
                                 try:
                                     claim1.addSources([
                                         c.copy() for c in chain(*source.values())])
-                                except pywikibot.data.api.APIError:
+                                except APIError:
                                     pass  # duplicate reference present
                     elif self.is_sourced(claim1):
                         cl = claim2

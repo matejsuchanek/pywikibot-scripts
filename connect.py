@@ -4,7 +4,7 @@ import datetime
 import pywikibot
 
 from pywikibot import pagegenerators, textlib
-from pywikibot.exceptions import NoPageError
+from pywikibot.exceptions import APIError, NoPageError
 from pywikibot.tools import first_lower
 
 pywikibot.handle_args()
@@ -290,7 +290,7 @@ for project in tp_map.keys():
                     item.setSitelink(
                         page, summary='Adding sitelink %s' % page.title(
                             asLink=True, insite=item.site))
-                except pywikibot.data.api.APIError:
+                except APIError:
                     pass
                 else:
                     page.purge()
