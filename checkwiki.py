@@ -300,9 +300,7 @@ def main(*args):
     genFactory = pagegenerators.GeneratorFactory(site=site)
     numbers = []
     gens = []
-    for arg in local_args:
-        if genFactory.handle_arg(arg):
-            continue
+    for arg in genFactory.handle_args(local_args):
         if arg.startswith('-checkwiki:'):
             ids, priorities = checkwiki.parse_option(arg.partition(':')[2])
             gen = CheckWikiErrorGenerator(

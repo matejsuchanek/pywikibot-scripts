@@ -63,7 +63,7 @@ class QuickStatementsBot(WikidataEntityBot):
         self._current = new
 
     @staticmethod
-    def valid_text_literal(text, allow_empty=False):
+    def valid_text_literal(text, *, allow_empty=False):
         bound = 3 - allow_empty
         if text.startswith('"') and text.endswith('"') and len(text) >= bound:
             return text[1:-1]

@@ -1,7 +1,7 @@
 import requests
 import time
 
-from operator import attrgetter, methodcaller
+from operator import attrgetter
 
 import pywikibot
 
@@ -141,7 +141,7 @@ class Merger:
 
     @classmethod
     def _sort_by_id(cls, item1, item2):
-        id1, id2 = map(methodcaller('getID', numeric=True), [item1, item2])
+        id1, id2 = item1.getID(numeric=True), item2.getID(numeric=True)
         return (id1 < id2) - (id1 > id2)
 
     @classmethod

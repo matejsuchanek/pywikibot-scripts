@@ -1,6 +1,5 @@
 #!/usr/bin/python
 from itertools import chain, combinations
-from operator import attrgetter
 
 import pywikibot
 
@@ -110,9 +109,10 @@ class DuplicateDatesBot(WikidataEntityBot):
                         cl = claim2
                         for source in cl.sources:
                             if self.is_valid_source(source):
+                                sources_copy = [
+                                    c.copy() for c in chain(*source.values())]
                                 try:
-                                    claim1.addSources([
-                                        c.copy() for c in chain(*source.values())])
+                                    claim1.addSources(sources_copy)
                                 except APIError:
                                     pass  # duplicate reference present
                     elif self.is_sourced(claim1):
@@ -143,9 +143,7 @@ def main(*args):
     local_args = pywikibot.handle_args(args)
     site = pywikibot.Site()
     genFactory = GeneratorFactory(site=site)
-    for arg in local_args:
-        if genFactory.handle_arg(arg):
-            continue
+    for arg in genFactory.handle_args(local_args):
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if arg == '-prop':

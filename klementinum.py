@@ -28,7 +28,9 @@ def main():
         url = url_pattern.format(i)
         response = requests.get(url)
         code = parser.parse(response.text)
-        month = OrderedDict()
+
+        text += '\n-- ' + url
+        data[i] = month = OrderedDict()
         trs = (tr for tr in code.ifilter_tags() if tr.tag == 'tr')
         next(trs)  # skip headline
         for day, tr in enumerate(trs, start=1):
@@ -43,8 +45,7 @@ def main():
                 ('min', format_number(mn)),
                 ('min_year', get_single_year(mn_year)),
             ])
-        data[i] = month
-        text += '\n-- ' + url
+
     page = pywikibot.Page(site, 'Modul:Klementinum/data')
     text += '\n\nreturn ' + format_dictionary(
         data, quotes_always=True, use_tabs=True)

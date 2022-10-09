@@ -56,7 +56,7 @@ class BaseDescriptionBot(WikidataEntityBot):
         desc = re.sub(r'^\([^)]+\) +', '', desc)
         while ' ' * 2 in desc:
             desc = desc.replace(' ' * 2, ' ')
-        if re.search('[^IVX]\.$', desc) or desc.endswith(tuple(',:')):
+        if re.search(r'[^IVX]\.$', desc) or desc.endswith(tuple(',:')):
             desc = desc[:-1].rstrip()
         if desc.startswith(('a ', 'an ')):
             desc = desc.partition(' ')[2]

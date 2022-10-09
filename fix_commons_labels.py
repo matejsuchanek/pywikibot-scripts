@@ -2,6 +2,7 @@
 import pywikibot
 
 from pywikibot import pagegenerators
+from pywikibot.backports import removeprefix
 
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
@@ -35,7 +36,7 @@ class LabelsFixingBot(WikidataEntityBot):
             return
         if item.getSitelink('commonswiki').startswith('Category:'):
             if item.labels['en'].startswith('Category:'):
-                data = {'en': item.labels['en'][len('Category:'):]}
+                data = {'en': removeprefix(item.labels['en'], 'Category:')}
                 self.user_edit_entity(item, {'labels': data},
                                       summary=self.summary)
 
@@ -45,9 +46,7 @@ def main(*args):
     local_args = pywikibot.handle_args(args)
     site = pywikibot.Site()
     genFactory = pagegenerators.GeneratorFactory(site=site)
-    for arg in local_args:
-        if genFactory.handle_arg(arg):
-            continue
+    for arg in genFactory.handle_args(local_args):
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':

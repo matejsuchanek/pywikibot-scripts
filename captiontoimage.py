@@ -80,11 +80,9 @@ class CaptionToImageBot(WikidataEntityBot):
         for caption in item.claims[self.caption_property]:
             if self.caption_property in media_claim.qualifiers:
                 language = caption.getTarget().language
-                has_same_lang = False
-                for claim in media_claim.qualifiers[self.caption_property]:
-                    if claim.getTarget().language == language:
-                        has_same_lang = True
-                        break
+                has_same_lang = any(
+                    claim.getTarget().language == language
+                    for claim in media_claim.qualifiers[self.caption_property])
                 if has_same_lang:
                     pywikibot.output('Property %s already has a caption '
                                      'in language %s' % (our_prop, language))
@@ -108,9 +106,7 @@ def main(*args):
     local_args = pywikibot.handle_args(args)
     site = pywikibot.Site()
     genFactory = pagegenerators.GeneratorFactory(site=site)
-    for arg in local_args:
-        if genFactory.handle_arg(arg):
-            continue
+    for arg in genFactory.handle_args(local_args):
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':

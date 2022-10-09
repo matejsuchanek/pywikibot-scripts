@@ -79,9 +79,7 @@ def main(*args):
     local_args = pywikibot.handle_args(args)
     site = pywikibot.Site()
     genFactory = pagegenerators.GeneratorFactory(site=site)
-    for arg in local_args:
-        if genFactory.handle_arg(arg):
-            continue
+    for arg in genFactory.handle_args(local_args):
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':

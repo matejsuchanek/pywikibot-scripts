@@ -19,7 +19,7 @@ def get_sources(page):
     return [wiki, url]
 
 
-def tidy(value):
+def tidy(value) -> str:
     return removeDisabledParts(str(value), site=site).strip()
 
 
@@ -31,8 +31,7 @@ image_repo = site.image_repository()
 
 genFactory = pagegenerators.GeneratorFactory(site=site)
 genFactory.handle_arg('-ns:0')
-for arg in args:
-    genFactory.handle_arg(arg)
+genFactory.handle_args(args)
 generator = genFactory.getCombinedGenerator(preload=True)
 if not generator:
     genFactory.handle_arg('-ref:Template:Památky v Česku')

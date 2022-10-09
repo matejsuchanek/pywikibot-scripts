@@ -498,7 +498,7 @@ class Bold(CCHandledError, TagReplacement):
     tag = 'b'
 
     def replacement(self, match):
-        return match.expand("'''\g<content>'''")
+        return match.expand(r"'''\g<content>'''")
 
 
 class Unicode(CheckWikiError): # todo
@@ -562,7 +562,7 @@ class Italics(CCHandledError, TagReplacement):
     tag = 'i'
 
     def replacement(self, match):
-        return match.expand("''\g<content>''")
+        return match.expand(r"''\g<content>''")
 
 
 class StrikedText(TagReplacement):
@@ -572,7 +572,7 @@ class StrikedText(TagReplacement):
     tag = 'strike'
 
     def replacement(self, match):
-        return match.expand('<s>\g<content></s>')
+        return match.expand(r'<s>\g<content></s>')
 
 
 class BoldHeader(HeaderError):

@@ -15,8 +15,7 @@ repo = site.data_repository()
 
 genFactory = pagegenerators.GeneratorFactory(site=site)
 genFactory.handle_arg('-ns:0')
-for arg in args:
-    genFactory.handle_arg(arg)
+genFactory.handle_args(args)
 generator = genFactory.getCombinedGenerator(preload=True)
 if not generator:
     genFactory.handle_arg('-cat:Seznamy památných stromů v Česku podle okresů')

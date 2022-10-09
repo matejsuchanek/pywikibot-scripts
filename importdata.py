@@ -1,6 +1,4 @@
 #!/usr/bin/python
-import re
-
 from datetime import datetime
 
 import pywikibot

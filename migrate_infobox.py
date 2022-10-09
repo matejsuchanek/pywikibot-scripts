@@ -438,13 +438,11 @@ class InfoboxMigratingBot(WikitextFixingBot):
         pywikibot.output('Current offset: %s' % self.offset)
 
 # TODO: prepare for extending
-def main(*args): # bot_class=InfoboxMigratingBot
+def main(*args):  # bot_class=InfoboxMigratingBot
     options = {}
     local_args = pywikibot.handle_args(args)
     genFactory = pagegenerators.GeneratorFactory()
-    for arg in local_args:
-        if genFactory.handle_arg(arg):
-            continue
+    for arg in genFactory.handle_args(local_args):
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':
@@ -466,7 +464,7 @@ def main(*args): # bot_class=InfoboxMigratingBot
         genFactory.handle_arg('-transcludes:%s' % options['template'])
         generator = genFactory.getCombinedGenerator()
 
-    bot = InfoboxMigratingBot(generator=generator, **options) # bot_class
+    bot = InfoboxMigratingBot(generator=generator, **options)  # bot_class
     bot.run()
 
 

@@ -1,8 +1,6 @@
 #!/usr/bin/python
-import re
-
 from itertools import chain
-from operator import attrgetter, methodcaller
+from operator import methodcaller
 
 import pywikibot
 

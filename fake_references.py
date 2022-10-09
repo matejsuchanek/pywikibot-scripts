@@ -4,6 +4,7 @@ from contextlib import suppress
 import pywikibot
 
 from pywikibot import pagegenerators
+from pywikibot.backports import removeprefix
 
 from .query_store import QueryStore
 from .wikidata import WikidataEntityBot
@@ -146,12 +147,11 @@ class FakeReferencesBot(WikidataEntityBot):
                 continue
             target = None
             with suppress(pywikibot.InvalidTitle, ValueError):
-                if url.startswith(self.url_start):
-                    target = pywikibot.ItemPage(
-                        self.repo, url[len(self.url_start):])
-                elif url.startswith(self.repo.concept_base_uri):
-                    target = pywikibot.ItemPage(
-                        self.repo, url[len(self.repo.concept_base_uri):])
+                for prefix in [self.url_start, self.repo.concept_base_uri]:
+                    target_id = removeprefix(url, prefix)
+                    if target_id != url:
+                        target = pywikibot.ItemPage(self.repo, target_id)
+                        break
             if target:
                 if target.isRedirectPage():
                     target = target.getRedirectTarget()
@@ -170,9 +170,7 @@ def main(*args):
     local_args = pywikibot.handle_args(args)
     site = pywikibot.Site()
     genFactory = pagegenerators.GeneratorFactory(site=site)
-    for arg in local_args:
-        if genFactory.handle_arg(arg):
-            continue
+    for arg in genFactory.handle_args(local_args):
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':

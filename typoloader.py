@@ -65,7 +65,7 @@ class TypoRule:
         return not self.__eq__(other)
 
     def __repr__(self):
-        return '{0!r}({1!r}, {2!r}, {3!r}, {4!r})'.format(
+        return '{!r}({!r}, {!r}, {!r}, {!r})'.format(
             self.__class__.name, self.find, self.replacements,
             self.auto, self.query)
 
