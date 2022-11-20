@@ -5,13 +5,23 @@ import mwparserfromhell
 import pywikibot
 
 from pywikibot import pagegenerators
+from pywikibot.textlib import FILE_LINK_REGEX
 from pywikibot.tools import first_upper
+
+
+def get_sources(page):
+    wiki = pywikibot.Claim(repo, 'P143', is_reference=True)
+    wiki.setTarget(pywikibot.ItemPage(repo, 'Q191168'))
+    url = pywikibot.Claim(repo, 'P4656', is_reference=True)
+    url.setTarget('https:' + page.permalink())
+    return [wiki, url]
+
 
 args = pywikibot.handle_args()
 
 site = pywikibot.Site('cs', 'wikipedia')
 repo = site.data_repository()
-#image_repo = site.image_repository()
+image_repo = site.image_repository()
 
 genFactory = pagegenerators.GeneratorFactory(site=site)
 genFactory.handle_arg('-ns:0')
@@ -21,12 +31,15 @@ if not generator:
     genFactory.handle_arg('-cat:Seznamy památných stromů v Česku podle okresů')
     generator = genFactory.getCombinedGenerator(preload=True)
 
+ignore_images = {'Noimage 2-1.png'}
+
 # todo: cache all in a single query
 query = '''SELECT DISTINCT ?item {
   { ?item wdt:P3296 "%s" } UNION { ?item wdt:P677 "%s" }
 } LIMIT 2'''
 
 titleR = re.compile(r'(\s*)([^[|\]<>]+?)((?: *†| *\(x\))?\s*)')
+fileR = re.compile(FILE_LINK_REGEX % '|'.join(site.namespaces[6]), re.VERBOSE)
 
 for page in generator:
     pywikibot.info(page)
@@ -94,6 +107,21 @@ for page in generator:
                                 link.title, *groups)
                         title_cell.contents.replace(nodes[0], new)
                         change = True
+
+            if index['obrázek'] is not None:
+                match = fileR.search(str(cells[index['obrázek']]))
+                if match:
+                    image = pywikibot.FilePage(image_repo, match['filename'])
+                    if (
+                        image.exists() and not image.isRedirectPage()
+                        and image.title(with_ns=False) not in ignore_images
+                        and not item.claims.get('P18')
+                    ):
+                        # todo: check unique
+                        claim = pywikibot.Claim(repo, 'P18')
+                        claim.setTarget(image)
+                        claim.addSources(get_sources(page))
+                        item.addClaim(claim, asynchronous=True)
 
     if change:
         page.text = str(code)
