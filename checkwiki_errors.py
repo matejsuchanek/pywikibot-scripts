@@ -31,14 +31,14 @@ class CheckWikiError:
         return textlib.replaceExcept(text, self.pattern(), self.replacement,
                                      self.exceptions, site=page.site)
 
-    def isForFixes(self): # todo: per subclass
+    def isForFixes(self):  # todo: per subclass
         return hasattr(self, 'pattern') and hasattr(self, 'replacement')
 
     def toTuple(self):
         assert self.isForFixes()
         return (self.pattern().pattern, self.replacement)
 
-    def needsDecision(self): # todo: per subclass, user_interactor
+    def needsDecision(self):  # todo: per subclass, user_interactor
         return False
 
     def handledByCC(self):
@@ -65,6 +65,7 @@ class TagReplacement(CheckWikiError):
     tag = None  # extend
 
     def pattern(self):
+        # fixme
         return re.compile(r'(?s)<(?P<tag>%s)>(?P<content>.*?)</(?P=tag)>')
 
 
@@ -78,7 +79,7 @@ class EntityReplacement(CheckWikiError):
         return re.compile('&(?P<entity>%s);' % '|'.join(self.entities_map.keys()))
 
     def replacement(self, match):
-        entity = match.group('entity')
+        entity = match['entity']
         return self.entities_map[entity]
 
 
@@ -99,9 +100,11 @@ class PrefixedTemplate(CheckWikiError):
 
     def pattern(self):
         namespaces = self.site.namespaces[10]
-        return re.compile(r'\{\{ *(%s) *: *' % (
-            '|'.join(['[%s%s]%s' % (ns[0].upper(), ns[0].lower(), ns[1:]) for ns in namespaces])
-            ))
+        patterns = []
+        for ns in namespaces:
+            patterns.append(textlib.case_escape(namespaces.case, ns))
+        pattern = '|'.join(patterns)
+        return re.compile(r'\{\{ *(%s) *: *' % pattern)
 
     def replacement(self, match):
         return '{{'
@@ -129,14 +132,14 @@ class BrokenHTMLTag(CheckWikiError):
             '(?(quote)(?P=quote)|)')
 
         def replaceTag(match):
-            tag = match.group('tag')
+            tag = match['tag']
             if match.group('params') is not None:
                 params = []
                 for p in param_regex.finditer(match.group('params')):
                     params.append(p.group('param', 'content'))
                 if len(params) == 1:
                     if params[0][0] == 'id':
-                        return '{{Kotva|%s}}' % params[0][1] #fixme: l10n
+                        return '{{Kotva|%s}}' % params[0][1]  # fixme: l10n
                     if params[0][0] in ('clear', 'style'):
                         for s in ('right', 'left'):
                             if s in params[0][1]:
@@ -145,13 +148,13 @@ class BrokenHTMLTag(CheckWikiError):
 
             else:
                 tags_before = list(
-                    re.finditer('<%s(?: (?P<params>[^>]+))?(?<!/)>' % tag,
+                    re.finditer(f'<{tag}(?: (?P<params>[^>]+))?(?<!/)>',
                                 match.string[:match.start()])
                     )
                 if tags_before:
                     last = tags_before[-1]
-                    if '</%s>' % tag not in match.string[last.end():match.start()]:
-                        return '</%s>' % tag
+                    if f'</{tag}>' not in match.string[last.end():match.start()]:
+                        return f'</{tag}>'
                     else:
                         pass # previous and so on
                 else:
@@ -185,8 +188,8 @@ class LowHeadersLevel(HeaderError):
         if min_level > 2:
             text = regex.sub(
                 lambda match: '{eq} {content} {eq}'.format(
-                    eq=match.group('start')[min_level-2:],
-                    content=match.group('content').strip()),
+                    eq=match['start'][min_level-2:],
+                    content=match['content'].strip()),
                 text)
 
         return text
@@ -209,7 +212,7 @@ class MissingEquation(CheckWikiError):
         if end.count('=') != len(end):
             end = end.replace(' ', '')
             if start == end:
-                return '%s %s %s' % (start, content.strip(), end)
+                return f'{start} {content.strip()} {end}'
 
         return match.group()
 
@@ -233,7 +236,7 @@ class NoEndSquareBrackets(CheckWikiError): # fixme
 
     def replacement(self, match):
         inside, after = match.group('inside', 'after')
-        if any(inside.lstrip().lower().startswith('%s:' % x)
+        if any(inside.lstrip().lower().startswith(f'{x}:')
                for x in list(self.site.namespaces[6])):
             return match.group()
 
@@ -260,7 +263,7 @@ class NoEndSquareBrackets(CheckWikiError): # fixme
 
             if after == '[[':
                 if match.string[match.end():].find(']]') > match.string[match.end():].find('[['):
-                    return '[[%s]]' % inside
+                    return f'[[{inside}]]'
 
             if '|' in inside:
                 link = inside[:inside.index('|')]
@@ -269,13 +272,13 @@ class NoEndSquareBrackets(CheckWikiError): # fixme
                 split_link = link.split()
                 split_text = text.split()
                 for i, word in enumerate(split_link):
-                    if word.lower().startswith(split_link[-1].lower()): # todo: better comparison
+                    if word.lower().startswith(split_link[-1].lower()):  # todo: better comparison
                         text = ' '.join(split_text[:i+1])
                         text_after = ' '.join(split_text[i+1:])
                         return '[[%s|%s]] %s%s%s' % (
                             link, text, text_after, space_after, after or '')
 
-                return match.group() # todo: same words in link and text
+                return match.group()  # todo: same words in link and text
 
             if not after and inside.endswith(']'):
                 return match.group() + ']'
@@ -335,19 +338,20 @@ class HTMLEntity(EntityReplacement):
         'yen': '¥', 'yuml': 'ÿ', 'Yuml': 'Ÿ', 'zeta': 'ζ', 'Zeta': 'Ζ',
         #'quot': '"',
     }
+    known = {'amp', 'dagger', 'Dagger', 'gt', 'lt', 'mdash', 'ndash', 'nbsp',
+             'quot'}
     number = 11
 
     def pattern(self):
         return re.compile('&(?P<entity>[A-Za-z0-9]+);')
 
     def replacement(self, match):
-        entity = match.group('entity')
+        entity = match['entity']
         if entity in self.entities_map:
             return self.entities_map[entity]
 
-        if entity not in ['amp', 'dagger', 'Dagger', 'gt', 'lt', 'mdash',
-                          'ndash', 'nbsp', 'quot']:
-            pywikibot.output('Unrecognized HTML entity "%s"' % match.group())
+        if entity not in self.known:
+            pywikibot.info(f'Unrecognized HTML entity "{match.group()}"')
 
         return match.group()
 
@@ -386,7 +390,7 @@ class SingleEquationHeader(HeaderError):
         return re.compile(r'(?m)^=([^\n=]+)= *$')
 
     def replacement(self, match):
-        return '== %s ==' % match.group(1).strip()
+        return f'== {match[1].strip()} =='
 
 
 class Dagger(EntityReplacement):
@@ -409,7 +413,7 @@ class EnglishCategory(CCHandledError):
     def replacement(self, match):
         ns = list(self.site.namespaces[14])
         ns.remove('Category')
-        return '[[%s:' % ns[0]
+        return f'[[{ns[0]}:'
 
 
 class CategoryWithSpace(CheckWikiError):
@@ -437,9 +441,9 @@ class CategoryWithSpace(CheckWikiError):
         if (prefix != new_prefix or content != new_content
             or (has_key and key != new_key)):
             if has_key:
-                return '[[%s:%s|%s]]' % (new_prefix, new_content, new_key)
+                return f'[[{new_prefix}:{new_content}|{new_key}]]'
             else:
-                return '[[%s:%s]]' % (new_prefix, new_content)
+                return f'[[{new_prefix}:{new_content}]]'
 
         return match.group()
 
@@ -454,8 +458,8 @@ class HeaderHierarchy(HeaderError):
         regex = self.pattern()
         levels = []
         for match in regex.finditer(text):
-            level = len(match.group('start'))
-            if level != len(match.group('end')):
+            level = len(match['start'])
+            if level != len(match['end']):
                 return text
             levels.append(level)
 
@@ -480,12 +484,12 @@ class HeaderHierarchy(HeaderError):
             if match is None:
                 break
 
-            level = len(match.group('start'))
+            level = len(match['start'])
             pos = match.end()
             if level != levels[i]:
                 eq = '=' * levels[i]
-                text = text[:match.start()] + '{eq} {content} {eq}'.format(
-                    eq=eq, content=match.group('content').strip()) + text[pos:]
+                content = match['content'].strip()
+                text = text[:match.start()] + f'{eq} {content} {eq}' + text[pos:]
             i += 1
 
         return text
@@ -545,12 +549,13 @@ class MagicWords(CheckWikiError):
         return re.compile(r'(?:\{\{([^}|]+)\}\}|\{\{\{[^}]+\}\}\})')
 
     def replacement(self, match):
-        if match.group().startswith('{{{'):
-            return match.group().strip('{}').partition('|')[2]
+        text = match.group()
+        if text.startswith('{{{'):
+            return text.strip('{}').partition('|')[2]
         else:
-            template, sep, value = match.group().strip('{}').partition(':')
+            template, sep, value = text.strip('{}').partition(':')
             if template.strip() in self.magic_templates:
-                return '{{subst:%s}}' % match.group(1)
+                return '{{subst:%s}}' % match[1]
 
         return match.group()
 
@@ -584,9 +589,8 @@ class BoldHeader(HeaderError):
     def replacement(self, match, *args):
         content = match.group('content')
         if "'''" in content:
-            content = content.replace("'''", '')
-            return ' '.join([
-                match.group('start'), content.strip(), match.group('end')])
+            content = content.replace("'''", '').strip()
+            return f"{match['start']} {content} {match['end']}"
         else:
             return match.group()
 
@@ -609,9 +613,9 @@ class SelfLink(CheckWikiError):
                 return before + split[-1] + after
 
             index = match.string.replace('&nbsp;', ' ').find(
-                "'''%s'''" % title)
+                f"'''{title}'''")
             if index < 0 or match.end() < index:
-                return "'''%s'''" % split[-1]
+                return f"'''{split[-1]}'''"
             else:
                 return split[-1]
 
@@ -662,7 +666,7 @@ class ListWithBreak(CheckWikiError):
     summary = 'odstranění zb. zalomení'
 
     def pattern(self):
-        return re.compile(r'(?m)^[%s]+.*$' % self.list_chars)
+        return re.compile(f'(?m)^[{self.list_chars}]+.*$')
 
     def replacement(self, match):
         line = match.group()
@@ -681,9 +685,9 @@ class HeaderWithColon(HeaderError):
         content = match.group('content').strip()
         if content.endswith(':'):
             return ' '.join([
-                match.group('start'),
+                match['start'],
                 content[:-1].strip(),
-                match.group('end'),
+                match['end'],
             ])
         else:
             return match.group()
@@ -701,7 +705,7 @@ class ParameterWithBreak(CheckWikiError):
 
         for template, fielddict in textlib.extract_templates_and_params(
                 match.group(), remove_disabled_parts=False, strip=False):
-            if template.strip() == match.group('name'):
+            if template.strip() == match['name']:
                 changed = False
                 name_part = match.group().split('|', 1)[0]
                 space_before = re.match(r'\{\{(\s*)', name_part).group(1)
@@ -714,7 +718,7 @@ class ParameterWithBreak(CheckWikiError):
                     if param.isdigit():
                         return match.group()
                     else:
-                        new_template += '|%s=%s' % (param, new_value)
+                        new_template += f'|{param}={new_value}'
 
                 if changed:
                     return new_template + '}}'
@@ -744,7 +748,7 @@ class RefBeforePunctuation(CheckWikiError):
         if match.group().startswith(';') and match.string[match.start()-1] == '\n':
             return match.group()
 
-        regex = re.compile('[%s ]+$' % self.punct)
+        regex = re.compile(f'[{self.punct} ]+$')
         positions = []
         all_punct = []
         for ref in re.finditer('<ref', match.group()):
@@ -808,12 +812,12 @@ class SmallInsideTags(CheckWikiError):
         new_content = re.sub('</?small>', '', content)
         if new_content != content:
             content = new_content.strip()
-        return '<{tag}{params}>{content}</{tag}>'.format(
-            tag=match.group('tag'), content=content,
-            params=match.group('params') or '')
+        tag = match['tag']
+        params = match.group('params') or ''
+        return f'<{tag}{params}>{content}</{tag}>'
 
 
-class BadListStructure(CheckWikiError): # todo
+class BadListStructure(CheckWikiError):  # todo
 
     list_chars = ':*#'
     number = 75
@@ -1041,12 +1045,11 @@ class DuplicateReferences(CheckWikiError):
                 param = param_match.group('param')
                 quote = param_match.group('quote') or '"'
                 param_content = param_match.group('content').strip()
-                ref += ' {param}={quote}{content}{quote}'.format(
-                    param=param, quote=quote, content=param_content)
+                ref += f' {param}={quote}{param_content}{quote}'
             if content is not None:
-                return ref + '>%s</ref>' % content.strip()
+                return f'{ref}>{content.strip()}</ref>'
             else:
-                return ref + ' />'
+                return f'{ref} />'
 
         new_text = ref_regex.sub(replaceRef, text)
         if new_text != text:
@@ -1066,7 +1069,7 @@ class EmptyTag(CheckWikiError):
         return re.compile(r'<(%s)>(\s*)</\1>' % '|'.join(self.tags))
 
     def replacement(self, match):
-        return match.expand(r'\2')
+        return match[2]
 
 
 class ExternalLinkLikeInternal(CCHandledError):
@@ -1170,8 +1173,8 @@ class ReferenceQuotes(CheckWikiError):
                 quote = ends
 
             return '{param}={quote}{content}{quote}'.format(
-                content=p.group('content').strip(),
-                quote=quote, param=p.group('param'))
+                content=p['content'].strip(),
+                quote=quote, param=p['param'])
 
         params = re.sub('(?P<param>[a-z]+) *= *(?P<starts>[\'"])?'
                         '(?(starts)(?P=starts)*)'

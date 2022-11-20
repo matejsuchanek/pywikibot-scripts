@@ -60,14 +60,14 @@ class WikidataRedirectsFixingBot(WikidataEntityBot):
         target = item.getRedirectTarget()
         while target.isRedirectPage():
             target = target.getRedirectTarget()
-        pywikibot.output('{} --> {}'.format(item, target))
+        pywikibot.info(f'{item} --> {target}')
         backlinks = item.backlinks(follow_redirects=False,
                                    filter_redirects=None,
                                    namespaces=[0, 120])
         summary = self.summary.format(
             item.title(with_ns=True), target.title(with_ns=True))
         if self.opt.editgroups:
-            summary += ' ({})'.format(self.new_editgroups_summary())
+            summary += f' ({self.new_editgroups_summary()})'
         if target != item.getRedirectTarget():
             item.set_redirect_target(target, summary=summary)
         for entity in PreloadingEntityGenerator(backlinks):

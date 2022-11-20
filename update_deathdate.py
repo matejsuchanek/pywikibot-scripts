@@ -54,21 +54,21 @@ class DeathDateUpdatingBot(SingleSiteBot, ExistingPageBot):
         matches = [match for match in map(self.categoryR.fullmatch, titles)
                    if match]
         if not matches:
-            pywikibot.output('No birthdate category found')
+            pywikibot.info('No birthdate category found')
             return
         fullmatch = matches.pop()
         if matches:
-            pywikibot.output('Multiple birthdate categories found')
+            pywikibot.info('Multiple birthdate categories found')
             return
-        birth_date = fullmatch.group(1)
-        search_query = 'linksto:"%s"' % page.title()  # todo: sanitize?
+        birth_date = fullmatch[1]
+        search_query = f'linksto:"{page.title()}"'  # todo: sanitize?
         search_query += r' insource:/\[\[[^\[\]]+\]\]'
-        search_query += r' +\(\* *\[*%s\]*\)/' % birth_date
+        search_query += fr' +\(\* *\[*{birth_date}\]*\)/'
         search_query += ' -intitle:"Seznam"'
         pattern = r'\[\[((?:%s)(?:\|[^\[\]]+)?)\]\]' % '|'.join(
             re.escape(p.title()) for p in chain([page], page.backlinks(
                 follow_redirects=False, filter_redirects=True, namespaces=[0])))
-        pattern += r' +\(\* *(\[\[)?(%s)(\]\])?\)' % birth_date
+        pattern += fr' +\(\* *(\[\[)?({birth_date})(\]\])?\)'
         regex = re.compile(pattern)
         for ref_page in PreloadingGenerator(
                 page.site.search(search_query, namespaces=[0])):

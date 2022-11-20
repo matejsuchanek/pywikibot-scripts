@@ -53,13 +53,13 @@ class WikidataEntityBot(WikidataBot):
 
     def filterProperty(self, prop_page):
         raise NotImplementedError(
-            '%s.filterProperty needs overriding in a subclass' % self.__class__
-        )
+            f'{self.__class__.__name__}.filterProperty needs '
+            'overriding in a subclass')
 
     def new_editgroups_summary(self):
         # https://www.wikidata.org/wiki/Wikidata:Edit_groups/Adding_a_tool
-        return '[[:toollabs:editgroups/b/CB/{:x}|details]]'.format(
-            random.randrange(0, 2**48))
+        n = random.randrange(0, 2**48)
+        return f'[[:toollabs:editgroups/b/CB/{n:x}|details]]'
 
     def user_edit_entity(self, item, data=None, *, cleanup=None, **kwargs):
         # todo: support stub items

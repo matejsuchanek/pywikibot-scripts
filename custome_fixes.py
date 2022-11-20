@@ -199,7 +199,7 @@ class AdataFix(Fix):
         if len(self.props & set(claims.keys())) < self.minprops:
             return
 
-        new_text = re.sub(r'(\{\{[Pp]ortály\|)', r'%s\n\1' % adata, text,
+        new_text = re.sub(r'(\{\{[Pp]ortály\|)', fr'{adata}\n\1', text,
                           count=1)  # fixme: l10n
         if new_text == text:
             new_text = re.sub(
@@ -215,7 +215,7 @@ class AdataFix(Fix):
             summaries.append('doplnění autoritních dat')
             page.text = new_text
         else:
-            pywikibot.output('Failed to add authority control')
+            pywikibot.info('Failed to add authority control')
 
 
 class CategoriesFix(LazyFix):
@@ -292,7 +292,7 @@ class CategoriesFix(LazyFix):
         if not matches:
             return text
 
-        defaultsort = matches.pop().group(1).strip()
+        defaultsort = matches.pop()[1].strip()
         categories = textlib.getCategoryLinks(text, site=self.site)
         changed = False
         for category in categories:
@@ -540,7 +540,7 @@ class RedirectFix(LazyFix):
 
     def get_redirects(self):
         redirects = []  # todo: set?
-        pywikibot.output('Loading redirects')
+        pywikibot.info('Loading redirects')
         page = pywikibot.Page(self.site, self.page_title)
         text = page.text.partition('{{SHORTTOC}}\n')[2]
         for line in text.splitlines():
@@ -555,7 +555,7 @@ class RedirectFix(LazyFix):
     def load(self):
         self.cache = {}
         self.redirects = self.get_redirects()
-        pywikibot.output('%d redirects loaded' % len(self.redirects))
+        pywikibot.info(f'{len(self.redirects)} redirects loaded')
 
     def from_cache(self, link):
         link = link.replace('_', ' ').strip()  # todo: normalize completely
@@ -565,11 +565,11 @@ class RedirectFix(LazyFix):
         if link not in self.cache:
             page = pywikibot.Page(self.site, link)
             if not page.exists():
-                pywikibot.warning('%s does not exist' % page.title())
+                pywikibot.warning(f'{page.title()} does not exist')
                 self.redirects.remove(link)  # fixme: both cases
                 return False
             if not page.isRedirectPage():
-                pywikibot.warning('%s is not a redirect' % page.title())
+                pywikibot.warning(f'{page.title()} is not a redirect')
                 self.redirects.remove(link)  # fixme: both cases
                 return False
 
@@ -588,49 +588,45 @@ class RedirectFix(LazyFix):
                self.replace2)
 
     def replace1(self, match):
-        link = match.group(1)
+        link = match[1]
         target = self.from_cache(link)
         if not target:
             return match.group()
 
-        left_spaces = len(link) - len(link.lstrip())
-        right_spaces = len(link) - len(link.rstrip())
-        return '[[%s%s%s|' % (left_spaces * ' ', target, right_spaces * ' ')
+        left = (len(link) - len(link.lstrip())) * ' '
+        right = (len(link) - len(link.rstrip())) * ' '
+        return f'[[{left}{target}{right}|'
 
     def replace2(self, match):
-        link = match.group(1)
+        link = match[1]
         trail = match.group(2) or ''
         target = self.from_cache(link)
         if not target:
             return match.group()
 
-        left_spaces = len(link) - len(link.lstrip())
-        right_spaces = len(link) - len(link.rstrip())
+        left_spaces = (len(link) - len(link.lstrip())) * ' '
+        right_spaces = (len(link) - len(link.rstrip())) * ' '
         if (link.lstrip() + trail).startswith(target):
             rest = (link.lstrip() + trail)[len(target):]
-            return '[[%s%s]]%s' % (' ' * left_spaces, target, rest)
+            return f'[[{left_spaces}{target}]]{rest}'
 
         if self.onlypiped is True:  # todo: user_interactor
             return match.group()
 
         options_list = [match.group()]
         if not trail:
-            options_list.append(
-                '[[%s%s%s]]' % (left_spaces * ' ', target, right_spaces * ' ')
-            )
-        options_list.append(
-            '[[%s|%s%s]]' % (target, link, trail)
-        )
+            options_list.append(f'[[{left_spaces}{target}{right_spaces}]]')
+        options_list.append(f'[[{target}|{link}{trail}]]')
 
         options = [
-            ('%d %s' % (i, opt), str(i))
+            (f'{i} {opt}', str(i))
             for i, opt in enumerate(options_list, start=1)
         ] + [('Do not replace unpiped links', 'n')]
 
         pre = match.string[max(0, match.start() - 30):match.start()].rpartition('\n')[2]
         post = match.string[match.end():match.end() + 30].partition('\n')[0]
-        pywikibot.output(color_format('{0}{lightred}{1}{default}{2}',
-                                      pre, match.group(), post))
+        pywikibot.info(color_format('{0}{lightred}{1}{default}{2}',
+                                    pre, match.group(), post))
         choice = pywikibot.input_choice('Replace this link?', options,
                                         default='1', automatic_quit=False)
         if choice == 'n':
@@ -804,11 +800,10 @@ class SectionsFix(LazyFix):
 
         for sect in sections:
             old_title = sect['nodes'][0].title
-            left_spaces = len(old_title) - len(old_title.lstrip())
-            right_spaces = len(old_title) - len(old_title.rstrip())
-            sect['nodes'][0].title = '%s%s%s' % (left_spaces * ' ',
-                                                 sect['name'],
-                                                 right_spaces * ' ')
+            left_spaces = (len(old_title) - len(old_title.lstrip())) * ' '
+            right_spaces = (len(old_title) - len(old_title.rstrip())) * ' '
+            sect['nodes'][0].title = f"{left_spaces}{sect['name']}{right_spaces}"
+
         return do_more
 
     def sortkey(self, sect):
@@ -816,7 +811,7 @@ class SectionsFix(LazyFix):
             return -1
         if sect['name'] in self.headers_in_order:
             return self.headers_in_order.index(sect['name'])
-        pywikibot.warning('Found unknown header: "%s"' % sect['name'])
+        pywikibot.warning(f"Found unknown header: \"{sect['name']}\"")
         return len(self.headers_in_order)
 
     def check_levels(self, sections, code):
@@ -824,7 +819,7 @@ class SectionsFix(LazyFix):
         mixed_levels = {2, 3} <= {sect['nodes'][0].level for sect in sections}
         if mixed_levels:
             if self.root_header not in map(itemgetter('name'), sections):
-                new_header = '== %s ==\n' % self.root_header
+                new_header = f'== {self.root_header} ==\n'
                 sections.insert(0, {
                     'name': self.root_header,
                     'nodes': self.parser.parse(new_header).nodes
@@ -931,7 +926,7 @@ class TemplateFix(LazyFix):
         )
 
     def replace(self, match):
-        template_name = match.group('template').replace('_', ' ').strip()
+        template_name = match['template'].replace('_', ' ').strip()
         if template_name.startswith(tuple(self.defaultsort)):
             return match.group()
 
@@ -959,7 +954,7 @@ class TemplateFix(LazyFix):
                    if part.isalpha()):
                 target = first_lower(target)
 
-        return match.group('before') + target + match.group('after')
+        return match['before'] + target + match['after']
 
 
 class TypoFix(LazyFix):
@@ -1022,7 +1017,7 @@ class TypoFix(LazyFix):
                     else:
                         summary += ' a jednoho dalšího'
             else:
-                summary = 'oprava překlepu: %s' % replaced[0]
+                summary = f'oprava překlepu: {replaced[0]}'
 
             summaries.append(summary)
 

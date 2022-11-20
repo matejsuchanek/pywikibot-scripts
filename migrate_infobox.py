@@ -137,7 +137,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
 
             unnamed = {}
             for name, value in chain(fielddict.items(), IterUnnamed(unnamed)):
-                end += len('|%s=%s' % (name, value))
+                end += len(f'|{name}={value}')
 
                 name = name.strip()
                 value = (value
@@ -164,7 +164,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
                             (name, value)
                         )
                 except AssertionError:
-                    pywikibot.error('Couldn\'t handle parameter "%s"' % name)
+                    pywikibot.error(f"Couldn't handle parameter '{name}'")
                     return text, 0
                 except UnnamedParamException:
                     unnamed[value] = ''
@@ -202,7 +202,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
             return text, 0
 
         if not changed:
-            pywikibot.output('No parameters changed')
+            pywikibot.info('No parameters changed')
             return text, 0
 
         while end < len(text) and text[end].isspace():  # todo: also before
@@ -227,17 +227,17 @@ class InfoboxMigratingBot(WikitextFixingBot):
         if len(new_params) > 0:
             new_template += '\n'
             for param, value in new_params:
-                new_template += '%s| %s = %s\n' % (space_before, param, value)
+                new_template += f'{space_before}| {param} = {value}\n'
 
         if len(old_params) > 0:
             new_template += '<!-- Zastaralé parametry -->\n'
             for param, value in old_params:
-                new_template += '%s| %s = %s\n' % (space_before, param, value)
+                new_template += f'{space_before}| {param} = {value}\n'
 
         if len(unknown_params) > 0:
             new_template += '<!-- Neznámé parametry -->\n'
             for param, value in unknown_params:
-                new_template += '%s| %s = %s\n' % (space_before, param, value)
+                new_template += f'{space_before}| {param} = {value}\n'
 
         new_template += '}}\n'
 
@@ -423,7 +423,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
         keys = [i for i, j in params]
         duplicates = {key for key in keys if keys.count(key) > 1}
         if duplicates:
-            pywikibot.warning('Duplicate arguments %s' % duplicates)
+            pywikibot.warning(f'Duplicate arguments {duplicates}')
             for dupe in duplicates:
                 values = [y for x, y in params if x == dupe]
                 #print(dupe)
@@ -435,7 +435,7 @@ class InfoboxMigratingBot(WikitextFixingBot):
 
     def exit(self):
         super().exit()
-        pywikibot.output('Current offset: %s' % self.offset)
+        pywikibot.info(f'Current offset: {self.offset}')
 
 # TODO: prepare for extending
 def main(*args):  # bot_class=InfoboxMigratingBot
@@ -461,7 +461,7 @@ def main(*args):  # bot_class=InfoboxMigratingBot
 
     generator = genFactory.getCombinedGenerator()
     if not generator:
-        genFactory.handle_arg('-transcludes:%s' % options['template'])
+        genFactory.handle_arg(f"-transcludes:{options['template']}")
         generator = genFactory.getCombinedGenerator()
 
     bot = InfoboxMigratingBot(generator=generator, **options)  # bot_class

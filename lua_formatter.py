@@ -19,7 +19,7 @@ def _indent(level, **kwargs):
 def _wrap_quotes(text, quote):
     if quote in text:
         text = text.replace(quote, '\\' + quote)
-    return '{0}{1}{0}'.format(quote, text)
+    return f'{quote}{text}{quote}'
 
 
 def _format_string(text, **kwargs):
@@ -39,7 +39,8 @@ def _format_key(key, **kwargs):
     if key is None:
         return '[nil]'
     elif isinstance(key, (int, float)):
-        return '[%s]' % str(key).lower()  # lower for booleans (which are ints)
+        key = str(key)
+        return f'[{key.lower()}]'  # lower for booleans (which are ints)
     else:
         assert isinstance(key, str)
         if not key.isalnum() or kwargs.get('quotes_always') is True:

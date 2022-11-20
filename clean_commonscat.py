@@ -32,13 +32,22 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
     def setup(self):
         super().setup()
         self.cacheSources()
+        # todo: l10n etc.
+        templates = itertools.chain(
+            map(re.escape, self.site.getmagicwords('defaultsort')),
+            ('[Pp]ahýl', '[Pp]osloupnost', '[Aa]utoritní data', '[Pp]ortály'))
+        templates = '|'.join(templates)
+        ns = '|'.join(self.site.namespaces[14])
+        self.empty_sectionR = re.compile(
+            r'\s*\n==+ *Externí odkazy *==+ *\n\s*'
+            fr'(?:^==|^\{\{(?:{templates})|^\[\[(?:{ns}):)', flags=re.M)
 
     def treat_page(self):  # todo: treat_page_and_item
         page = self.current_page
         item = page.data_item()
         if 'P373' in item.claims:
             self.addCallback(page.touch)
-            pywikibot.output('Already has a category on Commons')
+            pywikibot.info('Already has a category on Commons')
             return
 
         cat_name = None
@@ -61,7 +70,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
         exists = commons_cat.exists()
         if not exists and not commons_cat.isEmptyCategory():
             if self.opt['createnew'] is not True:
-                pywikibot.warning('%s is not empty' % commons_cat.title())
+                pywikibot.warning(f'{commons_cat.title()} is not empty')
                 return
 
             exists = self.doWithCallback(
@@ -70,8 +79,8 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
 
         if not exists:
             if self.opt['noclean'] is True:
-                pywikibot.output("Category doesn't exist on Commons, "
-                                 'cleanup restricted')
+                pywikibot.info(
+                    "Category doesn't exist on Commons, cleanup restricted")
                 return
             regex = r'(?:\n?|^)(?:\* *)?\{\{ *[Cc]ommons(?:cat|[_ ]?category)'
             if has_param:
@@ -80,18 +89,8 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
             page_replaced_text = re.sub(
                 regex, '', page.text, flags=re.M, count=1)
             if page_replaced_text != page.text:
-                # todo: l10n etc.
-                templates = itertools.chain(
-                    map(re.escape, page.site.getmagicwords('defaultsort')),
-                    ('[Pp]ahýl', '[Pp]osloupnost', '[Aa]utoritní data', '[Pp]ortály'))
-                empty_sectionR = (
-                    r'\s*\n==+ *Externí odkazy *==+ *\n\s*'
-                    r'(^==|^\{\{(?:%s)|\[\[(?:%s):)' % (
-                        '|'.join(templates),
-                        '|'.join(page.site.namespaces[14])))
-                page_replaced_text = re.sub(
-                    empty_sectionR, r'\n\n\1',
-                    page_replaced_text, flags=re.M, count=1)
+                page_replaced_text = self.empty_sectionR.sub(
+                    r'\n\n\1', page_replaced_text, count=1)
 
             # fixme
             self.doWithCallback(
@@ -99,11 +98,11 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
                 summary=i18n.translate(page.site, save_summary))
         else:
             if self.opt['noimport'] is True:
-                pywikibot.output('Category exists on Commons, import restricted')
+                pywikibot.info('Category exists on Commons, import restricted')
                 return
             claim = pywikibot.Claim(self.repo, 'P373')
             claim.setTarget(cat_name)
-            pywikibot.output('Category missing on Wikidata')
+            pywikibot.info('Category missing on Wikidata')
             self.user_add_claim(item, claim, page.site, asynchronous=True)
             self.addCallback(page.touch)
 
@@ -130,7 +129,7 @@ def main(*args):
             return
 
         if not category:
-            pywikibot.output("%s doesn't have an appropriate category" % site)
+            pywikibot.info(f"{site} doesn't have an appropriate category")
             return
 
         generator = itertools.chain(

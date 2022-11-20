@@ -27,18 +27,18 @@ class BaseDescriptionBot(WikidataEntityBot):
         self.REF_REGEX = re.compile(r'<ref.*?(>.*?</ref|/)>')
 
     def get_regex_for_title(self, escaped_title):
-        pattern = r'^\*+ *\[\[(%s)(?:\|[^][]+)?\]\]' % escaped_title
+        pattern = fr'^\*+ *\[\[({escaped_title})(?:\|[^][]+)?\]\]'
         pattern += r' *(?:\([^)]+\))?'
         pattern += '(?:,| [-–]) *(.*)$'
         return re.compile(pattern, re.M)
 
     @staticmethod
-    def handle_link(m):
-        text = m.group(2)
+    def handle_link(match):
+        text = match[2]
         if text:
             return text.lstrip('|').strip()
         else:
-            return m.group('title').strip()
+            return match['title'].strip()
 
     def validate_description(self, desc):
         return (bool(desc) and len(desc.split()) >= self.opt['min_words'])
@@ -63,8 +63,8 @@ class BaseDescriptionBot(WikidataEntityBot):
         return desc
 
     def get_summary(self, page, desc):
-        return 'importing [{}] description "{}" from {}'.format(
-            page.site.lang, desc, page.title(as_link=True, insite=self.repo))
+        link = page.title(as_link=True, insite=self.repo)
+        return f'importing [{page.site.lang}] description "{desc}" from {link}'
 
 
 class MissingDescriptionBot(BaseDescriptionBot):
@@ -91,8 +91,8 @@ class MissingDescriptionBot(BaseDescriptionBot):
         if self.site.lang in item.descriptions:
             return
         title = item.getSitelink(self.site)
-        search_query = r'linksto:"%s" insource:/\* *%s/' % (
-            title, re.escape('[[' + title))
+        link_start = re.escape('[[' + title)
+        search_query = fr'linksto:"{title}" insource:/\* *{link_start}/'
         regex = self.get_regex_for_title(re.escape(title))
         for ref_page in PreloadingGenerator(
                 SearchPageGenerator(search_query, namespaces=[0])):
@@ -102,7 +102,7 @@ class MissingDescriptionBot(BaseDescriptionBot):
                 continue
             if not self.opt['allpages'] and not ref_page.isDisambig():
                 continue
-            desc = self.parse_description(match.group(2))
+            desc = self.parse_description(match[2])
             if not self.validate_description(desc):
                 continue
             summary = self.get_summary(ref_page, desc)
@@ -146,9 +146,7 @@ def main(*args):
     local_args = pywikibot.handle_args(args)
     site = pywikibot.Site()
     genFactory = GeneratorFactory(site=site)
-    for arg in local_args:
-        if genFactory.handle_arg(arg):
-            continue
+    for arg in genFactory.handle_args(local_args):
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':

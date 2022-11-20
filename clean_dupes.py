@@ -116,16 +116,16 @@ class DupesMergingBot(WikidataEntityBot):
                             targets.add(target)
 
         if not targets:
-            pywikibot.output('No target found')
+            pywikibot.info('No target found')
             return
 
         target = targets.pop()
         if targets:
-            pywikibot.output('Multiple targets found')
+            pywikibot.info('Multiple targets found')
             return
 
         while target.isRedirectPage():
-            pywikibot.warning('Target %s is redirect' % target.getID())
+            pywikibot.warning(f'Target {target.getID()} is redirect')
             target = target.getRedirectTarget()
 
         if item == target:
@@ -154,8 +154,8 @@ class DupesMergingBot(WikidataEntityBot):
                         self.redirectsTo(target_page, page)):
                     continue
 
-            pywikibot.output('Target has a conflicting sitelink: %s'
-                             % site.dbName())
+            pywikibot.info(
+                f'Target has a conflicting sitelink: {site.dbName()}')
             return
 
         target_claims = []
@@ -197,7 +197,7 @@ class DupesMergingBot(WikidataEntityBot):
         if not self._save_page(
                 item, self._save_entity, Merger.clean_merge, item, target,
                 ignore_conflicts=['description']):
-            pywikibot.output('Reverting changes...')
+            pywikibot.info('Reverting changes...')
             bot = BaseRevertBot(self.site)  # todo: integrate to Merger
             comment = 'Error occurred when attempting to merge with %s'
             bot.comment = comment % target.title(as_link=True)
@@ -227,8 +227,8 @@ class DupesMergingBot(WikidataEntityBot):
 
     def exit(self):
         super().exit()
-        pywikibot.output('\nCurrent offset: %i (use %i)\n' % (
-            self.offset, self.offset - self.offset % 50))
+        bound = self.offset - self.offset % 50
+        pywikibot.info(f'\nCurrent offset: {self.offset} (use {bound})\n')
 
 
 def main(*args):

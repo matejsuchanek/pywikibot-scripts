@@ -92,7 +92,7 @@ class TypoRule:
 
         if not replacements:
             raise IncompleteTypoRuleException(
-                'No replacements found for rule "{}"'.format(find.pattern))
+                f'No replacements found for rule "{find.pattern}"')
 
         query = None
         if parameters.get('hledat'):
@@ -102,7 +102,7 @@ class TypoRule:
             else:
                 try:
                     re.compile(part)
-                    query = 'insource:/{}/'.format(part)
+                    query = f'insource:/{part}/'
                 except re.error as exc:
                     raise InvalidExpressionException(exc, 'query')
 
@@ -125,14 +125,12 @@ class TypoRule:
             for i, repl in enumerate(self.replacements, start=1):
                 replacement = match.expand(repl)
                 replacements.append(replacement)
-                options.append(
-                    ('%s %s' % (i, underscores(replacement)), str(i))
-                )
+                options.append((f'{i} {underscores(replacement)}', str(i)))
             text = match.string
             pre = text[max(0, match.start() - 30):match.start()].rpartition('\n')[2]
             post = text[match.end():match.end() + 30].partition('\n')[0]
-            pywikibot.output(color_format('{0}{lightred}{1}{default}{2}',
-                                          pre, old, post))
+            pywikibot.info(color_format('{0}{lightred}{1}{default}{2}',
+                                        pre, old, post))
             choice = pywikibot.input_choice('Choose the best replacement',
                                             options, automatic_quit=False,
                                             default='k')
@@ -141,11 +139,12 @@ class TypoRule:
         else:
             new = match.expand(self.replacements[0])
             if old == new:
-                pywikibot.warning('No replacement done in string "%s"' % old)
+                pywikibot.warning(f'No replacement done in string "{old}"')
 
         if old != new:
-            fragment = ' → '.join(underscores(re.sub('\n', r'\\n', i))
-                                  for i in (old, new))
+            old_str = underscores(old.replace('\n', '\\n'))
+            new_str = underscores(new.replace('\n', '\\n'))
+            fragment = f'{old_str} → {new_str}'
             if fragment.lower() not in map(str.lower, replaced):
                 replaced.append(fragment)
         return new
@@ -161,8 +160,7 @@ class TypoRule:
         delta = finish - start
         self.longest = max(delta, self.longest)
         if delta > 5:
-            pywikibot.warning('Slow typo rule "{}" ({})'.format(
-                self.find.pattern, delta))
+            pywikibot.warning(f'Slow typo rule "{self.find.pattern}" ({delta})')
         return text
 
 
@@ -186,7 +184,7 @@ class TyposLoader:
         return pywikibot.Page(self.site, self.whitelist_page_name)
 
     def loadTypos(self):
-        pywikibot.output('Loading typo rules')
+        pywikibot.info('Loading typo rules')
         self.typoRules = []
 
         if self.typos_page_name is None:
@@ -217,7 +215,7 @@ class TyposLoader:
                     if load_all or not rule.needs_decision():
                         self.typoRules.append(rule)
 
-        pywikibot.output('{} typo rules loaded'.format(len(self.typoRules)))
+        pywikibot.info(f'{len(self.typoRules)} typo rules loaded')
         return self.typoRules
 
     def loadWhitelist(self):
@@ -225,5 +223,5 @@ class TyposLoader:
         self.fp_page = self.getWhitelistPage()
         if self.fp_page.exists():
             for match in re.finditer(r'\[\[([^]|]+)\]\]', self.fp_page.text):
-                self.whitelist.append(match.group(1).strip())
+                self.whitelist.append(match[1].strip())
         return self.whitelist

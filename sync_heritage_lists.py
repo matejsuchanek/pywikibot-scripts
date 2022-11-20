@@ -39,7 +39,7 @@ if not generator:
 
 ignore_images = {'Noimage 2-1.png'}
 
-pywikibot.output('Loading all identifiers...')
+pywikibot.info('Loading all identifiers...')
 
 query = 'SELECT * WHERE { ?item wdt:P762 ?id }'
 obj = SparqlQuery(repo=repo)
@@ -54,7 +54,7 @@ for entry in result:
 del result
 
 for page in generator:
-    pywikibot.output(page)
+    pywikibot.info(page)
     code = mwparserfromhell.parse(page.text)
     change = False
     for template in code.ifilter_templates(

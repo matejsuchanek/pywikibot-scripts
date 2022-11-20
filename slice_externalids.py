@@ -39,7 +39,7 @@ class ExternalIdSlicingBot(WikidataEntityBot):
         }
         offset = self.opt['offset']
         while True:
-            pywikibot.output('\nLoading items (offset %i)...' % offset)
+            pywikibot.info(f'\nLoading items (offset {offset})...')
             opts['offset'] = offset
             ask = self.store.build_query('ask_externalid_props', **opts)
             if not self.sparql.ask(ask):
@@ -61,23 +61,23 @@ class ExternalIdSlicingBot(WikidataEntityBot):
                     continue
                 formatter, regex = self.get_formatter_and_regex(prop)
                 if not formatter:
-                    pywikibot.output("%s doesn't have a formatter" % prop)
+                    pywikibot.info(f"{prop} doesn't have a formatter")
                     break
                 value = self.find_value(cl.target, formatter)
                 if not value:
-                    pywikibot.output('Value not found in "%s" for property %s'
-                                     % (cl.target, prop))
+                    pywikibot.info(
+                        f'Value not found in "{cl.target}" for property {prop}')
                     self.failed.setdefault(prop, set()).add(item)
                     continue
                 if regex:
                     try:
-                        match = re.match('(%s)' % regex, value)
+                        match = re.match(f'({regex})', value)
                     except re.error:
-                        pywikibot.output('Couldn\'t apply regex "%s"' % regex)
+                        pywikibot.info(f'Couldn\'t apply regex "{regex}"')
                         break
                     if not match:
-                        pywikibot.output('Value "%s" not matched by regex '
-                                         '"%s"' % (value, regex))
+                        pywikibot.info(
+                            f'Value "{value}" not matched by regex "{regex}"')
                         self.failed.setdefault(prop, set()).add(item)
                         continue
                     value = match.group()
@@ -138,15 +138,16 @@ class ExternalIdSlicingBot(WikidataEntityBot):
         else:
             return value[len(split[0]):index].rstrip('/')
 
-    def exit(self):
+    def exit(self):  # fixme: teardown
         if self.failed:
             text = ''
             for prop in sorted(self.failed):
-                text += '* [[Property:%s]]:\n' % prop
+                text += f'* [[Property:{prop}]]:\n'
                 for item in sorted(self.failed[prop]):
-                    text += '** [[%s]]\n' % item.title()
+                    text += f'** [[{item.title()}]]\n'
+            username = self.repo.username()
             page = pywikibot.Page(
-                self.repo, 'User:%s/Wrong external ids' % self.repo.username())
+                self.repo, f'User:{username}/Wrong external ids')
             page.put(text, summary='update')
         super().exit()
 

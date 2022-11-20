@@ -39,7 +39,7 @@ class Merger:
         kwargs.pop('asynchronous', None)  # fixme
         if safe and not cls.can_merge(item_from, item_to, quick=quick):
             raise OtherPageSaveError(
-                item_from, 'Cannot merge %s with %s' % (item_from, item_to))
+                item_from, f'Cannot merge {item_from} with {item_to}')
 
         cls.merge(item_from, item_to, **kwargs)
         if not item_from.isRedirectPage():

@@ -82,8 +82,8 @@ class QuickStatementsBot(WikidataEntityBot):
             return True
 
         def invalid_report():
-            pywikibot.warning('Invalid value "{}" for {} datatype'
-                              .format(value, snak.type))
+            pywikibot.warning(
+                f'Invalid value "{value}" for {snak.type} datatype')
 
         if snak.type in self.entity_types:
             target = self.parse_entity(value)
@@ -160,8 +160,7 @@ class QuickStatementsBot(WikidataEntityBot):
             else:
                 invalid_report()
         else:
-            pywikibot.warning('"{}" datatype is not supported yet'
-                              .format(snak.type))
+            pywikibot.warning(f'"{snak.type}" datatype is not supported yet')
 
         return False
 
@@ -177,7 +176,7 @@ class QuickStatementsBot(WikidataEntityBot):
     def handle_line(self, line):
         comment_match = self.commentR.search(line)
         if comment_match:
-            summary = comment_match.group(1)
+            summary = comment_match[1]
             line = line[:comment_match.start()]
         else:
             summary = None
@@ -185,7 +184,7 @@ class QuickStatementsBot(WikidataEntityBot):
         split = line.split('\t')
         first = split[0]
         if first != 'CREATE' and (len(split) < 3 or len(split) % 2 == 0):
-            pywikibot.warning('Invalid line: {}'.format(line))
+            pywikibot.warning(f'Invalid line: {line}')
             return
 
         if first == 'MERGE':
@@ -220,8 +219,7 @@ class QuickStatementsBot(WikidataEntityBot):
         if pred.startswith(tuple(self.attr_mapping)) and not minus:
             literal = self.valid_text_literal(split[2], allow_empty=True)
             if literal is None:
-                pywikibot.warning('Invalid literal for {}-command'
-                                  .format(pred))
+                pywikibot.warning(f'Invalid literal for {pred}-command')
                 return
             init, *lang = pred  # split init. char and lang. code
             key = self.attr_mapping[init]['key']
@@ -242,7 +240,7 @@ class QuickStatementsBot(WikidataEntityBot):
             return
 
         if not isinstance(obj, pywikibot.PropertyPage):
-            pywikibot.warning('{} is not a valid property id'.format(pred))
+            pywikibot.warning(f'{pred} is not a valid property id')
             return
 
         claim = obj.newClaim()
@@ -288,7 +286,7 @@ class QuickStatementsBot(WikidataEntityBot):
                 return
 
             if not isinstance(obj, pywikibot.PropertyPage):
-                pywikibot.warning('{} is not a valid property id'.format(prop))
+                pywikibot.warning(f'{prop} is not a valid property id')
                 return
 
             snak = obj.newClaim(**{key: True})

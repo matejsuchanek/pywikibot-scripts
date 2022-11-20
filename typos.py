@@ -66,49 +66,47 @@ class TypoBot(WikitextFixingBot):
 
             # todo: if not allrules:...
             self.offset = i
-            pywikibot.output('\nQuery: "%s"' % rule.query)
+            pywikibot.info(f'\nQuery: "{rule.query}"')
             old_max = rule.longest
             rule.longest = 0.0
             self.current_rule = rule
             self.skip_rule = False
-            self.processed = 0.0
-            self.replaced = 0.0
+            self.processed = self.replaced = 0
             for page in self.site.search(rule.query, namespaces=[0]):
                 if self.skip_rule:
                     break
                 yield page
                 if not self.is_rule_accurate:
-                    pywikibot.output(
-                        'Skipped inefficient query "%s" (%d/%d)' % (
-                            rule.query,
-                            int(self.replaced), int(self.processed)))
+                    pywikibot.info(
+                        f'Skipped inefficient query "{rule.query}" '
+                        f'({self.replaced}/{self.processed}')
                     break
             else:
                 if self.processed < 1:
-                    pywikibot.output('No results from query %s' % rule.query)
+                    pywikibot.info(f'No results from query "{rule.query}"')
                 else:
-                    pywikibot.output('%.f accuracy of query %s' % (
-                        (self.replaced / self.processed) * 100, rule.query))
+                    percent = (self.replaced / self.processed) * 100
+                    pywikibot.info(
+                        f'{percent:.f}% accuracy of query "{rule.query}"')
 
             if self.processed > 0:
-                pywikibot.output('Longest match: %fs' % rule.longest)
+                pywikibot.info(f'Longest match: {rule.longest}s')
             rule.longest = max(old_max, rule.longest)
 
     def save_false_positive(self, page):
         link = page.title(as_link=True)
-        self.fp_page.text += '\n* %s' % link
+        self.fp_page.text += f'\n* {link}'
         self.fp_page.save(summary=link, asynchronous=True)
         self.whitelist.append(page.title())
 
     def skip_page(self, page):
         if page.title() in self.whitelist:
-            pywikibot.warning('Skipped {} because it is whitelisted'
-                              .format(page))
+            pywikibot.warning(f'Skipped {page} because it is whitelisted')
             return True
 
         if self.own_generator and self.current_rule.find.search(page.title()):
-            pywikibot.warning('Skipped {} because the rule matches the title'
-                              .format(page))
+            pywikibot.warning(
+                f'Skipped {page} because the rule matches the title')
             return True
 
         return super().skip_page(page)
@@ -129,8 +127,8 @@ class TypoBot(WikitextFixingBot):
             text = self.current_rule.apply(page.text, done_replacements)
             if page.text == text:
                 if quickly:
-                    pywikibot.output('Typo not found, not fixing another '
-                                     'typos in quick mode')
+                    pywikibot.info('Typo not found, not fixing another '
+                                   'typos in quick mode')
                     return
             else:
                 self.replaced += 1
@@ -193,12 +191,11 @@ class TypoBot(WikitextFixingBot):
         rules = sorted(
             (rule for rule in self.typoRules if not rule.needs_decision()),
             key=lambda rule: rule.longest, reverse=True)[:3]
-        pywikibot.output('\nSlowest autonomous rules:')
+        pywikibot.info('\nSlowest autonomous rules:')
         for i, rule in enumerate(rules, start=1):
-            pywikibot.output(
-                '%d. "%s" - %f' % (i, rule.find.pattern, rule.longest))
+            pywikibot.info(f'{i}. "{rule.find.pattern}" - {rule.longest}')
         if self.own_generator:
-            pywikibot.output('\nCurrent offset: %d\n' % self.offset)
+            pywikibot.info(f'\nCurrent offset: {self.offset}\n')
         super().teardown()
 
 
@@ -207,9 +204,7 @@ def main(*args):
     local_args = pywikibot.handle_args(args)
     genFactory = pagegenerators.GeneratorFactory()
     genFactory.handle_arg('-ns:0')
-    for arg in local_args:
-        if genFactory.handle_arg(arg):
-            continue
+    for arg in genFactory.handle_args(local_args):
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':

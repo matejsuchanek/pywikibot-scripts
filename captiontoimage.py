@@ -59,13 +59,13 @@ class CaptionToImageBot(WikidataEntityBot):
                     if our_prop is None:
                         our_prop = prop
                     else:
-                        pywikibot.output('More than one media property used')
+                        pywikibot.info('More than one media property used')
                         return
 
         remove_claims = []
         remove_all = self.opt['removeall'] is True
         if our_prop is None:
-            pywikibot.output('No media property found')
+            pywikibot.info('No media property found')
             if remove_all:
                 remove_claims.extend(item.claims[self.caption_property])
                 self._save_page(item, self._save_entity, item.removeClaims,
@@ -74,7 +74,7 @@ class CaptionToImageBot(WikidataEntityBot):
 
         media_claim = item.claims[our_prop][0]
         if len(item.claims[our_prop]) > 1:
-            pywikibot.output('Property %s has more than one value' % our_prop)
+            pywikibot.info(f'Property {our_prop} has more than one value')
             return
 
         for caption in item.claims[self.caption_property]:
@@ -84,8 +84,8 @@ class CaptionToImageBot(WikidataEntityBot):
                     claim.getTarget().language == language
                     for claim in media_claim.qualifiers[self.caption_property])
                 if has_same_lang:
-                    pywikibot.output('Property %s already has a caption '
-                                     'in language %s' % (our_prop, language))
+                    pywikibot.info(f'Property {our_prop} already has '
+                                   f'a caption in language {language}')
                     if remove_all:
                         remove_claims.append(caption)
                     continue

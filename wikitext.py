@@ -45,7 +45,7 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
         for fix in self.fixes:
             fix.site = self.site
         if not self.generator:
-            pywikibot.output('No generator provided, making own generator...')
+            pywikibot.info('No generator provided, making own generator...')
             self.generator = pagegenerators.PreloadingGenerator(
                 chain.from_iterable(map(methodcaller('generator'), self.fixes)))
 
@@ -55,7 +55,7 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
         old_text = page.text
         callbacks = self.applyFixes(page, summaries)
         if len(summaries) < 1:
-            pywikibot.output('No replacements worth saving')
+            pywikibot.info('No replacements worth saving')
             return
         pywikibot.showDiff(old_text, page.text)
         # todo: method
@@ -72,8 +72,8 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
 
     def userPut(self, page, oldtext, newtext, **kwargs):
         if oldtext.rstrip() == newtext.rstrip():
-            pywikibot.output('No changes were needed on %s'
-                             % page.title(as_link=True))
+            pywikibot.info(
+                f'No changes were needed on {page.title(as_link=True)}')
             return
 
         self.current_page = page
@@ -84,7 +84,7 @@ class WikitextFixingBot(SingleSiteBot, ExistingPageBot):
             pywikibot.showDiff(oldtext, newtext)
 
         if 'summary' in kwargs:
-            pywikibot.output('Edit summary: %s' % kwargs['summary'])
+            pywikibot.info(f"Edit summary: {kwargs['summary']}")
 
         page.text = newtext
         return self._save_page(page, self.fix_wikitext, page, **kwargs)
@@ -104,9 +104,7 @@ def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
     genFactory = pagegenerators.GeneratorFactory()
-    for arg in local_args:
-        if genFactory.handle_arg(arg):
-            continue
+    for arg in genFactory.handle_args(local_args):
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':

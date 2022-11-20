@@ -41,7 +41,7 @@ class CheckWikiSettings:
             if inside_setting is False:
                 match = re.match(' *([a-z0-9_]+) *=', line)
                 if match is not None:
-                    setting = match.group(1)
+                    setting = match[1]
                     setting_text = ''
                     inside_setting = True
                     line = line[match.end():]
@@ -173,7 +173,7 @@ class CheckWiki:
         self.load_settings()
 
     def load_settings(self):
-        pywikibot.output('Loading CheckWiki settings...')
+        pywikibot.info('Loading CheckWiki settings...')
         self._settings = CheckWikiSettings.new_from_site(self.site)
 
     @property

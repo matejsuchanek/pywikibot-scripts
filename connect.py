@@ -214,7 +214,7 @@ for project in tp_map.keys():
         continue
 
     site = pywikibot.Site(lang, family)
-    pywikibot.output('Doing %s%s' % (lang, family))
+    pywikibot.info(f'Doing {lang}{family}')
     site.login()
 
     genFactory = pagegenerators.GeneratorFactory(site=site)
@@ -223,7 +223,7 @@ for project in tp_map.keys():
             continue
         if family == 'wikisource' and ns == 0:
             continue
-        genFactory.handle_arg('-ns:%i' % ns)
+        genFactory.handle_arg(f'-ns:{ns}')
     genFactory.handle_arg('-unconnectedpages')
     generator = genFactory.getCombinedGenerator(preload=True)
 
@@ -263,12 +263,12 @@ for project in tp_map.keys():
                     title = site.expand_text(title, page.title())
                 target_page = pywikibot.Page(target_site, title)
                 if not target_page.exists():
-                    pywikibot.output("%s doesn't exist" % target_page)
+                    pywikibot.info("{target_page} doesn't exist")
                     continue
                 while target_page.isRedirectPage():
                     target_page = target_page.getRedirectTarget()
                 if target_page.isDisambig():
-                    pywikibot.output('%s is a disambiguation' % target_page)
+                    pywikibot.info(f'{target_page} is a disambiguation')
                     continue
 
                 try:
@@ -277,12 +277,12 @@ for project in tp_map.keys():
                     repo = site.data_repository()
                     # fixme: unused return value
                     data = repo.linkTitles(page, target_page)
-                    pywikibot.output('Item created')
-                    pywikibot.output(data)  # todo
+                    pywikibot.info('Item created')
+                    pywikibot.info(data)  # todo
                     break
                 if site.dbName() in item.sitelinks:
-                    pywikibot.output(page)
-                    pywikibot.output('%s already has sitelink to %s%s' % (
+                    pywikibot.info(page)
+                    pywikibot.info('%s already has sitelink to %s%s' % (
                         item, lang, family))
                     continue
 
@@ -298,4 +298,4 @@ for project in tp_map.keys():
 
 end = datetime.datetime.now()
 
-pywikibot.output('Complete! Took %d seconds' % (end - start).total_seconds())
+pywikibot.info('Complete! Took %d seconds' % (end - start).total_seconds())

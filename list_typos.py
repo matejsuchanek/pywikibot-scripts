@@ -8,7 +8,7 @@ import pywikibot
 from pywikibot import textlib
 from pywikibot.bot import SingleSiteBot, ExistingPageBot
 from pywikibot.pagegenerators import PreloadingGenerator
-from pywikibot.tools import itergroup
+from pywikibot.tools.itertools import itergroup
 
 from .typoloader import TypoRule, TyposLoader
 
@@ -56,7 +56,7 @@ class TypoReportBot(SingleSiteBot):
             if rule.query is None:
                 continue
 
-            pywikibot.output('Query: "{}"'.format(rule.query))
+            pywikibot.info(f'Query: "{rule.query}"')
             self.current_rule = rule
             yield from PreloadingGenerator(
                 self.site.search(rule.query, namespaces=[0]))
@@ -64,13 +64,12 @@ class TypoReportBot(SingleSiteBot):
     def skip_page(self, page):
         # TODO: better terminology
         if page.title() in self.whitelist:
-            pywikibot.warning('Skipped {} because it is whitelisted'
-                              .format(page))
+            pywikibot.warning(f'Skipped {page} because it is whitelisted')
             return True
 
         if self.current_rule.find.search(page.title()):
-            pywikibot.warning('Skipped {} because the rule matches the title'
-                              .format(page))
+            pywikibot.warning(
+                f'Skipped {page} because the rule matches the title')
             return True
 
         return super().skip_page(page)
@@ -86,7 +85,7 @@ class TypoReportBot(SingleSiteBot):
         text = self.remove_disabled_parts(page.text)
         found = set()
         for match in self.current_rule.find.finditer(text):
-            match_text = match.group(0)
+            match_text = match[0]
             if match_text in found:
                 continue
             found.add(match_text)
@@ -153,7 +152,7 @@ class PurgeTypoReportBot(SingleSiteBot, ExistingPageBot):
             for string in self.cache.pop(key):
                 if string not in text:
                     continue
-                put_text = pattern.format('[[%s]]' % title, string)
+                put_text = pattern.format(f'[[{title}]]', string)
                 if put_text[2:] in self.helper.false_positives:
                     continue
                 self.put.append(put_text)

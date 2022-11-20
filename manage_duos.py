@@ -92,10 +92,10 @@ class DuosManagingBot(WikidataEntityBot):
         if super().skip_page(item):
             return True
         if 'P31' not in item.claims:
-            pywikibot.output('%s is missing P31 property' % item)
+            pywikibot.info(f'{item} is missing P31 property')
             return True
         if 'P527' in item.claims:
-            pywikibot.output('%s already has P527 property' % item)
+            pywikibot.info(f'{item} already has P527 property')
             return True
         return False
 
@@ -151,11 +151,11 @@ class DuosManagingBot(WikidataEntityBot):
         labels = self.get_labels(item, relation)
         count = max(map(len, labels))
         if count == 0:
-            pywikibot.output('No labels, skipping...')
+            pywikibot.info('No labels, skipping...')
             return
 
         if count < self.opt['min_labels']:
-            pywikibot.output('Too few labels (%i), skipping...' % count)
+            pywikibot.info(f'Too few labels ({count}), skipping...')
             return
 
         to_add = []
@@ -182,7 +182,7 @@ class DuosManagingBot(WikidataEntityBot):
             self.user_add_claim(item, claim)
 
         for claim in to_remove:
-            pywikibot.output('Removing %s --> %s' % (
+            pywikibot.info('Removing %s --> %s' % (
                 claim.id, claim.getTarget()))
             json = claim.toJSON()
             json['remove'] = ''
@@ -194,7 +194,7 @@ class DuosManagingBot(WikidataEntityBot):
             self.user_edit_entity(item, {'claims':[json]}, summary=summary)
 
     def create_item(self, item, labels, relation, to_add):
-        pywikibot.output('Creating item (relation "%s")...' % relation)
+        pywikibot.info(f'Creating item (relation "{relation}")...')
         new_item = pywikibot.ItemPage(self.repo)
         self.user_edit_entity(
             new_item,
@@ -211,7 +211,7 @@ class DuosManagingBot(WikidataEntityBot):
         self.user_add_claim(new_item, claim)
         for json in to_add:
             temp_claim = pywikibot.Claim.fromJSON(self.repo, json)
-            pywikibot.output('Adding %s --> %s' % (
+            pywikibot.info('Adding %s --> %s' % (
                 temp_claim.id, temp_claim.getTarget()))
             self.user_edit_entity(
                 new_item, {'claims':[json]},

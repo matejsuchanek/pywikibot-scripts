@@ -70,5 +70,5 @@ with open(path, 'r', encoding='utf-8') as file_data:
 
         item.editEntity(
             data, asynchronous=True,
-            summary='Adding [[Property:P1082]]: %d per data from [[Q3504917]], '
-            'see [[%s]]' % (count, ref_item))
+            summary=f'Adding [[Property:P1082]]: {count} per data from '
+                    f'[[Q3504917]], see [[{ref_item}]]')

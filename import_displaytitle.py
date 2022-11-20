@@ -37,8 +37,8 @@ class LabelSettingBot(WikidataEntityBot):
         label = item.labels.get(lang)
         if not label or self.stripped(label) == self.stripped(page_title):
             item.labels[lang] = first_lower(label) if label else title
-            summary = 'importing [%s] label from displaytitle in %s' % (
-                lang, page.title(as_link=True, insite=item.site))
+            link = page.title(as_link=True, insite=item.site)
+            summary = f'importing [{lang}] label from displaytitle in {link}'
             self.user_edit_entity(item, summary=summary)
 
 

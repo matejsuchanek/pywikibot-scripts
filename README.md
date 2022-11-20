@@ -2,8 +2,8 @@
 Own pywikibot scripts (for Wikimedia projects)
 
 ## Requirements
-Python 3.5 or newer.
-Pywikibot version [7c21ef2](https://github.com/wikimedia/pywikibot/commit/7c21ef2c8e43e2d4bc77c1600edb140b2fce4063).
+Python 3.6.1 or newer.
+Pywikibot version [4d6e674](https://github.com/wikimedia/pywikibot/commit/4d6e674bf1385961a27b3ddf9acc16bcb32373b0).
 
 ## Usage
 Checkout or download to "myscripts" directory inside "core/scripts/userscripts".

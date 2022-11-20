@@ -106,7 +106,7 @@ class TitlesMovingBot(WikitextFixingBot):
 
     def exit(self):
         super().exit()
-        pywikibot.output('Current offset: %d' % self.offset)
+        pywikibot.info(f'Current offset: {self.offset}')
 
 
 def main(*args):
@@ -127,7 +127,7 @@ def main(*args):
 
     generator = genFactory.getCombinedGenerator(preload=True)
     if not generator:
-        genFactory.handle_arg('-transcludes:%s' % options['template'])
+        genFactory.handle_arg(f"-transcludes:{options['template']}")
         generator = genFactory.getCombinedGenerator(preload=True)
 
     bot = TitlesMovingBot(generator=generator, **options)

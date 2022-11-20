@@ -42,13 +42,12 @@ class WikidataRedirectsBot(WikidataBot):
             self.options['date'] = pywikibot.input(
                 'Enter the date when the reports were created')
 
-        url = '%s/%s/%s/' % (self.labs_url, self.sub_directory,
-                             self.opt['date'])
+        url = f"{self.labs_url}/{self.sub_directory}/{self.opt['date']}/"
         response = urlopen(url)
         regex = re.compile('href="([^"]+)"')
         not_yet = bool(self.opt['start'])
         for match in regex.finditer(response.read().decode()):
-            file_name = match.group(1)
+            file_name = match[1]
             dbname = file_name.partition('-')[0]
             if not_yet:
                 if dbname == self.opt['start']:
@@ -65,7 +64,7 @@ class WikidataRedirectsBot(WikidataBot):
                 pywikibot.exception(e)
                 continue
 
-            pywikibot.output("Working on '%s'" % dbname)
+            pywikibot.info(f"Working on '{dbname}'")
             resp = urlopen(url + file_name)
             lines = resp.readlines()
             if not lines:
@@ -84,8 +83,8 @@ class WikidataRedirectsBot(WikidataBot):
 
     @property
     def summary(self):
-        return "based on [[toollabs:{}/{}/|Alphos' reports]]".format(
-            self.sub_directory, self.opt['date'])
+        return (f"based on [[toollabs:{self.sub_directory}/{self.opt['date']}/"
+                "|Alphos' reports]]")
 
     def user_confirm(self, *args):
         return True

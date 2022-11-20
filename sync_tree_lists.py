@@ -29,24 +29,26 @@ query = '''SELECT DISTINCT ?item {
 titleR = re.compile(r'(\s*)([^[|\]<>]+?)((?: *†| *\(x\))?\s*)')
 
 for page in generator:
-    pywikibot.output(page)
+    pywikibot.info(page)
     code = mwparserfromhell.parse(page.text)
     change = False
     for table in code.ifilter_tags(matches=lambda t: t.tag == 'table'):
         rows = table.contents.ifilter_tags(matches=lambda t: t.tag == 'tr')
         first = next(rows)
-        index = {key: None for key in ('název', 'obrázek', 'kód')}
+        index = dict.fromkeys(('název', 'obrázek', 'kód'), None)
         for i, cell in enumerate(first.contents.ifilter_tags(
                 matches=lambda t: t.tag == 'th')):
             for key, value in index.items():
                 if value is None and key in str(cell.contents).lower():
                     index[key] = i
                     break
+
         for key, value in index.items():
             if value is None:
-                pywikibot.output("Couldn't determine column for '%s'" % key)
+                pywikibot.info(f"Couldn't determine column for '{key}'")
         if index['kód'] is None:
             continue
+
         for row in rows:
             cells = row.contents.filter_tags(matches=lambda t: t.tag == 'td')
             code_cell = cells[index['kód']]
@@ -64,14 +66,16 @@ for page in generator:
             items = list(pagegenerators.WikidataSPARQLPageGenerator(
                 query % tuple(params[:2]), site=repo))
             if len(items) != 1:
-                pywikibot.output(
-                    "Couldn't determine the item for values {}/{} ({} items)"
-                    .format(params[0], params[1], len(items)))
+                pywikibot.info(
+                    f"Couldn't determine the item for values "
+                    f'{params[0]}/{params[1]} ({len(items)} items)')
                 continue
+
             item = items.pop()
             if params[2] != item.getID():  # 3rd param is index 2
                 template.add(3, item.getID())
                 change = True
+
             if index['název'] is not None:
                 title_cell = cells[index['název']]
                 nodes = title_cell.contents.nodes
