@@ -133,29 +133,35 @@ class DupesMergingBot(WikidataEntityBot):
             return
 
         target_sitelinks = []
-        target.get()
-        for page in item.iterlinks():
-            site = page.site
-            with self.get_lock_for(site):
-                try:
-                    target_link = target.getSitelink(site)
-                except NoPageError:
-                    continue
+        for dbname in item.sitelinks:
+            if dbname not in target.sitelinks:
+                continue
 
+            link = item.sitelinks[dbname]
+            site = link.site
+            with self.get_lock_for(site):
+                page = pywikibot.Page(link)
                 if not page.exists():
                     sitelinks.append(site)
                     continue
 
-                target_page = pywikibot.Page(site, target_link)
+                target_link = target.sitelinks[dbname]
+                target_page = pywikibot.Page(target_link)
                 if not target_page.exists():
                     target_sitelinks.append(site)
                     continue
-                if (self.redirectsTo(page, target_page) or
-                        self.redirectsTo(target_page, page)):
+
+                if self.redirectsTo(page, target_page):
+                    if link.badges:
+                        sitelinks.append(site)
                     continue
 
-            pywikibot.info(
-                f'Target has a conflicting sitelink: {site.dbName()}')
+                if self.redirectsTo(target_page, page):
+                    if target_link.badges:
+                        target_sitelinks.append(site)
+                    continue
+
+            pywikibot.info(f'Target has a conflicting sitelink: {dbname}')
             return
 
         target_claims = []
@@ -180,13 +186,13 @@ class DupesMergingBot(WikidataEntityBot):
         if sitelinks:
             self._save_page(
                 item, self._save_entity, item.removeSitelinks, sitelinks,
-                summary='removing sitelink(s) to non-existing page(s)')
+                summary='removing sitelink(s) to non-existing / redirected page(s)')
         if claims:
             self._save_page(item, self._save_entity, item.removeClaims, claims)
         if target_sitelinks:
             self._save_page(
                 target, self._save_entity, target.removeSitelinks, target_sitelinks,
-                summary='removing sitelink(s) to non-existing page(s)')
+                summary='removing sitelink(s) to non-existing / redirected page(s)')
         if target_claims:
             self._save_page(
                 target, self._save_entity, target.removeClaims, target_claims)
