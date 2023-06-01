@@ -1,4 +1,5 @@
 #!/usr/bin/python
+from contextlib import suppress
 from itertools import chain, combinations
 
 import pywikibot
@@ -90,6 +91,7 @@ class DuplicateDatesBot(WikidataEntityBot):
                 continue
             if any(claim.rank != 'normal' for claim in claims):
                 continue
+
             already = set()
             redundant = []
             unmerged = []
@@ -103,25 +105,27 @@ class DuplicateDatesBot(WikidataEntityBot):
                         skip = True
                 if skip:
                     continue
+
                 targets = lambda c1, c2: (c1.getTarget(), c2.getTarget())
                 if self.first_same_as_second(*targets(claim1, claim2)):
-                    if self.is_sourced(claim1) and self.is_sourced(claim2):
-                        cl = claim2
-                        for source in cl.sources:
-                            if self.is_valid_source(source):
-                                sources_copy = [
-                                    c.copy() for c in chain(*source.values())]
-                                try:
-                                    claim1.addSources(sources_copy)
-                                except APIError:
-                                    pass  # duplicate reference present
-                    elif self.is_sourced(claim1):
-                        cl = claim2
+                    if self.number_of_sources(claim1) > \
+                       self.number_of_sources(claim2):
+                        old, new = claim2, claim1
                     else:
-                        cl = claim1
-                    unmerged.append(cl)
-                    already.add(cl.snak)
+                        old, new = claim1, claim2
+
+                    for source in old.sources:
+                        if not self.is_valid_source(source):
+                            continue
+                        sources_copy = [
+                            c.copy() for c in chain(*source.values())]
+                        with suppress(APIError):  # duplicate reference present
+                            new.addSources(sources_copy)
+
+                    unmerged.append(old)
+                    already.add(old.snak)
                     continue
+
                 pairs = [(claim1, claim2), (claim2, claim1)]
                 for first, second in pairs:
                     if self.is_sourced(second):
@@ -130,6 +134,7 @@ class DuplicateDatesBot(WikidataEntityBot):
                         redundant.append(second)
                         already.add(second.snak)
                         break
+
             if redundant or unmerged:
                 if redundant:
                     summary = self.summary
