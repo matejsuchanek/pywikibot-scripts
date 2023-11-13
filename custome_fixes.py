@@ -20,9 +20,9 @@ from pywikibot.exceptions import NoPageError
 from pywikibot.tools import first_lower, first_upper
 from pywikibot.tools.formatter import color_format
 
-from .checkwiki_errors import CheckWikiError
-from .tools import deduplicate, FULL_ARTICLE_REGEX
-from .typoloader import TypoRule, TyposLoader
+from checkwiki_errors import CheckWikiError
+from tools import deduplicate, FULL_ARTICLE_REGEX
+from typoloader import TypoRule, TyposLoader
 
 
 class FixGenerator:

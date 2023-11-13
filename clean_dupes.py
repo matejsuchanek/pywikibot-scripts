@@ -11,9 +11,9 @@ from pywikibot.pagegenerators import (
     WikidataSPARQLPageGenerator,
 )
 
-from .merger import Merger
-from .query_store import QueryStore
-from .wikidata import WikidataEntityBot
+from merger import Merger
+from query_store import QueryStore
+from wikidata import WikidataEntityBot
 from scripts.revertbot import BaseRevertBot
 
 

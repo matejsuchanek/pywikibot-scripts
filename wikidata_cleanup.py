@@ -3,8 +3,8 @@ import pywikibot
 
 from pywikibot import pagegenerators
 
-from .wikidata import WikidataEntityBot
-from .wikidata_cleanup_toolkit import WikidataCleanupToolkit
+from wikidata import WikidataEntityBot
+from wikidata_cleanup_toolkit import WikidataCleanupToolkit
 
 
 class WikidataCleanupBot(WikidataEntityBot):

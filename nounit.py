@@ -4,8 +4,8 @@ import pywikibot
 
 from pywikibot import pagegenerators
 
-from .query_store import QueryStore
-from .wikidata import WikidataEntityBot
+from query_store import QueryStore
+from wikidata import WikidataEntityBot
 
 
 class UnitsFixingBot(WikidataEntityBot):

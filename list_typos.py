@@ -10,7 +10,7 @@ from pywikibot.bot import SingleSiteBot, ExistingPageBot
 from pywikibot.pagegenerators import PreloadingGenerator
 from pywikibot.tools.itertools import itergroup
 
-from .typoloader import TypoRule, TyposLoader
+from typoloader import TypoRule, TyposLoader
 
 
 class TypoReportBot(SingleSiteBot):

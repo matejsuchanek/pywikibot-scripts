@@ -8,7 +8,7 @@ from pywikibot import pagegenerators
 from pywikibot.textlib import removeDisabledParts
 from pywikibot.data.sparql import *
 
-from .tools import get_best_statements
+from tools import get_best_statements
 
 
 def get_sources(page):

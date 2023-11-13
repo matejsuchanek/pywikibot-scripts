@@ -6,7 +6,7 @@ import pywikibot
 from pywikibot.bot import WikidataBot
 from pywikibot.exceptions import NoPageError, IsRedirectPageError
 
-from .wikidata_cleanup_toolkit import WikidataCleanupToolkit
+from wikidata_cleanup_toolkit import WikidataCleanupToolkit
 
 
 class WikidataEntityBot(WikidataBot):

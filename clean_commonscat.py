@@ -7,9 +7,9 @@ import pywikibot
 from pywikibot import i18n, pagegenerators, textlib
 from pywikibot.exceptions import UnknownExtensionError
 
-from .deferred import DeferredCallbacksBot
-from .wikidata import WikidataEntityBot
-from .wikitext import WikitextFixingBot
+from deferred import DeferredCallbacksBot
+from wikidata import WikidataEntityBot
+from wikitext import WikitextFixingBot
 
 
 save_summary = {

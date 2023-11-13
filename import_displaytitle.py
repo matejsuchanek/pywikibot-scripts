@@ -8,7 +8,7 @@ from pywikibot.pagegenerators import (
 )
 from pywikibot.tools import first_lower
 
-from .wikidata import WikidataEntityBot
+from wikidata import WikidataEntityBot
 
 
 class LabelSettingBot(WikidataEntityBot):

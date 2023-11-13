@@ -9,7 +9,7 @@ from pywikibot.tools import first_upper
 from pywikibot.textlib import mwparserfromhell
 
 try:
-    from .wikitext import WikitextFixingBot
+    from wikitext import WikitextFixingBot
 except ImportError:
     from pywikibot.bot import SingleSiteBot, ExistingPageBot
 

@@ -6,8 +6,8 @@ import pywikibot
 from pywikibot import pagegenerators
 from pywikibot.exceptions import UnknownExtension
 
-from .checkwiki_errors import *
-from .wikitext import WikitextFixingBot
+from checkwiki_errors import *
+from wikitext import WikitextFixingBot
 
 
 class CheckWikiSettings:

@@ -7,7 +7,7 @@ from collections import OrderedDict
 import mwparserfromhell as parser
 import pywikibot
 
-from .lua_formatter import format_dictionary
+from lua_formatter import format_dictionary
 
 
 def get_single_year(year):

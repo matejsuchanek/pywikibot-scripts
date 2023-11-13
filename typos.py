@@ -4,8 +4,8 @@ import time
 import pywikibot
 from pywikibot import pagegenerators
 
-from .typoloader import TyposLoader
-from .wikitext import WikitextFixingBot
+from typoloader import TyposLoader
+from wikitext import WikitextFixingBot
 
 
 class TypoBot(WikitextFixingBot):

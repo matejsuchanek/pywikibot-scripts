@@ -4,8 +4,8 @@ import pywikibot
 from pywikibot import pagegenerators
 from pywikibot.exceptions import NoPageError
 
-from .error_reporting import ErrorReportingBot
-from .wikidata import WikidataEntityBot
+from error_reporting import ErrorReportingBot
+from wikidata import WikidataEntityBot
 
 
 class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):

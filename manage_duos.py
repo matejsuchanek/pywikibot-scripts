@@ -4,8 +4,8 @@ import pywikibot
 from pywikibot import pagegenerators
 from pywikibot.data.sparql import SparqlQuery
 
-from .query_store import QueryStore
-from .wikidata import WikidataEntityBot
+from query_store import QueryStore
+from wikidata import WikidataEntityBot
 
 
 class DuosManagingBot(WikidataEntityBot):

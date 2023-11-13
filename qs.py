@@ -14,7 +14,7 @@ from pywikibot.exceptions import (
 )
 from pywikibot.page import Property
 
-from .wikidata import WikidataEntityBot
+from wikidata import WikidataEntityBot
 
 
 class QuickStatementsBot(WikidataEntityBot):

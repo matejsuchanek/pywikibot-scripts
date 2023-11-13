@@ -12,8 +12,8 @@ from pywikibot.exceptions import APIError
 from pywikibot.textlib import mwparserfromhell
 from pywikibot.tools import first_upper
 
-from .tools import get_best_statements
-from .wikidata import WikidataEntityBot
+from tools import get_best_statements
+from wikidata import WikidataEntityBot
 
 
 def parse_float(value):  # todo: move to tools

@@ -10,9 +10,9 @@ from pywikibot import pagegenerators, textlib
 from pywikibot.tools import first_upper
 
 try:
-    from .wikitext import WikitextFixingBot
-    # TODO: from .tools import .
-    from .custome_fixes import FilesFix
+    from wikitext import WikitextFixingBot
+    # TODO: from tools import .
+    from custome_fixes import FilesFix
 except ImportError:
     from pywikibot.bot import SingleSiteBot, ExistingPageBot
 

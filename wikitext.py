@@ -7,7 +7,7 @@ import pywikibot
 from pywikibot import pagegenerators
 from pywikibot.bot import SingleSiteBot, ExistingPageBot
 
-from .custome_fixes import all_fixes
+from custome_fixes import all_fixes
 
 
 class WikitextFixingBot(SingleSiteBot, ExistingPageBot):

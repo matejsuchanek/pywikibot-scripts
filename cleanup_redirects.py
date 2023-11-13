@@ -11,7 +11,7 @@ import pywikibot
 from pywikibot.bot import WikidataBot
 from pywikibot.exceptions import NoPageError
 
-from .merger import Merger
+from merger import Merger
 
 
 class WikidataRedirectsBot(WikidataBot):

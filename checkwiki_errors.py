@@ -5,7 +5,7 @@ import pywikibot
 
 from pywikibot import textlib
 
-from .tools import deduplicate
+from tools import deduplicate
 
 
 class CheckWikiError:
