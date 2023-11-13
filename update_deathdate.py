@@ -12,13 +12,13 @@ from pywikibot.pagegenerators import PreloadingGenerator
 
 birth = {
     'wikipedia': {
-        'cs': r'Narození (\d+)',
+        'cs': r'Narození v roce (\d+)',
     },
 }
 
 death = {
     'wikipedia': {
-        'cs': 'Úmrtí %d',
+        'cs': 'Úmrtí v roce %d',
     },
 }
 

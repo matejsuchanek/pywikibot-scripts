@@ -3,6 +3,7 @@ from collections.abc import MutableMapping
 import pywikibot
 
 from pywikibot import Claim, html2unicode
+from pywikibot.backports import removesuffix
 from pywikibot.tools import first_lower
 from pywikibot.tools.chars import INVISIBLE_REGEX as invisible_regex
 
@@ -42,27 +43,31 @@ class WikidataCleanupToolkit:
         'bat-smg': 'sgs',
         'be-x-old': 'be-tarask',
         'bh': 'bho',
-        'commons': None,
         'de-formal': 'de',
         'es-formal': 'es',
         'fiu-vro': 'vro',
         'hu-formal': 'hu',
-        'incubator': None,
-        'mediawiki': None,
         'meta': 'en',
         'mul': None,
         'nl-informal': 'nl',
         'no': 'nb',
-        'old': None,
         'roa-rup': 'rup',
         'simple': 'en',
-        'sources': None,
         'species': 'en',
         'wikidata': 'en',
         'wikimania': 'en',
         'zh-classical': 'lzh',
         'zh-min-nan': 'nan',
         'zh-yue': 'yue',
+
+        # multilingual projects
+        'commons': None,
+        'functions': None,
+        'incubator': None,
+        'mediawiki': None,
+        'old': None,
+        'outreach': None,
+        'sources': None,
     }
 
     def __init__(self, fixes=[]):
@@ -296,6 +301,7 @@ class WikidataCleanupToolkit:
             'mannendubbel', 'vrouwendubbel', 'jongensdubbel', 'meisjesdubbel',
             # [[d:Topic:Wh6ieq0p9uc0jbwo]]
             'kwalificatie', 'rolstoelvrouwen', 'rolstoelvrouwendubbel',
+            'rolstoelmannen', 'rolstoelmannendubbel', 'quad', 'quaddubbel',
         }
         if part[-1].isdigit() or part in words:
             return False
@@ -311,7 +317,7 @@ class WikidataCleanupToolkit:
             description = terms['descriptions'].get(lang)
             if not description:
                 continue
-            left, sep, right = label.rstrip(')').rpartition(' (')
+            left, sep, right = removesuffix(label, ')').rpartition(' (')
             #if not sep:
             #    left, sep, right = label.partition(', ')
             if sep and not (set(left) & set('(:)')):

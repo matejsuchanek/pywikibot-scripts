@@ -22,7 +22,9 @@ class DuosManagingBot(WikidataEntityBot):
         'de': ' und ',
         'el': ' και ',
         'en': ' and ',
+        'en-ca': ' and ',
         'en-gb': ' and ',
+        'en-us': ' and ',
         'eo': ' kaj ',
         'es': ' y ',
         'et': ' ja ',
@@ -160,7 +162,11 @@ class DuosManagingBot(WikidataEntityBot):
 
         to_add = []
         to_remove = []
-        for prop in self.distribute_properties:
+        if relation == 'twin':
+            distribute = self.distribute_properties + ['P569', 'P19']
+        else:
+            distribute = self.distribute_properties
+        for prop in distribute:
             for claim in item.claims.get(prop, []):
                 if claim.getTarget():
                     to_remove.append(claim)

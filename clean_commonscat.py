@@ -40,8 +40,7 @@ class CommonscatCleaningBot(WikitextFixingBot, WikidataEntityBot, DeferredCallba
         ns = '|'.join(self.site.namespaces[14])
         self.empty_sectionR = re.compile(
             r'\s*\n==+ *Externí odkazy *==+ *\n\s*'
-            r'^(?:==|\{\{(?:{templates})|\[\[(?:{ns}):)'
-            .format(templates=templates, ns=ns),
+            r'^(?:==|\{\{(?:%s)|\[\[(?:%s):)' % (templates, ns),
             flags=re.M)
 
     def treat_page(self):  # todo: treat_page_and_item

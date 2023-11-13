@@ -64,6 +64,8 @@ for page in generator:
 
         for row in rows:
             cells = row.contents.filter_tags(matches=lambda t: t.tag == 'td')
+            if not cells:
+                continue
             code_cell = cells[index['kód']]
             templates = code_cell.contents.filter_templates(
                 matches=lambda t: t.name.matches('Pstrom'))
