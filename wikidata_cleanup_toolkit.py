@@ -1,39 +1,146 @@
-from collections.abc import MutableMapping
-
 import pywikibot
 
-from pywikibot import Claim, html2unicode
+from pywikibot import Claim, html2unicode, SiteLink
 from pywikibot.backports import removesuffix
 from pywikibot.tools import first_lower
 from pywikibot.tools.chars import INVISIBLE_REGEX as invisible_regex
 
 
-class DataWrapper(MutableMapping):
+class EntityDataWrapper:
 
-    def __init__(self, read, write):
-        self.read = read
-        self.write = write
-        self.update(write)
+    def __init__(self, entity):
+        self.entity = entity
 
-    def __getitem__(self, key):
-        return self.read[key]
+    def get_label(self, lang: str):
+        return self.entity.labels.get(lang)
 
-    def __delitem__(self, key):
-        del self.read[key]
-        del self.write[key]
+    def set_label(self, lang: str, value: str):
+        self.entity.labels[lang] = value
 
-    def __setitem__(self, key, value):
-        self.read[key] = value
-        self.write[key] = value
+    def iter_labels(self):
+        for lang, value in self.entity.labels.items():
+            if value:
+                yield lang
 
-    def __iter__(self):
-        return iter(self.read)
+    def get_description(self, lang: str):
+        return self.entity.descriptions.get(lang)
 
-    def __len__(self):
-        return len(self.read)
+    def set_description(self, lang: str, value: str):
+        self.entity.descriptions[lang] = value
 
-    def __contains__(self, key):
-        return key in self.read
+    def iter_descriptions(self):
+        for lang, value in self.entity.descriptions.items():
+            if value:
+                yield lang
+
+    def get_aliases(self, lang: str):
+        return list(self.entity.aliases.get(lang, []))
+
+    def add_alias(self, lang: str, value: str):
+        if value not in self.get_aliases(lang):
+            self.entity.aliases.setdefault(lang, []).append(value)
+            return True
+        return False
+
+    def remove_alias(self, lang: str, value: str):
+        if value in self.get_aliases(lang):
+            self.entity.aliases[lang].remove(value)
+            return True
+        return False
+
+    def set_aliases(self, lang: str, aliases):
+        self.entity.aliases[lang] = aliases
+
+    def iter_aliases(self):
+        for lang, value in self.entity.aliases.items():
+            if value:
+                yield lang
+
+    def get_sitelink(self, dbname: str):
+        return self.entity.sitelinks.get(dbname)
+
+    def iter_sitelinks(self):
+        yield from self.entity.sitelinks
+
+
+class SubmitDataWrapper(EntityDataWrapper):
+
+    def __init__(self, entity, data):
+        super().__init__(entity)
+        self.data = self.entity._normalizeData(data)
+
+    def get_label(self, lang: str):
+        if lang in self.data.get('labels', {}):
+            return self.data['labels'][lang]['value']
+        return super().get_label(lang)
+
+    def set_label(self, lang, value: str):
+        self.data.setdefault('labels', {}).update(
+            {lang: {'language': lang, 'value': value}})
+
+    def iter_labels(self):
+        seen = set()
+        for lang in self.data.get('labels', {}):
+            seen.add(lang)
+            if self.data['labels'][lang]['value']:
+                yield lang
+        for lang in super().iter_labels():
+            if lang not in seen:
+                yield lang
+
+    def get_description(self, lang: str):
+        if lang in self.data.get('descriptions', {}):
+            return self.data['descriptions'][lang]['value']
+        return super().get_description(lang)
+
+    def set_description(self, lang: str, value: str):
+        self.data.setdefault('descriptions', {}).update(
+            {lang: {'language': lang, 'value': value}})
+
+    def iter_descriptions(self):
+        seen = set()
+        for lang in self.data.get('descriptions', {}):
+            seen.add(lang)
+            if self.data['descriptions'][lang]['value']:
+                yield lang
+        for lang in super().iter_descriptions():
+            if lang not in seen:
+                yield lang
+
+    def get_aliases(self, lang: str):
+        raise NotImplementedError()  # TODO
+
+    def add_alias(self, lang: str, value: str):
+        raise NotImplementedError()  # TODO
+
+    def remove_alias(self, lang: str, value: str):
+        raise NotImplementedError()  # TODO
+
+    def set_aliases(self, lang: str, aliases):
+        raise NotImplementedError()  # TODO
+
+    def iter_aliases(self):
+        raise NotImplementedError()  # TODO
+
+    def get_sitelink(self, dbname: str):
+        if dbname in self.data.get('sitelinks', {}):
+            value = self.data['sitelinks'][dbname]
+            if value['title']:
+                return SiteLink.fromJSON(value, self.entity.repo)
+            else:
+                return None
+
+        return super().get_sitelink(dbname)
+
+    def iter_sitelinks(self):
+        seen = set()
+        for dbname in self.data.get('sitelinks', {}):
+            seen.add(dbname)
+            if self.data['sitelinks'][dbname]['title']:
+                yield dbname
+        for dbname in super().iter_sitelinks():
+            if dbname not in seen:
+                yield dbname
 
 
 class WikidataCleanupToolkit:
@@ -48,7 +155,6 @@ class WikidataCleanupToolkit:
         'fiu-vro': 'vro',
         'hu-formal': 'hu',
         'meta': 'en',
-        'mul': None,
         'nl-informal': 'nl',
         'no': 'nb',
         'roa-rup': 'rup',
@@ -62,12 +168,13 @@ class WikidataCleanupToolkit:
 
         # multilingual projects
         'commons': None,
-        'functions': None,
         'incubator': None,
         'mediawiki': None,
+        'mul': None,
         'old': None,
         'outreach': None,
         'sources': None,
+        'wikifunctions': None,
     }
 
     def __init__(self, fixes=[]):
@@ -84,46 +191,28 @@ class WikidataCleanupToolkit:
         ret = False
         if not self.fixes or fix in self.fixes:
             handler = getattr(self, fix)
-            ret = handler(*args, **kwargs)
+            try:
+                ret = handler(*args, **kwargs)
+            except NotImplementedError:
+                pass
         return ret
 
-    def _get_terms(self, item):
-        return {'labels': item.labels,
-                'descriptions': item.descriptions,
-                'aliases': item.aliases}
-
-    def get_sitelinks(self, item, data=dict()):
-        sitelinks = {}
-        for key, value in item._content.get('sitelinks', {}).items():
-            sitelinks[key] = value['title']
-        for key, value in data.items():
-            sitelinks[key] = value['title']
-        return sitelinks
-
     def cleanup_data(self, item, data):
+        wrapper = SubmitDataWrapper(item, data)
         # fixme: entity type
-        terms = {}
-        keys = ('labels', 'descriptions', 'aliases')
-        for key in keys:
-            terms[key] = DataWrapper(
-                getattr(item, key), data.setdefault(key, {}))
         ret = False
-        ret = self.exec_fix('fix_languages', terms) or ret
-        ret = self.exec_fix('deduplicate_aliases', terms) or ret
-        #ret = self.exec_fix('move_alias_to_label', terms) or ret
-        ret = self.exec_fix(
-            'add_missing_labels',
-            self.get_sitelinks(item, data.get('sitelinks', {})),
-            terms['labels']
-        ) or ret
-        ret = self.exec_fix('cleanup_labels', terms) or ret
+        ret = self.exec_fix('fix_languages', wrapper) or ret
         ret = self.exec_fix(
             'fix_HTML',
-            terms,
+            wrapper,
             item.claims,
             [], #data.setdefault('claims', [])
         ) or ret
-        ret = self.exec_fix('replace_invisible', terms) or ret
+        ret = self.exec_fix('replace_invisible', wrapper) or ret
+        #ret = self.exec_fix('move_alias_to_label', wrapper) or ret
+        ret = self.exec_fix('add_missing_labels', wrapper) or ret
+        ret = self.exec_fix('cleanup_labels', wrapper) or ret
+        ret = self.exec_fix('deduplicate_aliases', wrapper) or ret
         # fixme: buggy
 ##        ret = self.exec_fix(
 ##            'fix_quantities',
@@ -140,55 +229,49 @@ class WikidataCleanupToolkit:
 ##            item.claims,
 ##            data.setdefault('claims', [])
 ##        ) or ret
-        for key in keys + ('claims',):
-            if not data[key]:
-                data.pop(key)
         return ret
 
     def cleanup_entity(self, item):
+        wrapper = EntityDataWrapper(item)
         # fixme: entity type
-        # fixme: sync order with cleanup_data
-        terms = self._get_terms(item)
         ret = False
-        ret = self.exec_fix('fix_languages', terms) or ret
-        ret = self.exec_fix('fix_HTML', terms, item.claims, []) or ret
-        ret = self.exec_fix('replace_invisible', terms) or ret
-        ret = self.exec_fix('deduplicate_aliases', terms) or ret
-        #ret = self.exec_fix('move_alias_to_label', terms) or ret
-        ret = self.exec_fix(
-            'add_missing_labels',
-            item.sitelinks,
-            terms['labels']
-        ) or ret
-        ret = self.exec_fix('cleanup_labels', terms) or ret
-##        ret = self.exec_fix('fix_quantities', item.claims, []) or ret
+        ret = self.exec_fix('fix_languages', wrapper) or ret
+        ret = self.exec_fix('fix_HTML', wrapper, item.claims, []) or ret
+        ret = self.exec_fix('replace_invisible', wrapper) or ret
+        #ret = self.exec_fix('move_alias_to_label', wrapper) or ret
+        ret = self.exec_fix('add_missing_labels', wrapper) or ret
+        ret = self.exec_fix('cleanup_labels', wrapper) or ret
+        ret = self.exec_fix('deduplicate_aliases', wrapper) or ret
+        #ret = self.exec_fix('fix_quantities', item.claims, []) or ret
         ret = self.exec_fix('deduplicate_claims', item.claims, []) or ret
         ret = self.exec_fix('deduplicate_references', item.claims, []) or ret
         return ret
 
-    def move_alias_to_label(self, terms):  # todo: not always desired
+    def move_alias_to_label(self, wrapper):  # todo: not always desired
         ret = False
-        for lang, aliases in terms['aliases'].items():
-            if len(aliases) == 1:
-                terms['aliases'][lang] = []
-                terms['labels'][lang] = aliases.pop()
+        for lang in wrapper.iter_aliases():
+            aliases = wrapper.get_aliases(lang)
+            if len(aliases) == 1 and not wrapper.get_label(lang):
+                alias = aliases.pop()
+                wrapper.remove_alias(lang, alias)
+                wrapper.set_label(lang, alias)
                 ret = True
         return ret
 
-    def deduplicate_aliases(self, data):
+    def deduplicate_aliases(self, wrapper):
         ret = False
-        for lang, aliases in data['aliases'].items():
+        for lang in wrapper.iter_aliases():
             already = set()
-            label = data['labels'].get(lang)
+            aliases = wrapper.get_aliases(lang)
+            label = wrapper.get_label(lang)
             if label:
                 already.add(label)
-            for alias in aliases[:]:
+            for alias in aliases:
                 if alias in already:
-                    aliases.remove(alias)
+                    wrapper.remove_alias(lang, alias)
                     ret = True
                 else:
                     already.add(alias)
-            data['aliases'][lang] = aliases
         return ret
 
     @classmethod
@@ -196,63 +279,65 @@ class WikidataCleanupToolkit:
         lang = lang.replace('_', '-')
         return cls.lang_map.get(lang, lang)
 
-    def fix_languages(self, data):
+    def fix_languages(self, wrapper):
         ret = False
         for lang, norm in self.lang_map.items():
-            label = data['labels'].get(lang)
+            label = wrapper.get_label(lang)
             if not label:
                 continue
             if norm:
-                norm_label = data['labels'].get(norm)
-                if norm_label:
-                    if first_lower(norm_label) != first_lower(label):
-                        aliases = data['aliases'].get(norm, [])
-                        if first_lower(label) not in map(first_lower, aliases):
-                            aliases.append(label)
-                            data['aliases'][norm] = aliases
-                else:
-                    data['labels'][norm] = label
-            data['labels'][lang] = ''
+                norm_label = wrapper.get_label(norm)
+                if not norm_label:
+                    wrapper.set_label(norm, label)
+                elif first_lower(norm_label) != first_lower(label):
+                    aliases = wrapper.get_aliases(norm)
+                    if first_lower(label) not in map(first_lower, aliases):
+                        wrapper.add_alias(norm, label)
+            wrapper.set_label(lang, '')
             ret = True
+
         for lang, norm in self.lang_map.items():
-            description = data['descriptions'].get(lang)
+            description = wrapper.get_description(lang)
             if description:
-                if norm and norm not in data['descriptions']:
-                    data['descriptions'][norm] = description
-                data['descriptions'][lang] = ''
+                if norm and not wrapper.get_description(norm):
+                    wrapper.set_description(norm, description)
+                wrapper.set_description(lang, '')
                 ret = True
+
         for lang, norm in self.lang_map.items():
-            old_aliases = data['aliases'].get(lang)
+            old_aliases = wrapper.get_aliases(lang)
             if not old_aliases:
                 continue
             if norm:
-                new_aliases = data['aliases'].get(norm, [])
+                new_aliases = wrapper.get_aliases(norm)
                 already = set(map(first_lower, new_aliases))
-                norm_label = data['labels'].get(norm)
+                norm_label = wrapper.get_label(norm)
                 if norm_label:
                     already.add(first_lower(norm_label))
                 for alias in old_aliases:
                     if first_lower(alias) not in already:
-                        new_aliases.append(alias)
+                        wrapper.add_alias(lang, alias)
                         already.add(first_lower(alias))
-                # fixme: buggy, raises not-recognized-array
-                data['aliases'][norm] = new_aliases
-            data['aliases'][lang] = []
+            wrapper.set_aliases(lang, [])
             ret = True
+
         return ret
 
-    def get_missing_labels(self, sitelinks, dont):
+    def get_missing_labels(self, wrapper):
+        skip = set()
         labels = {}
-        for dbname in sitelinks:
+        for dbname in wrapper.iter_sitelinks():
             # [[d:Topic:Vedxkcb8ek6ss1pc]]
             if dbname.startswith('alswiki'):
                 continue
             lang = self.normalize_lang(dbname.rpartition('wik')[0])
-            if not lang or lang in dont:
+            if not lang or lang in skip:
+                continue
+            if wrapper.get_label(lang):
                 continue
 
             # try to defer this as much as possible
-            link = sitelinks[dbname]
+            link = wrapper.get_sitelink(dbname)
             title = link.canonical_title()
 
             # todo: check if this is still needed
@@ -282,14 +367,15 @@ class WikidataCleanupToolkit:
             label = labels.get(lang)
             if label and first_lower(label) != first_lower(title):
                 labels.pop(lang)  # todo: better handling
-                dont.add(lang)
+                skip.add(lang)
                 continue
             labels[lang] = title
         return labels
 
-    def add_missing_labels(self, sitelinks, data):
-        labels = self.get_missing_labels(sitelinks, set(data.keys()))
-        data.update(labels)
+    def add_missing_labels(self, wrapper):
+        labels = self.get_missing_labels(wrapper)
+        for lang, label in labels.items():
+            wrapper.set_label(lang, label)
         return bool(labels)
 
     @staticmethod
@@ -311,39 +397,81 @@ class WikidataCleanupToolkit:
                     return False
         return True
 
-    def cleanup_labels(self, terms):
+    def cleanup_labels(self, wrapper):
         ret = False
-        for lang, label in terms['labels'].items():
-            description = terms['descriptions'].get(lang)
+        # strip "(x)" if "x" is in description
+        for lang in wrapper.iter_labels():
+            label = wrapper.get_label(lang)
+            if not label.endswith(')'):
+                continue
+            description = wrapper.get_description(lang)
             if not description:
                 continue
             left, sep, right = removesuffix(label, ')').rpartition(' (')
             #if not sep:
             #    left, sep, right = label.partition(', ')
-            if sep and not (set(left) & set('(:)')):
-                if right and self.can_strip(right, description):
-                    terms['labels'][lang] = left.strip()
+            if sep and right and not (set(left) & set('(:)')):
+                if self.can_strip(right, description):
+                    wrapper.set_label(lang, left.rstrip())
                     ret = True
+
+        # "majority vote"
+        labels = {lang: wrapper.get_label(lang) for lang in wrapper.iter_labels()}
+        will_strip = {}
+        for lang, label in labels.items():
+            if not label.endswith(')'):
+                continue
+            left, sep, right = removesuffix(label, ')').rpartition(' (')
+            if sep and right and not (set(left) & set('(:)')):
+                if left not in will_strip:
+                    with_ = without = 0
+                    for txt in labels.values():
+                        with_ += txt.startswith(f'{left} (') and txt.endswith(')')
+                        without += (txt == left)
+                    will_strip[left] = without > with_
+
+                if will_strip[left] and wrapper.get_description(lang):
+                    wrapper.set_label(lang, left.rstrip())
+                    ret = True
+
         return ret
 
-    def fix_HTML(self, terms, claims, data):
+    def fix_HTML(self, wrapper, claims, data):
         ret = False
-        for key in ('labels', 'descriptions'):
-            for lang, value in terms[key].items():
-                while True:
-                    new = html2unicode(value.replace('^|^', '&'))
-                    if new == value:
-                        break
-                    terms[key][lang] = value = new
-                    ret = True
-        for lang, aliases in terms['aliases'].items():
+        for lang in wrapper.iter_labels():
+            value = wrapper.get_label(lang)
+            while True:
+                new = html2unicode(value.replace('^|^', '&'))
+                if new == value:
+                    break
+                wrapper.set_label(lang, new)
+                value = new
+                ret = True
+
+        for lang in wrapper.iter_descriptions():
+            value = wrapper.get_description(lang)
+            while True:
+                new = html2unicode(value.replace('^|^', '&'))
+                if new == value:
+                    break
+                wrapper.set_description(lang, new)
+                value = new
+                ret = True
+
+        for lang in wrapper.iter_aliases():
+            aliases = wrapper.get_aliases(lang)
+            change = False
             for i, value in enumerate(aliases):
                 while True:
                     new = html2unicode(value.replace('^|^', '&'))
                     if new == value:
                         break
                     aliases[i] = value = new
-                    ret = True
+                    change = True
+            if change:
+                ret = True
+                wrapper.set_aliases(lang, aliases)
+
         for values in claims.values():
             for claim in values:
                 if claim.type != 'monolingualtext':
@@ -361,20 +489,32 @@ class WikidataCleanupToolkit:
                     ret = True
         return ret
 
-    def replace_invisible(self, terms):
+    def replace_invisible(self, wrapper):
         ret = False
         double = ' ' * 2
-        for key in ('labels', 'descriptions'):
-            for lang, value in terms[key].items():
-                new = value
-                # fixme: really all of them?
-                #new = invisible_regex.sub('', new)
-                while double in new:
-                    new = new.replace(double, ' ')
-                if new != value:
-                    terms[key][lang] = new
-                    ret = True
-        for lang, aliases in terms['aliases'].items():
+        for lang in wrapper.iter_labels():
+            new = value = wrapper.get_label(lang)
+            # fixme: really all of them?
+            #new = invisible_regex.sub('', new)
+            while double in new:
+                new = new.replace(double, ' ')
+            if new != value:
+                wrapper.set_label(lang, new)
+                ret = True
+
+        for lang in wrapper.iter_descriptions():
+            new = value = wrapper.get_description(lang)
+            # fixme: really all of them?
+            #new = invisible_regex.sub('', new)
+            while double in new:
+                new = new.replace(double, ' ')
+            if new != value:
+                wrapper.set_description(lang, new)
+                ret = True
+
+        for lang in wrapper.iter_aliases():
+            aliases = wrapper.get_aliases(lang)
+            change = False
             for i, value in enumerate(aliases):
                 new = value
                 # fixme: really all of them?
@@ -383,7 +523,11 @@ class WikidataCleanupToolkit:
                     new = new.replace(double, ' ')
                 if new != value:
                     aliases[i] = new
-                    ret = True
+                    change = True
+            if change:
+                ret = True
+                wrapper.set_aliases(lang, aliases)
+
         return ret
 
     def fix_quantity(self, snak):
