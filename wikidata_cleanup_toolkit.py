@@ -379,8 +379,10 @@ class WikidataCleanupToolkit:
         return bool(labels)
 
     @staticmethod
-    def can_strip(part, description):
-        words = {
+    def can_strip(lang, part, description):
+        if part[-1].isdigit():
+            return False
+        if lang == 'nl' and part in {
             # [[d:Topic:Uljziilm6l85hsp3]]
             'vrouwen', 'mannen', 'jongens', 'meisjes', 'enkel', 'dubbel',
             'mannenenkel', 'vrouwenenkel', 'jongensenkel', 'meisjesenkel',
@@ -388,9 +390,14 @@ class WikidataCleanupToolkit:
             # [[d:Topic:Wh6ieq0p9uc0jbwo]]
             'kwalificatie', 'rolstoelvrouwen', 'rolstoelvrouwendubbel',
             'rolstoelmannen', 'rolstoelmannendubbel', 'quad', 'quaddubbel',
-        }
-        if part[-1].isdigit() or part in words:
+        }:
             return False
+        elif lang == 'fr' and part in {
+            # [[d:Topic:Xyxkoqqub5ob8vdr]]
+            'simple dames', 'double dames', 'simple messieurs', 'double messieurs'
+        }:
+            return False
+
         if part not in description:  # todo: word to word, not just substring
             for sub in part.split(', '):
                 if sub not in description:
@@ -411,7 +418,7 @@ class WikidataCleanupToolkit:
             #if not sep:
             #    left, sep, right = label.partition(', ')
             if sep and right and not (set(left) & set('(:)')):
-                if self.can_strip(right, description):
+                if self.can_strip(lang, right, description):
                     wrapper.set_label(lang, left.rstrip())
                     ret = True
 
