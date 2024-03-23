@@ -1,13 +1,12 @@
 #!/usr/bin/python
+import json
 import re
-import requests
 
 from collections import OrderedDict
 
 import mwparserfromhell as parser
 import pywikibot
-
-from lua_formatter import format_dictionary
+import requests
 
 
 def get_single_year(year):
@@ -20,17 +19,18 @@ def format_number(val):
 
 def main():
     pywikibot.handle_args()
-    site = pywikibot.Site()
+    site = pywikibot.Site('cs', 'wikipedia')
     url_pattern = 'https://www.chmi.cz/files/portal/docs/meteo/ok/klementinum/extrklem{:02d}_cs.html'
-    text = '-- Zdroj dat:'
+
     data = OrderedDict()
+    sources = []
     for i in range(1, 13):
         url = url_pattern.format(i)
         response = requests.get(url)
         code = parser.parse(response.text)
 
-        text += '\n-- ' + url
-        data[i] = month = OrderedDict()
+        sources.append(url)
+        data[str(i)] = month = OrderedDict()
         trs = (tr for tr in code.ifilter_tags() if tr.tag == 'tr')
         next(trs)  # skip headline
         for day, tr in enumerate(trs, start=1):
@@ -38,7 +38,7 @@ def main():
             if len(tags) != 6:
                 break
             _, avg, mx, mx_year, mn, mn_year = [tag.contents for tag in tags]
-            month[day] = OrderedDict([
+            month[str(day)] = OrderedDict([
                 ('avg', format_number(avg)),
                 ('max', format_number(mx)),
                 ('max_year', get_single_year(mx_year)),
@@ -46,9 +46,13 @@ def main():
                 ('min_year', get_single_year(mn_year)),
             ])
 
-    page = pywikibot.Page(site, 'Modul:Klementinum/data')
-    text += '\n\nreturn ' + format_dictionary(
-        data, quotes_always=True, use_tabs=True)
+    text = json.dumps({
+        '@metadata': {
+            'sources': sources,
+        },
+        'data': data,
+    })
+    page = pywikibot.Page(site, 'Šablona:Klementinum/data.json')
     page.put(text, summary='aktualizace dat pro šablonu Klementinum',
              minor=False, botflag=False, apply_cosmetic_changes=False)
 

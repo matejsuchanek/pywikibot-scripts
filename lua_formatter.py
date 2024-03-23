@@ -1,3 +1,5 @@
+"""This module is deprecated. Using JSON is more practical."""
+
 __all__ = (
     'format_dictionary',
     'format_list',
