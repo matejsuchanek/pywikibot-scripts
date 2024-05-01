@@ -1,6 +1,7 @@
 import re
 
 import pywikibot
+from pywikibot.tools.chars import url2string
 
 FULL_ARTICLE_REGEX = r'\A[\s\S]*\Z'
 
@@ -57,7 +58,7 @@ def parse_image(text, site):
                 caption = split.pop() + '|' + caption
             caption = caption.rstrip('.').strip()
         image = split[0].partition(':')[2].rstrip(']')
-        image = pywikibot.page.url2unicode(image)
+        image = url2string(image)
         image = re.sub('[ _]+', ' ', image).strip()
 
     return image, caption

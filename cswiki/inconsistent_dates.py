@@ -17,12 +17,9 @@ from pywikibot.backports import (
     Callable,
     Dict,
     Iterable,
-    List,
     Match,
     OrderedDict,
     Pattern,
-    Set,
-    Tuple,
 )
 from pywikibot.bot import SingleSiteBot
 from pywikibot.pagegenerators import (
@@ -52,7 +49,7 @@ class DayMonth:
         else:
             return f'{self.month:02d}'
 
-    def sortkey(self) -> Tuple[int, int]:
+    def sortkey(self) -> tuple[int, int]:
         if self.day:
             return (self.month, self.day)
         else:
@@ -88,7 +85,7 @@ class Date:
         else:
             return str(self.year)
 
-    def sortkey(self) -> Tuple[int, int, int]:
+    def sortkey(self) -> tuple[int, int, int]:
         if self.dm:
             return (self.year,) + self.dm.sortkey()
         else:
@@ -104,10 +101,10 @@ class Date:
         return True
 
 
-DatesPair = Tuple[Optional[Set[Date]], Optional[Set[Date]]]
+DatesPair = tuple[Optional[set[Date]], Optional[set[Date]]]
 
 
-def split_if_matches(regex: Pattern, text: str) -> Tuple[Match, str]:
+def split_if_matches(regex: Pattern, text: str) -> tuple[Match, str]:
     match = regex.match(text)
     if match:
         return match, text[match.end():]
@@ -149,7 +146,7 @@ def get_day_month_from_text(
 
 def get_dms_from_match_groups(
     groups: Iterable[Optional[str]]
-) -> Tuple[Set[DayMonth], List[str]]:
+) -> tuple[set[DayMonth], list[str]]:
     found = set()
     invalid = []
     for group in groups:
@@ -162,7 +159,7 @@ def get_dms_from_match_groups(
     return found, invalid
 
 
-def get_all_dates(years: Set[int], dms: Set[DayMonth]) -> Set[Date]:
+def get_all_dates(years: set[int], dms: set[DayMonth]) -> set[Date]:
     dates = set()
     for dm in (dms or {None}):
         for year in years:
@@ -204,7 +201,7 @@ def make_fragment(template: str, args: OrderedDict[str, str]) -> str:
     return text
 
 
-def get_date_from_params(params: List[str]) -> Date:
+def get_date_from_params(params: list[str]) -> Date:
     assert len(params) == 3
     month = int(params[1])
     if month:
@@ -215,7 +212,7 @@ def get_date_from_params(params: List[str]) -> Date:
     return Date(int(params[0]), dm)
 
 
-def all_consistent(dates: Set[Date], others: Set[Date]) -> bool:
+def all_consistent(dates: set[Date], others: set[Date]) -> bool:
     for date in dates:
         if all(not date.consistent_with(d) for d in others):
             return False
@@ -411,7 +408,7 @@ class DatesBot(SingleSiteBot):
 
     @staticmethod
     def wrap_for_preloading(
-        generator: Iterable[Tuple[pywikibot.Page, Any]],
+        generator: Iterable[tuple[pywikibot.Page, Any]],
         cache: Dict
     ) -> Iterable[pywikibot.Page]:
         for page, entry in generator:
@@ -428,7 +425,7 @@ class DatesBot(SingleSiteBot):
                        .format(json.dumps(entry, indent=4)))
 
     def report_from_entry(self, source: pywikibot.Page, target: pywikibot.Page,
-                          context: DateContext, *sources: Set[Date]) -> None:
+                          context: DateContext, *sources: set[Date]) -> None:
         entry = {
             'source': source.title(),
             'target': target.title(),
@@ -447,7 +444,7 @@ class DatesBot(SingleSiteBot):
                        .format(json.dumps(entry, indent=4)))
 
     def report_person(self, page: pywikibot.Page, context: DateContext,
-                      *sources: Set[Date]) -> None:
+                      *sources: set[Date]) -> None:
         entry = {
             'target': page.title(),
             'what': context.name,
@@ -465,7 +462,7 @@ class DatesBot(SingleSiteBot):
                        .format(json.dumps(entry, indent=4)))
 
     def treat_entry(self, source_page: pywikibot.Page, page: pywikibot.Page,
-                    entry: Dict[DateContext, Set[Date]]) -> None:
+                    entry: Dict[DateContext, set[Date]]) -> None:
         while page.isRedirectPage():
             page = page.getRedirectTarget()
         if '#' in page.title() or page.namespace() != 0:
@@ -607,7 +604,7 @@ class DatesBot(SingleSiteBot):
                 yield page, {DateContext.DOB: dob, DateContext.DOD: dod}
 
     def check_person(self, page: pywikibot.Page, context: DateContext,
-                     *sources: Set[Date]) -> None:
+                     *sources: set[Date]) -> None:
         filter_sources = [s for s in sources if s]
         if len(filter_sources) < 2:
             return
@@ -630,7 +627,7 @@ class DatesBot(SingleSiteBot):
                 return
 
     def get_dates_for_person(self, page: pywikibot.Page
-                             ) -> Tuple[DatesPair, ...]:
+                             ) -> tuple[DatesPair, ...]:
         intro_content = textlib.extract_sections(page.text, page.site)
 
         intro = self.get_dates_from_intro(intro_content.header, page)
@@ -654,7 +651,7 @@ class DatesBot(SingleSiteBot):
             site=self.site)
 
     def get_dates_from_match(self, match: Match, page: pywikibot.Page
-                             ) -> Set[Date]:
+                             ) -> set[Date]:
         years = set()
         rest = []
         last_year = None
@@ -774,10 +771,10 @@ class DatesBot(SingleSiteBot):
 
     def get_dates_from_categories_helper(
         self,
-        categories: List[pywikibot.Category],
-        prefixes: Tuple[str, str],
+        categories: list[pywikibot.Category],
+        prefixes: tuple[str, str],
         page: pywikibot.Page
-    ) -> Set[Date]:
+    ) -> set[Date]:
         years = set()
         dms = set()
         matched = []
