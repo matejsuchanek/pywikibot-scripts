@@ -1,6 +1,8 @@
+from itertools import chain
+
 import pywikibot
 
-from pywikibot import Claim, html2unicode, SiteLink
+from pywikibot import Claim, html2unicode, SiteLink, WbMonolingualText
 from pywikibot.backports import removesuffix
 from pywikibot.tools import first_lower
 from pywikibot.tools.chars import INVISIBLE_REGEX as invisible_regex
@@ -382,6 +384,9 @@ class WikidataCleanupToolkit:
     def can_strip(lang, part, description):
         if part[-1].isdigit():
             return False
+        if lang == 'de':
+            # [[d:Topic:Y3blbm3qa391v79u]]
+            return False
         if lang == 'nl' and part in {
             # [[d:Topic:Uljziilm6l85hsp3]]
             'vrouwen', 'mannen', 'jongens', 'meisjes', 'enkel', 'dubbel',
@@ -406,6 +411,13 @@ class WikidataCleanupToolkit:
 
     def cleanup_labels(self, wrapper):
         ret = False
+        in_claims = None
+        search_claims = lambda: {
+            claim.getTarget().text
+            for claim in chain.from_iterable(wrapper.entity.claims.values())
+            if claim.rank != 'deprecated'
+            and isinstance(claim.getTarget(), WbMonolingualText)
+        }
         # strip "(x)" if "x" is in description
         for lang in wrapper.iter_labels():
             label = wrapper.get_label(lang)
@@ -414,6 +426,12 @@ class WikidataCleanupToolkit:
             description = wrapper.get_description(lang)
             if not description:
                 continue
+
+            if in_claims is None:
+                in_claims = search_claims()
+            if label in in_claims:
+                continue
+
             left, sep, right = removesuffix(label, ')').rpartition(' (')
             #if not sep:
             #    left, sep, right = label.partition(', ')
@@ -428,6 +446,12 @@ class WikidataCleanupToolkit:
         for lang, label in labels.items():
             if not label.endswith(')'):
                 continue
+
+            if in_claims is None:
+                in_claims = search_claims()
+            if label in in_claims:
+                continue
+
             left, sep, right = removesuffix(label, ')').rpartition(' (')
             if sep and right and not (set(left) & set('(:)')):
                 if left not in will_strip:
