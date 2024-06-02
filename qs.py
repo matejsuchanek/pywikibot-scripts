@@ -10,6 +10,7 @@ from pywikibot import Coordinate, WbMonolingualText, WbQuantity, WbTime
 from pywikibot.exceptions import (
     APIError,
     NoWikibaseEntityError,
+    OtherPageSaveError,
     WikiBaseError,
 )
 from pywikibot.page import Property
@@ -221,13 +222,16 @@ class QuickStatementsBot(WikidataEntityBot):
             if literal is None:
                 pywikibot.warning(f'Invalid literal for {pred}-command')
                 return
-            init, *lang = pred  # split init. char and lang. code
+            init, lang = pred[0], pred[1:]
             key = self.attr_mapping[init]['key']
             callback = self.attr_mapping[init].get(
                 'callback',
                 lambda data, key, value: data.update({key: value}))
             callback(getattr(self.current, key), lang, literal)
-            self.current.editEntity(summary=summary)
+            try:
+                self.current.editEntity(summary=summary)
+            except OtherPageSaveError:
+                pass
             return
 
         # assume the predicate is a property
