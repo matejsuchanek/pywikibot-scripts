@@ -24,13 +24,13 @@ class WikidataCleanupBot(WikidataEntityBot):
     @property
     def summary(self):
         return {
-            'add_missing_labels': 'add missing labels',
+            'add_missing_labels': 'import labels from sitelinks',
             'cleanup_labels': 'strip labels',
             'deduplicate_aliases': 'remove duplicate aliases',
             'deduplicate_claims': 'merge duplicate claims',
             'deduplicate_references': 'remove duplicate references',
-            'fix_HTML': 'fix HTML',
-            'fix_languages': 'fix invalid languages',
+            'fix_HTML': 'resolve HTML entities',
+            'fix_languages': 'resolve invalid languages',
             'fix_quantities': 'remove explicit bounds',
             'replace_invisible': 'replace invisible characters',
         }[self.fix]

@@ -155,6 +155,7 @@ class WikidataCleanupToolkit:
         'de-formal': 'de',
         'es-formal': 'es',
         'fiu-vro': 'vro',
+        'foundation': 'en',
         'hu-formal': 'hu',
         'meta': 'en',
         'nl-informal': 'nl',
@@ -172,8 +173,6 @@ class WikidataCleanupToolkit:
         'commons': None,
         'incubator': None,
         'mediawiki': None,
-        'mul': None,
-        'old': None,
         'outreach': None,
         'sources': None,
         'wikifunctions': None,
@@ -371,7 +370,15 @@ class WikidataCleanupToolkit:
                 labels.pop(lang)  # todo: better handling
                 skip.add(lang)
                 continue
+
+            default = wrapper.get_label('mul')
+            if title == default:
+                continue
+            if default and title.startswith((f'{default} (', f'{default},')):
+                continue
+
             labels[lang] = title
+
         return labels
 
     def add_missing_labels(self, wrapper):
