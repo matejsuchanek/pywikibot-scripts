@@ -54,7 +54,7 @@ def main():
     })
     page = pywikibot.Page(site, 'Šablona:Klementinum/data.json')
     page.put(text, summary='aktualizace dat pro šablonu Klementinum',
-             minor=False, botflag=False, apply_cosmetic_changes=False)
+             minor=False, bot=False, apply_cosmetic_changes=False)
 
 
 if __name__ == '__main__':

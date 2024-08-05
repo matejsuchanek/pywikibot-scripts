@@ -107,7 +107,7 @@ class TypoReportBot(SingleSiteBot):
             page = pywikibot.Page(self.site, outputpage)
             page.text = '\n'.join(put)
             page.save(summary='aktualizace seznamu překlepů', minor=False,
-                      botflag=False, apply_cosmetic_changes=False)
+                      bot=False, apply_cosmetic_changes=False)
         super().teardown()
 
 
@@ -159,7 +159,7 @@ class PurgeTypoReportBot(SingleSiteBot, ExistingPageBot):
 
         page.text = '\n'.join(self.put)
         page.save(summary='odstranění vyřešených překlepů', minor=True,
-                  botflag=True, apply_cosmetic_changes=False)
+                  bot=True, apply_cosmetic_changes=False)
 
 
 def main(*args):

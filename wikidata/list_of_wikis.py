@@ -75,6 +75,6 @@ if added:
     pywikibot.showDiff(page.text, text)
     page.text = text
     pywikibot.output(f'Edit summary: {summary}')
-    page.save(summary=summary, minor=False, botflag=False)
+    page.save(summary=summary, minor=False, bot=False)
 else:
     pywikibot.output('No wikis to be added')
