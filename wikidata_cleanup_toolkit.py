@@ -394,7 +394,16 @@ class WikidataCleanupToolkit:
         if lang == 'de':
             # [[d:Topic:Y3blbm3qa391v79u]]
             return False
-        if lang == 'nl' and part in {
+
+        if lang == 'en' and part in {'men', 'women'}:
+            # [[d:Topic:Xyxkoqqub5ob8vdr]]
+            return False
+        elif lang == 'fr' and part in {
+            # [[d:Topic:Xyxkoqqub5ob8vdr]]
+            'simple dames', 'double dames', 'simple messieurs', 'double messieurs'
+        }:
+            return False
+        elif lang == 'nl' and part in {
             # [[d:Topic:Uljziilm6l85hsp3]]
             'vrouwen', 'mannen', 'jongens', 'meisjes', 'enkel', 'dubbel',
             'mannenenkel', 'vrouwenenkel', 'jongensenkel', 'meisjesenkel',
@@ -404,10 +413,7 @@ class WikidataCleanupToolkit:
             'rolstoelmannen', 'rolstoelmannendubbel', 'quad', 'quaddubbel',
         }:
             return False
-        elif lang == 'fr' and part in {
-            # [[d:Topic:Xyxkoqqub5ob8vdr]]
-            'simple dames', 'double dames', 'simple messieurs', 'double messieurs'
-        }:
+        elif lang == 'pl' and part in {'mężczyźni', 'kobiety'}:
             return False
 
         if part not in description:  # todo: word to word, not just substring
