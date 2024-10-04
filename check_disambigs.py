@@ -10,7 +10,7 @@ from wikidata import WikidataEntityBot
 
 class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
 
-    disambig_item = 'Q4167410'
+    disambig_items = {'Q4167410', 'Q22808320', 'Q61996773'}
     file_name = 'log_disambigs.txt'
     page_pattern = 'User:%s/Disambig_errors'
     skip = {
@@ -25,7 +25,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
     }
     use_from_page = False
 
-    def __init__(self, **kwargs):
+    def __init__(self, generator=None, **kwargs):
         self.available_options.update({
             'limit': 1000,
             'min_sitelinks': 1,
@@ -33,20 +33,22 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
             #'only': None, todo
         })
         super().__init__(**kwargs)
+        self.generator = pagegenerators.PreloadingEntityGenerator(
+            generator or self.custom_generator()
+        )
 
     def skip_page(self, item):
         return super().skip_page(item) or (
-            item.title(as_link=True, insite=self.repo) in self.log_page.text or
-            not self.is_disambig(item))
+            item.title(as_link=True, insite=self.repo) in self.log_page.text
+            or not self.is_disambig(item))
 
     def is_disambig(self, item):
         for claim in item.claims.get('P31', []):
-            if claim.target_equals(self.disambig_item):
+            if any(claim.target_equals(cls) for cls in self.disambig_items):
                 return True
         return False
 
-    @property
-    def generator(self):
+    def custom_generator(self):
         # todo: move to store
         QUERY = '''SELECT ?item WITH {
   SELECT DISTINCT ?item {
@@ -60,9 +62,8 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
 } ORDER BY ?hash''' % (self.disambig_item, self.opt['min_sitelinks'],
                        self.opt['offset'], self.opt['limit'])
 
-        return pagegenerators.PreloadingEntityGenerator(
-            pagegenerators.WikidataSPARQLPageGenerator(QUERY, site=self.repo,
-                                                       result_type=list))
+        return pagegenerators.WikidataSPARQLPageGenerator(
+            QUERY, site=self.repo, result_type=list)
 
     def treat_page_and_item(self, page, item):
         append_text = ''
@@ -105,7 +106,10 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
 
 def main(*args):
     options = {}
-    for arg in pywikibot.handle_args(args):
+    local_args = pywikibot.handle_args(args)
+    site = pywikibot.Site('wikidata', 'wikidata')
+    genFactory = pagegenerators.GeneratorFactory(site=site)
+    for arg in genFactory.handle_args(local_args):
         if arg.startswith('-'):
             arg, sep, value = arg.partition(':')
             if value != '':
@@ -113,8 +117,9 @@ def main(*args):
             else:
                 options[arg[1:]] = True
 
-    site = pywikibot.Site('wikidata', 'wikidata')
-    bot = DisambigsCheckingBot(site=site, **options)
+    generator = genFactory.getCombinedGenerator()
+
+    bot = DisambigsCheckingBot(site=site, generator=generator, **options)
     bot.run()
 
 
