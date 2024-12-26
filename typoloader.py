@@ -4,7 +4,6 @@ import time
 import pywikibot
 
 from pywikibot import textlib
-from pywikibot.tools.formatter import color_format
 
 
 class IncompleteTypoRuleException(Exception):
@@ -129,8 +128,7 @@ class TypoRule:
             text = match.string
             pre = text[max(0, match.start() - 30):match.start()].rpartition('\n')[2]
             post = text[match.end():match.end() + 30].partition('\n')[0]
-            pywikibot.info(color_format('{0}{lightred}{1}{default}{2}',
-                                        pre, old, post))
+            pywikibot.info(f'{pre}<<lightred>>{old}<<default>>{pos}')
             choice = pywikibot.input_choice('Choose the best replacement',
                                             options, automatic_quit=False,
                                             default='k')

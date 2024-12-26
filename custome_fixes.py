@@ -18,7 +18,6 @@ import pywikibot
 from pywikibot import pagegenerators, textlib
 from pywikibot.exceptions import NoPageError
 from pywikibot.tools import first_lower, first_upper
-from pywikibot.tools.formatter import color_format
 
 from checkwiki_errors import CheckWikiError
 from tools import deduplicate, FULL_ARTICLE_REGEX
@@ -625,8 +624,7 @@ class RedirectFix(LazyFix):
 
         pre = match.string[max(0, match.start() - 30):match.start()].rpartition('\n')[2]
         post = match.string[match.end():match.end() + 30].partition('\n')[0]
-        pywikibot.info(color_format('{0}{lightred}{1}{default}{2}',
-                                    pre, match.group(), post))
+        pywikibot.info(f'{pre}<<lightred>>{match.group()}<<default>>{post}')
         choice = pywikibot.input_choice('Replace this link?', options,
                                         default='1', automatic_quit=False)
         if choice == 'n':
