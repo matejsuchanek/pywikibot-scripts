@@ -18,13 +18,13 @@ from wikidata import WikidataEntityBot
 
 class DuplicateDatesBot(WikidataEntityBot):
 
-    invalid_refs = {'P143', 'P4656'}
+    invalid_refs = {'P143', 'P813', 'P3452', 'P4656'}
     use_from_page = False
 
     def __init__(self, generator, **kwargs):
         self.available_options.update({
             'limit': 1000,
-            'props': ['P569', 'P570'],
+            'props': ['P569', 'P570', 'P2031', 'P2032'],
         })
         super().__init__(**kwargs)
         self.store = QueryStore()
@@ -71,7 +71,7 @@ class DuplicateDatesBot(WikidataEntityBot):
 
     @classmethod
     def is_valid_source(cls, source):
-        return bool(source) and not (set(source) & cls.invalid_refs)
+        return bool(set(source) - cls.invalid_refs)
 
     @classmethod
     def number_of_sources(cls, claim):
@@ -84,63 +84,121 @@ class DuplicateDatesBot(WikidataEntityBot):
     def is_sourced(cls, claim):
         return cls.number_of_sources(claim) > 0
 
+    @classmethod
+    def can_merge_claims(cls, claim1, claim2):
+        if claim1.getSnakType() != claim2.getSnakType():
+            return False
+
+        if (
+            claim1.getSnakType() == 'value'
+            and not cls.first_same_as_second(
+                claim1.getTarget(),
+                claim2.getTarget()
+            )
+        ):
+            return False
+
+        if (
+            claim1.qualifiers != claim2.qualifiers
+            and not (
+                claim1.rank != 'deprecated'
+                and claim2.rank == 'normal'
+                and not claim2.qualifiers
+                and not cls.is_sourced(claim2)
+            )
+            and not (
+                claim2.rank != 'deprecated'
+                and claim1.rank == 'normal'
+                and not claim1.qualifiers
+                and not cls.is_sourced(claim1)
+            )
+        ):
+            return False
+
+        return True
+
     def treat_page_and_item(self, page, item):
+        redundant = []
+        unmerged = []
         for prop in self.opt['props']:
             claims = item.claims.get(prop, [])
             if len(claims) < 2:
                 continue
-            if any(claim.rank != 'normal' for claim in claims):
-                continue
 
             already = set()
-            redundant = []
-            unmerged = []
             for claim1, claim2 in combinations(claims, 2):
                 if claim1.snak in already or claim2.snak in already:
                     continue
-                skip = False
-                for claim in (claim1, claim2):
-                    if not bool(claim.getTarget()) or bool(claim.qualifiers):
-                        already.add(claim.snak)
-                        skip = True
-                if skip:
+
+                if (claim1.rank, claim2.rank) in (
+                    ('preferred', 'deprecated'),
+                    ('deprecated', 'preferred'),
+                ):
+                    # this would need manual intervention
                     continue
 
-                targets = lambda c1, c2: (c1.getTarget(), c2.getTarget())
-                if self.first_same_as_second(*targets(claim1, claim2)):
-                    if self.number_of_sources(claim1) > \
-                       self.number_of_sources(claim2):
-                        old, new = claim2, claim1
-                    else:
-                        old, new = claim1, claim2
+                if self.can_merge_claims(claim1, claim2):
+                    # never remove preferred/deprecated claim
+                    # if either is normal
+                    if claim1.rank != claim2.rank:
+                        if claim1.rank == 'normal':
+                            claim1, claim2 = claim2, claim1
+                    elif claim2.qualifiers and not claim1.qualifiers:
+                        claim1, claim2 = claim2, claim1
+                    elif (
+                        self.number_of_sources(claim2) >
+                        self.number_of_sources(claim1)
+                    ):
+                        claim1, claim2 = claim2, claim1
 
-                    for source in old.sources:
+                    for source in claim2.sources:
                         if not self.is_valid_source(source):
                             continue
                         sources_copy = [
                             c.copy() for c in chain(*source.values())]
                         with suppress(APIError):  # duplicate reference present
-                            new.addSources(sources_copy)
+                            claim1.addSources(sources_copy)
 
-                    unmerged.append(old)
-                    already.add(old.snak)
+                    unmerged.append(claim2)
+                    already.add(claim2.snak)
+                    continue
+
+                if not (claim1.getSnakType() == 'value' == claim2.getSnakType()):
                     continue
 
                 pairs = [(claim1, claim2), (claim2, claim1)]
                 for first, second in pairs:
                     if self.is_sourced(second):
                         continue
-                    if self.first_inside_second(*targets(first, second)):
+                    # never remove preferred/deprecated claim
+                    # if either is normal
+                    if first.rank != second.rank and second.rank != 'normal':
+                        continue
+
+                    if (
+                        first.qualifiers != second.qualifiers
+                        and not (
+                            first.rank == 'preferred'
+                            and second.rank == 'normal'
+                            and not second.qualifiers
+                        )
+                    ):
+                        continue
+
+                    if self.first_inside_second(
+                        first.getTarget(),
+                        second.getTarget()
+                    ):
                         redundant.append(second)
                         already.add(second.snak)
                         break
 
-            if redundant or unmerged:
-                if redundant:
-                    summary = self.summary
-                else:
-                    summary = 'remove redundant claim(s)'
-                item.removeClaims(redundant + unmerged, summary=summary)
+        if redundant or unmerged:
+            if redundant:
+                summary = self.summary
+            else:
+                summary = 'remove redundant claim(s)'
+            item.removeClaims(redundant + unmerged, summary=summary)
 
 
 def main(*args):

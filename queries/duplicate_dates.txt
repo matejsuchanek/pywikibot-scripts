@@ -4,9 +4,11 @@ SELECT DISTINCT ?item {
     (9 10) (9 11)
   } .
   ?statement1 psv:%(prop)s [ wikibase:timeValue ?val1; wikibase:timePrecision ?prec1 ] .
+  ?statement1 wikibase:rank ?rank1 .
   ?statement2 psv:%(prop)s [ wikibase:timeValue ?val2; wikibase:timePrecision ?prec2 ] .
+  ?statement2 wikibase:rank ?rank2 .
   FILTER( YEAR( ?val1 ) = YEAR( ?val2 ) ) .
-  MINUS { ?statement1 prov:wasDerivedFrom/!(pr:P143|pr:P4656) [] } .
-  ?statement2 prov:wasDerivedFrom/!(pr:P143|pr:P4656) [] .
-  MINUS { ?item p:%(prop)s [ wikibase:rank wikibase:PreferredRank, wikibase:DeprecatedRank ] } .
+  FILTER( ?rank1 = ?rank2 || ?rank2 = wikibase:NormalRank ) .
+  MINUS { ?statement1 prov:wasDerivedFrom/!(pr:P143|pr:P813|pr:P4656) [] } .
+  ?statement2 prov:wasDerivedFrom/!(pr:P143|pr:P813|pr:P4656) [] .
 } LIMIT %(limit)d
