@@ -42,6 +42,7 @@ class DuosManagingBot(WikidataEntityBot):
         'lt': ' ir ',
         'lv': ' un ',
         'ms': ' dan ',
+        'mul': ' and ',
         'nb': ' og ',
         'nl': ' en ',
         'nn': ' og ',
@@ -63,19 +64,25 @@ class DuosManagingBot(WikidataEntityBot):
         'P21', 'P22', 'P25', 'P27', 'P40', 'P53', 'P106', 'P1412',
     ]
     class_to_relation = [
-        ('Q106925878', 'father-son'),
+        ('Q132776479', 'twin-sisters'),
+        ('Q132776456', 'twin-brothers'),
         ('Q14756018', 'twin'),
         ('Q14073567', 'sibling'),
         ('Q3046146', 'spouse'),
+        ('Q106925878', 'father-son'),
+        ('Q1313923', 'relative'),
         # TODO: ('Q1141470', 'comedians'), not a "relation by blood"
     ]
     relation_map = {
+        #'comedians': 'P1327',
+        #'father-son': '', we don't know who is who
+        # TODO: 'partner': 'P451',
+        'relative': 'P1038',
         'sibling': 'P3373',
         'spouse': 'P26',
-        'twin': 'P3373',
-        # TODO: 'partner': 'P451',
-        #'father-son': '', we don't know who is who
-        #'comedians': 'P1327',
+        'twin': 'P3373/P1039/Q131440579',
+        'twin-brothers': 'P3373/P1039/Q108714555',
+        'twin-sisters': 'P3373/P1039/Q108714611',
     }
     use_from_page = False
 
@@ -177,9 +184,18 @@ class DuosManagingBot(WikidataEntityBot):
         items = [self.create_item(item, data, relation, to_add)
                  for data in labels]
         if self.relation_map.get(relation):
+            recipe = self.relation_map[relation].split('/')
+            if len(recipe) == 3:
+                prop, qprop, qval = recipe
+            else:
+                prop, qprop, qval = recipe[0], None, None
             for it, target in zip(items, reversed(items)):
-                claim = pywikibot.Claim(self.repo, self.relation_map[relation])
+                claim = pywikibot.Claim(self.repo, prop)
                 claim.setTarget(target)
+                if qprop:
+                    qualifier = pywikibot.Claim(self.repo, qprop, is_qualifier=True)
+                    qualifier.setTarget(pywikibot.ItemPage(self.repo, qval))
+                    claim.addQualifier(qualifier)
                 self.user_add_claim(it, claim)
 
         for it in items:
@@ -188,16 +204,18 @@ class DuosManagingBot(WikidataEntityBot):
             self.user_add_claim(item, claim)
 
         for claim in to_remove:
-            pywikibot.info('Removing %s --> %s' % (
-                claim.id, claim.getTarget()))
+            pywikibot.info(f'Removing {claim.id} --> {claim.getTarget()}')
             json = claim.toJSON()
             json['remove'] = ''
-            summary = 'moved [[Property:{}]] to {} & {}'.format(
-                claim.id,
-                items[0].title(as_link=True, insite=self.repo),
-                items[1].title(as_link=True, insite=self.repo)
+            self.user_edit_entity(
+                item,
+                {'claims': [json]},
+                summary='moved [[Property:{}]] to {} & {}'.format(
+                    claim.id,
+                    items[0].title(as_link=True, insite=self.repo),
+                    items[1].title(as_link=True, insite=self.repo)
+                )
             )
-            self.user_edit_entity(item, {'claims':[json]}, summary=summary)
 
     def create_item(self, item, labels, relation, to_add):
         pywikibot.info(f'Creating item (relation "{relation}")...')
@@ -220,10 +238,12 @@ class DuosManagingBot(WikidataEntityBot):
             pywikibot.info('Adding %s --> %s' % (
                 temp_claim.id, temp_claim.getTarget()))
             self.user_edit_entity(
-                new_item, {'claims':[json]},
+                new_item, {'claims': [json]},
                 summary='moving [[Property:%s]] from %s' % (
                     temp_claim.id,
-                    item.title(as_link=True, insite=self.repo)))
+                    item.title(as_link=True, insite=self.repo)
+                )
+            )
         return new_item
 
 
