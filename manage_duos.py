@@ -13,6 +13,8 @@ class DuosManagingBot(WikidataEntityBot):
     conj = {
         'af': ' en ',
         'az': ' və ',
+        'be': ' і ',
+        'be-tarask': ' і ',
         'bg': ' и ',
         'br': ' ha ',
         'ca': ' i ',
@@ -20,11 +22,8 @@ class DuosManagingBot(WikidataEntityBot):
         'cy': ' a ',
         'da': ' og ',
         'de': ' und ',
+        'de-at': ' und ',
         'el': ' και ',
-        'en': ' and ',
-        'en-ca': ' and ',
-        'en-gb': ' and ',
-        'en-us': ' and ',
         'eo': ' kaj ',
         'es': ' y ',
         'et': ' ja ',
@@ -42,7 +41,6 @@ class DuosManagingBot(WikidataEntityBot):
         'lt': ' ir ',
         'lv': ' un ',
         'ms': ' dan ',
-        'mul': ' and ',
         'nb': ' og ',
         'nl': ' en ',
         'nn': ' og ',
@@ -54,14 +52,17 @@ class DuosManagingBot(WikidataEntityBot):
         'sk': ' a ',
         'sl': ' in ',
         'sr': ' и ',
+        'sr-ec': ' и ',
+        'sr-el': ' i ',
         'sv': ' och ',
+        'sw': ' na ',
         'tr': ' ve ',
         'uk': ' і ',
         'vi': ' và ',
         'war': ' ngan ',
     }
     distribute_properties = [
-        'P21', 'P22', 'P25', 'P27', 'P40', 'P53', 'P106', 'P1412',
+        'P22', 'P25', 'P27', 'P40', 'P53', 'P106', 'P1412',
     ]
     class_to_relation = [
         ('Q132776479', 'twin-sisters'),
@@ -126,9 +127,14 @@ class DuosManagingBot(WikidataEntityBot):
 
     def get_labels(self, item, relation):
         labels = [{}, {}]
-        for lang in item.labels.keys() & self.conj.keys():
-            for conj in (self.conj[lang], ' & '):
-                label = item.labels[lang].partition(' (')[0]
+        for lang, value in item.labels.items():
+            delim = []
+            if lang in self.conj:
+                delim.append(self.conj[lang])
+            delim.append(' and ')
+            delim.append(' & ')
+            for conj in delim:
+                label = value.partition(' (')[0]
                 if ', ' in label:
                     continue
                 split = label.split(conj)
@@ -169,10 +175,13 @@ class DuosManagingBot(WikidataEntityBot):
 
         to_add = []
         to_remove = []
-        if relation == 'twin':
+        if relation.startswith('twin'):
             distribute = self.distribute_properties + ['P569', 'P19']
+            if relation.startswith('twin-'):
+                distribute.append('P21')
         else:
             distribute = self.distribute_properties
+
         for prop in distribute:
             for claim in item.claims.get(prop, []):
                 if claim.getTarget():
@@ -196,12 +205,15 @@ class DuosManagingBot(WikidataEntityBot):
                     qualifier = pywikibot.Claim(self.repo, qprop, is_qualifier=True)
                     qualifier.setTarget(pywikibot.ItemPage(self.repo, qval))
                     claim.addQualifier(qualifier)
-                self.user_add_claim(it, claim)
+                source = pywikibot.Claim(self.repo, 'P3452', is_reference=True)
+                source.setTarget(item)
+                claim.addSource(source)
+                self.user_add_claim(it, claim, asynchronous=False)
 
         for it in items:
             claim = pywikibot.Claim(self.repo, 'P527')
             claim.setTarget(it)
-            self.user_add_claim(item, claim)
+            self.user_add_claim(item, claim, asynchronous=False)
 
         for claim in to_remove:
             pywikibot.info(f'Removing {claim.id} --> {claim.getTarget()}')
@@ -210,6 +222,7 @@ class DuosManagingBot(WikidataEntityBot):
             self.user_edit_entity(
                 item,
                 {'claims': [json]},
+                asynchronous=False,
                 summary='moved [[Property:{}]] to {} & {}'.format(
                     claim.id,
                     items[0].title(as_link=True, insite=self.repo),
@@ -218,32 +231,25 @@ class DuosManagingBot(WikidataEntityBot):
             )
 
     def create_item(self, item, labels, relation, to_add):
+        instance_of = pywikibot.Claim(self.repo, 'P31')
+        instance_of.setTarget(pywikibot.ItemPage(self.repo, 'Q5'))
+        part_of = pywikibot.Claim(self.repo, 'P361')
+        part_of.setTarget(item)
+
         pywikibot.info(f'Creating item (relation "{relation}")...')
         new_item = pywikibot.ItemPage(self.repo)
         self.user_edit_entity(
             new_item,
-            {'labels': labels},
+            {
+                'labels': labels,
+                'claims': [instance_of.toJSON(), part_of.toJSON()] + to_add,
+            },
             asynchronous=False,
-            summary='based on data in %s' % item.title(
-                as_link=True, insite=self.repo))
-
-        claim = pywikibot.Claim(self.repo, 'P31')
-        claim.setTarget(pywikibot.ItemPage(self.repo, 'Q5'))
-        self.user_add_claim(new_item, claim)
-        claim = pywikibot.Claim(self.repo, 'P361')
-        claim.setTarget(item)
-        self.user_add_claim(new_item, claim)
-        for json in to_add:
-            temp_claim = pywikibot.Claim.fromJSON(self.repo, json)
-            pywikibot.info('Adding %s --> %s' % (
-                temp_claim.id, temp_claim.getTarget()))
-            self.user_edit_entity(
-                new_item, {'claims': [json]},
-                summary='moving [[Property:%s]] from %s' % (
-                    temp_claim.id,
-                    item.title(as_link=True, insite=self.repo)
-                )
+            summary='based on data in {}'.format(
+                item.title(as_link=True, insite=self.repo)
             )
+        )
+
         return new_item
 
 
