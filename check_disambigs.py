@@ -99,7 +99,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
         if append_text:
             prep = '\n* %s' % item.title(as_link=True, insite=self.repo)
             if count > 0:
-                prep += ' (%i sitelink%s)' % (count, 's' if count > 1 else '')
+                prep += f' ({count} sitelink' + ('s' if count > 1 else '') + ')'
             append_text = prep + append_text
             self.append(append_text)
 
@@ -107,7 +107,7 @@ class DisambigsCheckingBot(WikidataEntityBot, ErrorReportingBot):
 def main(*args):
     options = {}
     local_args = pywikibot.handle_args(args)
-    site = pywikibot.Site('wikidata', 'wikidata')
+    site = pywikibot.Site()
     genFactory = pagegenerators.GeneratorFactory(site=site)
     for arg in genFactory.handle_args(local_args):
         if arg.startswith('-'):

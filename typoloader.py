@@ -64,9 +64,10 @@ class TypoRule:
         return not self.__eq__(other)
 
     def __repr__(self):
-        return '{!r}({!r}, {!r}, {!r}, {!r})'.format(
-            self.__class__.name, self.find, self.replacements,
-            self.auto, self.query)
+        return (
+            f'{self.__class__.name}({self.find!r}, {self.replacements!r}, '
+            f'auto={self.auto!r}, query={self.query!r})'
+        )
 
     def needs_decision(self):
         return not self.auto or len(self.replacements) > 1
@@ -182,7 +183,7 @@ class TyposLoader:
         return pywikibot.Page(self.site, self.whitelist_page_name)
 
     def loadTypos(self):
-        pywikibot.info('Loading typo rules')
+        pywikibot.info('Loading typo rules...')
         self.typoRules = []
 
         if self.typos_page_name is None:

@@ -176,6 +176,7 @@ class DuosManagingBot(WikidataEntityBot):
         to_add = []
         to_remove = []
         if relation.startswith('twin'):
+        if relation and relation.startswith('twin'):
             distribute = self.distribute_properties + ['P569', 'P19']
             if relation.startswith('twin-'):
                 distribute.append('P21')
