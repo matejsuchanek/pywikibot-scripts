@@ -25,6 +25,7 @@ class QuickStatementsBot(WikidataEntityBot):
     def __init__(self, generator, **kwargs):
         self.available_options.update({
             'always': True,
+            'coalesce': False,
             'noresolve': False,
         })
         super().__init__(**kwargs)
@@ -37,7 +38,7 @@ class QuickStatementsBot(WikidataEntityBot):
         self.quantity_boundsR = re.compile(
             r'({0})(?:\[({0}),({0})\])(?:U([1-9]\d*))?'
             .format(self.decimal_pattern))
-        self.commentR = re.compile(r' */\*(.*?)\*/$')
+        self.commentR = re.compile(r'/\*(.*?)\*/$')
 
         self.entity_types = frozenset(
             key for key, val in Property.value_types.items()
@@ -54,6 +55,8 @@ class QuickStatementsBot(WikidataEntityBot):
         }
         self.last = None  # the last created item (using CREATE)
         self._current = None  # the last treated entity
+        self.last_summary = None
+        self.has_changes = False
 
     @property
     def current(self):
@@ -61,7 +64,32 @@ class QuickStatementsBot(WikidataEntityBot):
 
     @current.setter
     def current(self, new):
+        if self._current == new:
+            return
+
+        self.put_changes()
         self._current = new
+
+    def changes_ready(self, summary=None):
+        if summary:
+            self.last_summary = summary
+
+        if self.opt.coalesce:
+            self.has_changes = True
+        else:
+            self.put_changes()
+
+    def put_changes(self):
+        if not self.has_changes or not self.current:
+            return
+
+        summary = self.last_summary
+        self.has_changes = False
+        self.last_summary = None
+        try:
+            self.current.editEntity(summary=summary)
+        except OtherPageSaveError:
+            pass
 
     @staticmethod
     def valid_text_literal(text, *, allow_empty=False):
@@ -155,7 +183,8 @@ class QuickStatementsBot(WikidataEntityBot):
                 coord = Coordinate(
                     *map(float, match.groups()),
                     precision=1e-4,  # hardcoded as in claimit.py
-                    site=self.repo)
+                    site=self.repo
+                )
                 snak.setTarget(coord)
                 return True
             else:
@@ -177,8 +206,8 @@ class QuickStatementsBot(WikidataEntityBot):
     def handle_line(self, line):
         comment_match = self.commentR.search(line)
         if comment_match:
-            summary = comment_match[1]
-            line = line[:comment_match.start()]
+            summary = comment_match[1].strip()
+            line = line[:comment_match.start()].rstrip()
         else:
             summary = None
 
@@ -212,8 +241,6 @@ class QuickStatementsBot(WikidataEntityBot):
                 pywikibot.error(e)
                 return
 
-        # TODO: this is currently unused but might become handy
-        # if consecutive edits to an item are squashed
         self.current = item
 
         pred = split[1]
@@ -226,12 +253,10 @@ class QuickStatementsBot(WikidataEntityBot):
             key = self.attr_mapping[init]['key']
             callback = self.attr_mapping[init].get(
                 'callback',
-                lambda data, key, value: data.update({key: value}))
+                lambda data, key, value: data.update({key: value})
+            )
             callback(getattr(self.current, key), lang, literal)
-            try:
-                self.current.editEntity(summary=summary)
-            except OtherPageSaveError:
-                pass
+            self.changes_ready(summary=summary)
             return
 
         # assume the predicate is a property
@@ -253,7 +278,7 @@ class QuickStatementsBot(WikidataEntityBot):
             return
 
         add_new = True
-        if not self.opt['noresolve']:
+        if not self.opt.noresolve:
             for other in self.current.claims.get(pred, []):
                 if other.same_as(claim, ignore_rank=True, ignore_quals=True,
                                  ignore_refs=True):
@@ -261,15 +286,22 @@ class QuickStatementsBot(WikidataEntityBot):
                     add_new = False
                     break
 
+        # TODO: "-STATEMENT"
         if minus:
             if add_new:
                 pywikibot.warning('No matching claim to remove found')
             else:
+                self.put_changes()
                 self.current.removeClaim(claim, summary=summary)
             return
 
         if add_new:
-            self.current.addClaim(claim, summary=summary)
+            if self.opt.coalesce:
+                self.current.claims.setdefault(claim.id, []).append(claim)
+                self.changes_ready(summary=summary)
+            else:
+                # put_changes not needed here
+                self.current.addClaim(claim, summary=summary)
 
         qualifiers = []
         references = []
@@ -295,17 +327,20 @@ class QuickStatementsBot(WikidataEntityBot):
 
             snak = obj.newClaim(**{key: True})
             del obj
-            ok = self.set_target(snak, value.strip())
-            if not ok:
+            if not self.set_target(snak, value.strip()):
                 return
             collection.append(snak)
 
-        has_qualifiers = list(chain(*claim.qualifiers.values()))
+        has_qualifiers = list(chain.from_iterable(claim.qualifiers.values()))
         for qual in qualifiers:
             if qual not in has_qualifiers:
+                if not add_new:
+                    self.put_changes()
                 claim.addQualifier(qual)
                 has_qualifiers.append(qual)
         if references:
+            if not add_new:
+                self.put_changes()
             # TODO: check for duplicity
             claim.addSources(references)
 
@@ -314,6 +349,7 @@ class QuickStatementsBot(WikidataEntityBot):
             line = line.rstrip()
             if line:
                 self.handle_line(line)
+        self.put_changes()
 
 
 def main(*args):
