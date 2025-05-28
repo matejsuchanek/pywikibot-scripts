@@ -349,6 +349,8 @@ class WikidataCleanupToolkit:
                 continue
             if title.startswith('Wikipédia:Candidatos a artigo/'):
                 continue
+            if dbname.endswith('wiktionary') and link.namespace == 0:
+                continue
             # [[d:Topic:Vw8cayiif34m2eem]]
             if dbname.endswith('wikinews') and link.namespace == 14:
                 continue
@@ -356,9 +358,9 @@ class WikidataCleanupToolkit:
             if dbname == 'zh_yuewiki' and title.startswith('Portal:時人時事/'):
                 continue
             # [[d:Topic:Vrel33kwnco2xp55]]
-            if dbname.endswith('wikisource'):
-                if link.namespace == link.site.namespaces.lookup_name('Author'):
-                    title = title.partition(':')[2]
+            if dbname.endswith('wikisource') \
+               and link.namespace == link.site.namespaces.lookup_name('Author'):
+                title = title.partition(':')[2]
             # [[d:Topic:Uhdjlv9aae6iijuc]]
             # todo: create a lib for this
             if lang == 'fr' and title.startswith(
@@ -373,11 +375,18 @@ class WikidataCleanupToolkit:
 
             default = wrapper.get_label('mul')
             if title == default:
+                # cf. Wikidata (Q2013)
+                labels.pop(lang, None)
+                skip.add(lang)
                 continue
             if default and title.startswith((f'{default} (', f'{default},')):
+                labels.pop(lang, None)
+                skip.add(lang)
                 continue
 
             labels[lang] = title
+            # TODO: if 'mul' exists and we add a new label in lang XY,
+            # should all languages that fallback to XY get a copy of 'mul'?
 
         return labels
 
