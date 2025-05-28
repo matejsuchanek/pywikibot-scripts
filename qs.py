@@ -292,7 +292,7 @@ class QuickStatementsBot(WikidataEntityBot):
                 pywikibot.warning('No matching claim to remove found')
             else:
                 self.put_changes()
-                self.current.removeClaim(claim, summary=summary)
+                self.current.removeClaims(claim, summary=summary)
             return
 
         if add_new:
