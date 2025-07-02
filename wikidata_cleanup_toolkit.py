@@ -157,6 +157,7 @@ class WikidataCleanupToolkit:
         'fiu-vro': 'vro',
         'foundation': 'en',
         'hu-formal': 'hu',
+        'kr': 'knc',
         'meta': 'en',
         'nl-informal': 'nl',
         'no': 'nb',
