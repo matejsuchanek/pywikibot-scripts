@@ -639,10 +639,10 @@ class DatesBot(SingleSiteBot):
         wd = self.get_dates_from_wd(page)
 
         # deal with false claims
-        if intro[1] \
-           and not any(bool(p[1]) for p in [infobox, cats, wd]) \
-           and 'Žijící lidé' in (cat.title(with_ns=False) for cat in categories):
-            intro = (intro[0], None)
+        if intro[1] and not any(bool(p[1]) for p in [infobox, cats, wd]):
+            categories = textlib.getCategoryLinks(page.text, self.site)
+            if 'Žijící lidé' in (cat.title(with_ns=False) for cat in categories):
+                intro = (intro[0], None)
 
         return intro, infobox, cats, wd
 
