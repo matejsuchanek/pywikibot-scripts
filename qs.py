@@ -74,9 +74,8 @@ class QuickStatementsBot(WikidataEntityBot):
         if summary:
             self.last_summary = summary
 
-        if self.opt.coalesce:
-            self.has_changes = True
-        else:
+        self.has_changes = True
+        if not self.opt.coalesce:
             self.put_changes()
 
     def put_changes(self):
