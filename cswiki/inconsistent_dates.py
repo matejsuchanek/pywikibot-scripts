@@ -193,6 +193,7 @@ def get_matching_template_args(
             return params
     return None
 
+
 def make_fragment(template: str, args: OrderedDict[str, str]) -> str:
     text = ''
     text += '{{%s|' % template
@@ -322,7 +323,8 @@ class DatesBot(SingleSiteBot):
             keys = ['entry', 'intro', 'categories', 'infobox', 'wd']
 
             text += "'''Neshodné datumy v seznamech:'''\n"
-            text += '{| class="wikitable sortable"\n'
+            text += '{{Sticky header}}\n'
+            text += '{| class="wikitable sortable sticky-header"\n'
             text += '! class="unsortable" | Stránka'
             text += ' !! class="unsortable" | Článek !! Údaj !! Seznam'
             text += ' !! Úvod !! Kategorie !! Infobox !! Wikidata\n'
@@ -342,7 +344,8 @@ class DatesBot(SingleSiteBot):
             keys = ['intro', 'categories', 'infobox', 'wd']
 
             text += "'''Neshodné datumy v článcích:'''\n"
-            text += '{| class="wikitable sortable"\n'
+            text += '{{Sticky header}}\n'
+            text += '{| class="wikitable sortable sticky-header"\n'
             text += ' ! class="unsortable" | Článek !! Údaj !! Úvod'
             text += ' !! Kategorie !! Infobox !! Wikidata\n'
             for entry in self.data['person']:
@@ -635,6 +638,12 @@ class DatesBot(SingleSiteBot):
         cats = self.get_dates_from_categories(page)
         wd = self.get_dates_from_wd(page)
 
+        # deal with false claims
+        if intro[1] \
+           and not any(bool(p[1]) for p in [infobox, cats, wd]) \
+           and 'Žijící lidé' in (cat.title(with_ns=False) for cat in categories):
+            intro = (intro[0], None)
+
         return intro, infobox, cats, wd
 
     def treat_person(self, page: pywikibot.Page) -> None:
@@ -787,13 +796,7 @@ class DatesBot(SingleSiteBot):
                 continue
 
             rest = removeprefix(title, prefixes[1])
-            if rest == title:
-                continue
-
-            if rest.isdigit():  # b/c
-                years.add(int(rest))
-                matched.append(cat)
-            else:
+            if rest != title:
                 dm = get_day_month_from_text(rest, needs_day=True)
                 if dm:
                     dms.add(dm)
@@ -801,6 +804,7 @@ class DatesBot(SingleSiteBot):
 
         out = get_all_dates(years, dms)
         if len(out) > 1:
+            matched.sort()
             # hack
             fragment = ''.join(cat.title(as_link=True) for cat in matched)
             self.report_fragment(fragment, page)
