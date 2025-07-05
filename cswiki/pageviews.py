@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 
 import pywikibot
 import requests
-from pywikibot.backports import removeprefix, removesuffix
+from pywikibot.backports import removeprefix
 from pywikibot.comms.http import user_agent
 from pywikibot.pagegenerators import PreloadingGenerator
 
@@ -15,7 +15,7 @@ pywikibot.handle_args()
 site = pywikibot.Site()
 
 headers = {'User-Agent': user_agent()}
-hostname = removesuffix(site.hostname(), '.org')
+hostname = site.hostname()
 prefix = 'https://wikimedia.org/api/rest_v1/metrics/pageviews'
 pattern = f'{prefix}/top/{hostname}/all-access/%Y/%m/%d'
 
@@ -40,10 +40,21 @@ weights = [pow(gamma, i) for i in range(days)]
 
 today = date.today()
 this = today - timedelta(days=1)
+first = today - timedelta(days=days)
 min_per_day = []
 
 check_categories.add(f'Úmrtí v roce {this.year}')
 check_categories.add(f'Úmrtí v roce {this.year - 1}')
+
+aggregate_url = '{}/aggregate/{}/all-access/user/daily/{}/{}'.format(
+    prefix,
+    hostname,
+    first.strftime('%Y%m%d'),
+    this.strftime('%Y%m%d')
+)
+resp = requests.get(aggregate_url, headers=headers)
+data = resp.json()
+daily = [entry['views'] for entry in data['items']]
 
 index = defaultdict(lambda: [None] * days)
 for diff in range(days):
@@ -117,8 +128,6 @@ while True:
 
 done_heap.sort(reverse=True)
 
-first = today - timedelta(days=days)
-
 lines = []
 lines.append(
     f"Nejčtenější stránky za období {first.day}. {first.month}. {first.year}"
@@ -128,12 +137,27 @@ lines.append('')
 lines.append('{| class="wikitable sortable"')
 lines.append('! Pořadí')
 lines.append('! Stránka')
-lines.append('! Celkový počet návštěv')
-lines.append('! Vážený počet návštěv')
+lines.append('! Celkový<br>počet návštěv')
+lines.append('! Vážený<br>počet návštěv')
 lines.append('! Koeficient')
 lines.append('! Problémy')
 lines.append('! Příznaky')
 lines.append('! class="unsortable" | Graf')
+
+aggregate = sum(daily)
+weighted = sum(v * w for v, w in zip(daily, weights))
+coef = weighted / aggregate
+
+lines.append('|-')
+lines.append('|')
+lines.append("| ''vše''")
+lines.append(f'| {aggregate}')
+lines.append(f'| {weighted:.0f}')
+lines.append('| %s' % f'{coef:.3f}'.replace('.', ',', 1))
+lines.append(f'|')
+lines.append(f'|')
+lines.append(f"| [https://pageviews.wmcloud.org/siteviews/?sites={hostname}"
+                 f"&agent=user&range=latest-20]")
 
 gen = (pywikibot.Page(site, title) for _, title, _ in done_heap)
 for rank, (page, (total, title, values)) in enumerate(zip(
@@ -171,7 +195,7 @@ for rank, (page, (total, title, values)) in enumerate(zip(
     else:
         lines.append('|')
 
-    lines.append(f"| [https://pageviews.wmcloud.org/pageviews/?project={site.hostname()}"
+    lines.append(f"| [https://pageviews.wmcloud.org/pageviews/?project={hostname}"
                  f"&agent=user&range=latest-20&pages={title}]")
 
 lines.append('|}')
