@@ -23,7 +23,7 @@ class DuplicateDatesBot(WikidataEntityBot):
 
     def __init__(self, generator, **kwargs):
         self.available_options.update({
-            'limit': 1000,
+            'days': 30,
             'props': ['P569', 'P570', 'P2031', 'P2032'],
         })
         super().__init__(**kwargs)
@@ -34,7 +34,7 @@ class DuplicateDatesBot(WikidataEntityBot):
         for prop in self.opt['props']:
             for key in ('duplicate_dates', 'unmerged_dates'):
                 query = self.store.build_query(
-                    key, prop=prop, limit=self.opt['limit'])
+                    key, prop=prop, days=self.opt['days'])
                 yield from WikidataSPARQLPageGenerator(query, site=self.repo)
 
     @property

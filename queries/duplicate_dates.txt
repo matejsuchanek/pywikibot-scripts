@@ -1,14 +1,20 @@
 SELECT DISTINCT ?item {
+  ?item schema:dateModified ?dateModified . hint:Prior hint:rangeSafe true .
+  FILTER( ?dateModified > ( NOW() - %(days)d ) ) .
   ?item p:%(prop)s ?statement1, ?statement2 FILTER( ?statement2 != ?statement1 ) .
   VALUES (?prec1 ?prec2) {
     (9 10) (9 11)
   } .
-  ?statement1 psv:%(prop)s [ wikibase:timeValue ?val1; wikibase:timePrecision ?prec1 ] .
+  ?statement1 psv:%(prop)s ?node1 .
+  ?node1 wikibase:timeValue ?val1 . hint:Prior hint:rangeSafe true .
+  ?node1 wikibase:timePrecision ?prec1 .
   ?statement1 wikibase:rank ?rank1 .
-  ?statement2 psv:%(prop)s [ wikibase:timeValue ?val2; wikibase:timePrecision ?prec2 ] .
+  ?statement2 psv:%(prop)s ?node2 .
+  ?node2 wikibase:timeValue ?val2 . hint:Prior hint:rangeSafe true .
+  ?node2 wikibase:timePrecision ?prec2 .
   ?statement2 wikibase:rank ?rank2 .
   FILTER( YEAR( ?val1 ) = YEAR( ?val2 ) ) .
   FILTER( ?rank1 = ?rank2 || ?rank2 = wikibase:NormalRank ) .
   MINUS { ?statement1 prov:wasDerivedFrom/!(pr:P143|pr:P813|pr:P4656) [] } .
   ?statement2 prov:wasDerivedFrom/!(pr:P143|pr:P813|pr:P4656) [] .
-} LIMIT %(limit)d
+}
