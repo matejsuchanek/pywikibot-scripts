@@ -4,7 +4,7 @@ import pywikibot
 
 from pywikibot import Claim, html2unicode, SiteLink, WbMonolingualText
 from pywikibot.backports import removesuffix
-from pywikibot.tools import first_lower
+from pywikibot.tools import first_lower, first_upper
 from pywikibot.tools.chars import INVISIBLE_REGEX as invisible_regex
 
 
@@ -375,15 +375,23 @@ class WikidataCleanupToolkit:
                 continue
 
             default = wrapper.get_label('mul')
-            if title == default:
-                # cf. Wikidata (Q2013)
-                labels.pop(lang, None)
-                skip.add(lang)
-                continue
-            if default and title.startswith((f'{default} (', f'{default},')):
-                labels.pop(lang, None)
-                skip.add(lang)
-                continue
+            if default:
+                default_uc = first_upper(default)
+                default_lc = first_lower(default)
+                if title in (default_uc, default_lc):
+                    # cf. Wikidata (Q2013), iPhone (Q2766)
+                    labels.pop(lang, None)
+                    skip.add(lang)
+                    continue
+                if title.startswith((
+                    f'{default_uc} (',
+                    f'{default_lc} (',
+                    f'{default_uc},',
+                    f'{default_lc},',
+                )):
+                    labels.pop(lang, None)
+                    skip.add(lang)
+                    continue
 
             labels[lang] = title
             # TODO: if 'mul' exists and we add a new label in lang XY,
