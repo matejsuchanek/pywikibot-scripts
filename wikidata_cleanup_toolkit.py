@@ -387,6 +387,14 @@ class WikidataCleanupToolkit:
                     labels.pop(lang, None)
                     skip.add(lang)
                     continue
+                if first_lower(title) in map(
+                    first_lower,
+                    wrapper.get_aliases('mul') + wrapper.get_aliases(lang)
+                ):
+                    # cf. Q131906486
+                    labels.pop(lang, None)
+                    skip.add(lang)
+                    continue
                 if title.startswith((
                     f'{default_uc} (',
                     f'{default_lc} (',
