@@ -4,6 +4,7 @@ import pywikibot
 
 from pywikibot import Claim, html2unicode, SiteLink, WbMonolingualText
 from pywikibot.backports import removesuffix
+from pywikibot.exceptions import UnknownSiteError
 from pywikibot.tools import first_lower, first_upper
 from pywikibot.tools.chars import INVISIBLE_REGEX as invisible_regex
 
@@ -339,7 +340,10 @@ class WikidataCleanupToolkit:
                 continue
 
             # try to defer this as much as possible
-            link = wrapper.get_sitelink(dbname)
+            try:
+                link = wrapper.get_sitelink(dbname)
+            except UnknownSiteError:
+                continue
             title = link.canonical_title()
 
             # todo: check if this is still needed
