@@ -1,6 +1,6 @@
 SELECT DISTINCT ?item {
   ?item schema:dateModified ?dateModified . hint:Prior hint:rangeSafe true .
-  FILTER( ?dateModified > ( NOW() - %(days)d ) ) .
+  FILTER( ?dateModified > "%(date)s"^^xsd:dateTime ) .
   ?item p:%(prop)s ?statement1, ?statement2 FILTER( ?statement2 != ?statement1 ) .
   VALUES (?prec1 ?prec2) {
     (9 10) (9 11)

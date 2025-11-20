@@ -1,6 +1,6 @@
 SELECT DISTINCT ?item WHERE {
   ?item schema:dateModified ?dateModified . hint:Prior hint:rangeSafe true .
-  FILTER( ?dateModified > ( NOW() - %(days)d ) ) .
+  FILTER( ?dateModified > "%(date)s"^^xsd:dateTime ) .
   ?item p:%(prop)s ?statement1, ?statement2 .
   FILTER( ?statement1 != ?statement2 ) .
   FILTER( STR( ?statement1 ) < STR( ?statement2 ) ) .
@@ -11,5 +11,5 @@ SELECT DISTINCT ?item WHERE {
   ?statement2 psv:%(prop)s ?node2 .
   ?node2 wikibase:timeValue ?val2 . hint:Prior hint:rangeSafe true .
   ?node2 wikibase:timePrecision ?prec2 .
-  FILTER( ?val1 = ?val2 ).
+  FILTER( ?val1 = ?val2 ) .
 }

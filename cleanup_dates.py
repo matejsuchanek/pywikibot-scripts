@@ -1,5 +1,6 @@
 #!/usr/bin/python
 from contextlib import suppress
+from datetime import datetime, timedelta
 from itertools import chain, combinations
 
 import pywikibot
@@ -33,8 +34,9 @@ class DuplicateDatesBot(WikidataEntityBot):
     def custom_generator(self):
         for prop in self.opt['props']:
             for key in ('duplicate_dates', 'unmerged_dates'):
+                time = datetime.now() - timedelta(days=self.opt['days'])
                 query = self.store.build_query(
-                    key, prop=prop, days=self.opt['days'])
+                    key, prop=prop, date=time.isoformat(timespec='seconds'))
                 yield from WikidataSPARQLPageGenerator(query, site=self.repo)
 
     @property
