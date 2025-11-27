@@ -2,6 +2,7 @@ import json
 import re
 from datetime import datetime
 
+import mwparserfromhell as parser
 import pywikibot
 import pywikibot.pagegenerators as pg
 from pywikibot.exceptions import NoWikibaseEntityError
@@ -42,6 +43,18 @@ def get_revision_wrapper(item, rev_id: int):
                 raise
         else:
             return rev
+
+
+def get_best_statements(statements):
+    best = []
+    best_rank = 'normal'
+    for st in statements:
+        if st.rank == best_rank:
+            best.append(st)
+        elif st.rank == 'preferred':
+            best[:] = [st]
+            best_rank = st.rank
+    return best
 
 
 def is_different(old, new):
@@ -87,6 +100,7 @@ editions = {
     '2022.1': '20220101',
     '2022.2': '20221209',
     '2023.1': '20231211',
+    '2025.2': '20251010',
 }
 stat_to_label = {
     'Q719675': 'téměř ohrožený',
@@ -136,7 +150,8 @@ gen = pg.PreloadingEntityGenerator(
 )
 
 for item in gen:
-    if not item.claims.get('P141'):
+    best = get_best_statements(item.claims.get('P141', []))
+    if not best:
         continue
 
     ts_to_status = {}
@@ -156,8 +171,9 @@ for item in gen:
             continue
 
         this = get_revision_wrapper(item, rev.revid)
-        if this.claims.get('P141'):
-            new = this.claims['P141'][0].getTarget()
+        claims = get_best_statements(this.claims.get('P141', []))
+        if claims:
+            new = claims[0].getTarget()
             if cur is None or is_different(cur, new):
                 key = rev.timestamp.strftime('%Y%m%d%H%M%S')
                 ts_to_status[key] = new.getID()
@@ -168,7 +184,7 @@ for item in gen:
 
     last_change = max(ts_to_status)
 
-    new = item.claims['P141'][0].getTarget()
+    new = best[0].getTarget()
     if cur is None or is_different(cur, new):
         key = item.latest_revision.timestamp.strftime('%Y%m%d%H%M%S')
         ts_to_status[key] = new.getID()
@@ -237,10 +253,19 @@ for item in gen:
 lines.append('|}')
 lines.append('</div>')
 
+new_text = '\n'.join(lines)
+
 site.login()
 
 output_page = pywikibot.Page(site, 'Wikipedie:WikiProjekt_Biologie/Status_ohrožení/vše')
-output_page.text = '\n'.join(lines)
+code = parser.parse(output_page.text)
+for old in code.ifilter_tags(matches='div'):
+    code.replace(old, new_text)
+    output_page.text = str(code)
+    break
+else:
+    output_page.text = new_text
+
 output_page.save(
     summary='tabulka', apply_cosmetic_changes=False, bot=False, minor=False
 )
