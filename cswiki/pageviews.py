@@ -6,7 +6,6 @@ from datetime import date, datetime, timedelta
 
 import pywikibot
 import requests
-from pywikibot.backports import removeprefix
 from pywikibot.comms.http import user_agent
 from pywikibot.pagegenerators import PreloadingGenerator
 
@@ -157,7 +156,7 @@ lines.append('| %s' % f'{coef:.3f}'.replace('.', ',', 1))
 lines.append(f'|')
 lines.append(f'|')
 lines.append(f"| [https://pageviews.wmcloud.org/siteviews/?sites={hostname}"
-                 f"&agent=user&range=latest-20]")
+                 f"&agent=user&range=latest-20 <nowiki>[0]</nowiki>]")
 
 gen = (pywikibot.Page(site, title) for _, title, _ in done_heap)
 for rank, (page, (total, title, values)) in enumerate(zip(
@@ -190,7 +189,7 @@ for rank, (page, (total, title, values)) in enumerate(zip(
 
     if show_categories:
         lines.append('| ' + ('<br>'.join(
-            f"[[:Kategorie:{c}|{removeprefix(c, 'Wikipedie:')}]]"
+            f"[[:Kategorie:{c}|{c.removeprefix('Wikipedie:')}]]"
             for c in sorted(show_categories))))
     else:
         lines.append('|')

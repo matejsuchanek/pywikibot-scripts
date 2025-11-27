@@ -4,7 +4,6 @@ import re
 import pywikibot
 
 from pywikibot import pagegenerators, textlib
-from pywikibot.backports import removesuffix
 from pywikibot.tools import first_upper
 from pywikibot.textlib import mwparserfromhell
 
@@ -92,7 +91,7 @@ class TitlesMovingBot(WikitextFixingBot):
         index = new_param.find(first)
         if index > 0:
             before = new_param[:index].strip()
-            before = removesuffix(before, '&nbsp;')
+            before = before.removesuffix('&nbsp;')
             if before.endswith('.') or before.endswith(']]'):
                 new_param = new_param[index:]
             else:

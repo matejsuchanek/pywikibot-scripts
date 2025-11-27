@@ -4,7 +4,6 @@ from contextlib import suppress
 import pywikibot
 
 from pywikibot import pagegenerators
-from pywikibot.backports import removeprefix
 
 from query_store import QueryStore
 from wikidata import WikidataEntityBot
@@ -148,7 +147,7 @@ class FakeReferencesBot(WikidataEntityBot):
             target = None
             with suppress(pywikibot.InvalidTitle, ValueError):
                 for prefix in [self.url_start, self.repo.concept_base_uri]:
-                    target_id = removeprefix(url, prefix)
+                    target_id = url.removeprefix(prefix)
                     if target_id != url:
                         target = pywikibot.ItemPage(self.repo, target_id)
                         break

@@ -3,7 +3,6 @@ from itertools import chain
 import pywikibot
 
 from pywikibot import Claim, html2unicode, SiteLink, WbMonolingualText
-from pywikibot.backports import removesuffix
 from pywikibot.exceptions import UnknownSiteError
 from pywikibot.tools import first_lower, first_upper
 from pywikibot.tools.chars import INVISIBLE_REGEX as invisible_regex
@@ -111,7 +110,9 @@ class SubmitDataWrapper(EntityDataWrapper):
                 yield lang
 
     def get_aliases(self, lang: str):
-        raise NotImplementedError()  # TODO
+        if lang in self.data.get('aliases', {}):
+            raise NotImplementedError()  # TODO
+        return super().get_aliases(lang)
 
     def add_alias(self, lang: str, value: str):
         raise NotImplementedError()  # TODO
@@ -364,7 +365,8 @@ class WikidataCleanupToolkit:
                 continue
             # [[d:Topic:Vrel33kwnco2xp55]]
             if dbname.endswith('wikisource') \
-               and link.namespace == link.site.namespaces.lookup_name('Author'):
+               and link.namespace == link.site.namespaces.lookup_name('Author') \
+               and '/' not in title:
                 title = title.partition(':')[2]
             # [[d:Topic:Uhdjlv9aae6iijuc]]
             # todo: create a lib for this
@@ -475,7 +477,7 @@ class WikidataCleanupToolkit:
             if label in in_claims:
                 continue
 
-            left, sep, right = removesuffix(label, ')').rpartition(' (')
+            left, sep, right = label.removesuffix(')').rpartition(' (')
             #if not sep:
             #    left, sep, right = label.partition(', ')
             if sep and right and not (set(left) & set('(:)')):
@@ -495,7 +497,7 @@ class WikidataCleanupToolkit:
             if label in in_claims:
                 continue
 
-            left, sep, right = removesuffix(label, ')').rpartition(' (')
+            left, sep, right = label.removesuffix(')').rpartition(' (')
             if sep and right and not (set(left) & set('(:)')):
                 if left not in will_strip:
                     with_ = without = 0

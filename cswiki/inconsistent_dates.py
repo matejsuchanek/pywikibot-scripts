@@ -2,25 +2,16 @@
 import json
 import re
 
-from collections import deque
+from collections import deque, OrderedDict
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import IntEnum
-from functools import lru_cache
+from functools import cache, lru_cache
 from typing import Any, Optional
 
 import pywikibot
 
 from pywikibot import textlib, WbTime
-from pywikibot.backports import (
-    cache,
-    removeprefix,
-    Callable,
-    Dict,
-    Iterable,
-    Match,
-    OrderedDict,
-    Pattern,
-)
 from pywikibot.bot import SingleSiteBot
 from pywikibot.pagegenerators import (
     GeneratorFactory,
@@ -104,7 +95,7 @@ class Date:
 DatesPair = tuple[Optional[set[Date]], Optional[set[Date]]]
 
 
-def split_if_matches(regex: Pattern, text: str) -> tuple[Match, str]:
+def split_if_matches(regex: re.Pattern, text: str) -> tuple[re.Match, str]:
     match = regex.match(text)
     if match:
         return match, text[match.end():]
@@ -176,7 +167,7 @@ def remove_templates(text: str) -> str:
     return text
 
 
-def get_last_match(regex: Pattern, text: str) -> Optional[Match]:
+def get_last_match(regex: re.Pattern, text: str) -> Optional[re.Match]:
     ret = None
     for match in regex.finditer(text):
         ret = match
@@ -249,7 +240,7 @@ for vals in months.values():
     trails = []
     for val in vals[1:]:
         if val.startswith(init):
-            trails.append(removeprefix(val, init))
+            trails.append(val.removeprefix(init))
     if trails:
         dm_tmp += fr'\[\[([123]?\d\.{space}{init})\]\]'
         dm_tmp += ('(?:' + ('|'.join(trails)) + ')') if len(trails) > 1 else trails[0]
@@ -465,7 +456,7 @@ class DatesBot(SingleSiteBot):
                        .format(json.dumps(entry, indent=4)))
 
     def treat_entry(self, source_page: pywikibot.Page, page: pywikibot.Page,
-                    entry: Dict[DateContext, set[Date]]) -> None:
+                    entry: dict[DateContext, set[Date]]) -> None:
         while page.isRedirectPage():
             page = page.getRedirectTarget()
         if '#' in page.title() or page.namespace() != 0:
@@ -659,7 +650,7 @@ class DatesBot(SingleSiteBot):
             ['comment', 'file', 'ref'],
             site=self.site)
 
-    def get_dates_from_match(self, match: Match, page: pywikibot.Page
+    def get_dates_from_match(self, match: re.Match, page: pywikibot.Page
                              ) -> set[Date]:
         years = set()
         rest = []
@@ -789,13 +780,13 @@ class DatesBot(SingleSiteBot):
         matched = []
         for cat in categories:
             title = cat.title(with_ns=False)
-            rest = removeprefix(title, prefixes[0])
+            rest = title.removeprefix(prefixes[0])
             if rest != title and rest.isdigit():
                 years.add(int(rest))
                 matched.append(cat)
                 continue
 
-            rest = removeprefix(title, prefixes[1])
+            rest = title.removeprefix(prefixes[1])
             if rest != title:
                 dm = get_day_month_from_text(rest, needs_day=True)
                 if dm:

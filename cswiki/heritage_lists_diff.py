@@ -131,4 +131,4 @@ text += '\n|}'
 
 out_page = pywikibot.Page(site, 'Matěj Suchánek/Reports/Souřadnice', ns=2)
 out_page.text = text
-out_page.save(summary='seznam', botflag=False)
+out_page.save(summary='seznam', bot=False, minor=False)
