@@ -355,6 +355,9 @@ class WikidataCleanupToolkit:
                 continue
             if title.startswith('Wikipédia:Candidatos a artigo/'):
                 continue
+            if link.namespace == 2 or link.namespace % 2 == 1:
+                pywikibot.info(f'Invalid link {link} found in {wrapper.entity}')
+                continue
             if dbname.endswith('wiktionary') and link.namespace == 0:
                 continue
             # [[d:Topic:Vw8cayiif34m2eem]]
