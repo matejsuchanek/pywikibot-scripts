@@ -1,6 +1,5 @@
 import heapq
 import json
-import os.path as osp
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
@@ -52,6 +51,7 @@ aggregate_url = '{}/aggregate/{}/all-access/user/daily/{}/{}'.format(
     this.strftime('%Y%m%d')
 )
 resp = requests.get(aggregate_url, headers=headers)
+    resp.raise_for_status()
 data = resp.json()
 daily = [entry['views'] for entry in data['items']]
 
@@ -59,6 +59,8 @@ index = defaultdict(lambda: [None] * days)
 for diff in range(days):
     the_day = this - timedelta(days=diff)
     resp = requests.get(the_day.strftime(pattern), headers=headers)
+    if not resp.ok:
+        resp.raise_for_status()
     data = resp.json()
 
     array = []
