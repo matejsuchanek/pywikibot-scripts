@@ -51,6 +51,7 @@ aggregate_url = '{}/aggregate/{}/all-access/user/daily/{}/{}'.format(
     this.strftime('%Y%m%d')
 )
 resp = requests.get(aggregate_url, headers=headers)
+if not resp.ok:
     resp.raise_for_status()
 data = resp.json()
 daily = [entry['views'] for entry in data['items']]
