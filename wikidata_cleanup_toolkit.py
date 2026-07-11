@@ -173,6 +173,7 @@ class WikidataCleanupToolkit:
         'zh-yue': 'yue',
 
         # multilingual projects
+        'abstract': None,
         'commons': None,
         'incubator': None,
         'mediawiki': None,
@@ -351,14 +352,12 @@ class WikidataCleanupToolkit:
             if ':' not in title and '/' in title:
                 continue
             # [[d:Topic:Vhs5f72i5obvkr3t]]
-            if title.startswith('Wikipedia:Artikelwerkstatt/'):
-                continue
-            if title.startswith('Wikipédia:Candidatos a artigo/'):
-                continue
-            if link.namespace == 2 or link.namespace % 2 == 1:
+            if title.startswith('Wikipedia:Artikelwerkstatt/') \
+               or title.startswith('Wikipedia:Redaktion Film und Fernsehen/Glashütte/') \
+               or title.startswith('Wikipédia:Candidatos a artigo/') \
+               or link.namespace == 2 or link.namespace % 2 == 1 \
+               or (dbname.endswith('wiktionary') and link.namespace == 0):
                 pywikibot.info(f'Invalid link {link} found in {wrapper.entity}')
-                continue
-            if dbname.endswith('wiktionary') and link.namespace == 0:
                 continue
             # [[d:Topic:Vw8cayiif34m2eem]]
             if dbname.endswith('wikinews') and link.namespace == 14:
